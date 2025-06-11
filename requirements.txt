@@ -1,25 +1,36 @@
-# Core GUI and System
-tkinter
-sqlite3
-
-# Document Processing
+# Core Dependencies
+tkinter-tooltip==2.0.0
 python-docx==0.8.11
-PyPDF2==3.0.1
-
-# Security and Encryption
+Pillow==10.0.1
+barcode[images]==1.4.0
 cryptography==41.0.7
-
-# AI/OpenAI Integration
-openai==1.3.7
-
-# Image Processing and Barcode Generation
-Pillow==10.1.0
-python-barcode[images]==0.15.1
-
-# System Utilities
+openai==1.3.0
 appdirs==1.4.4
 
-# Optional: For development and testing
-# pytest==7.4.3
-# black==23.11.0
-# flake8==6.1.0
+# Database
+# SQLite ist bereits in Python enthalten
+
+# PDF Processing
+PyPDF2==3.0.1
+
+# Development Dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.5.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
+
+# Build & Packaging
+pyinstaller==6.2.0
+setuptools==69.0.0
+wheel==0.42.0
+
+# Type Hints
+types-Pillow==10.1.0.2
+types-requests==2.31.0.10
