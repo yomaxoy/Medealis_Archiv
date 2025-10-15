@@ -1,0 +1,1066 @@
+"""
+Data Confirmation Popup - Step 1
+First step of the two-step workflow: Data validation only
+Based on splitting the original data_confirmation_popup.py
+"""
+
+import streamlit as st
+import os
+from datetime import datetime
+from pathlib import Path
+import logging
+
+# NEW: Import centralized services via ServiceRegistry
+try:
+    from warehouse.application.services.service_registry import (
+        get_document_storage_service,
+        get_item_service,
+        get_data_integration_service
+    )
+    from warehouse.application.services.document_generation import DocumentGenerationService
+    CENTRALIZED_SERVICES_AVAILABLE = True
+    logging.info(f"🔥 DEBUG: CENTRALIZED_SERVICES_AVAILABLE = {CENTRALIZED_SERVICES_AVAILABLE}")
+except ImportError as e:
+    CENTRALIZED_SERVICES_AVAILABLE = False
+    get_document_storage_service = None
+    get_item_service = None
+    get_data_integration_service = None
+    DocumentGenerationService = None
+    logging.warning(f"🔥 DEBUG: Centralized services not available - using fallback. Error: {e}")
+
+logger = logging.getLogger(__name__)
+
+
+@st.dialog("📋 Schritt 1: Daten bestätigen", width="large")
+def show_data_confirmation_step1_popup(item_data):
+    """Show Step 1: Data confirmation only - article, batch, quantity, storage location, order number."""
+    st.write("### 📋 Schritt 1: Lieferschein-Daten bestätigen")
+    st.write(f"**Artikel:** {item_data['article_number']} | **Charge:** {item_data['batch_number']}")
+
+    st.info("💡 **In diesem Schritt:** Bestätigen Sie die Artikeldaten und geben Sie den Lagerplatz ein. Nach der Bestätigung werden automatisch Begleitschein, Wareneingangskontrollschein und Label/Barcode erstellt.")
+
+    # === DATEN BESTÄTIGUNG ===
+    st.write("**🔍 Bitte bestätigen Sie die vom Lieferschein erfassten Daten:**")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        confirmed_article = st.text_input(
+            "Artikelnummer:",
+            value=item_data.get('article_number', ''),
+            key="popup_step1_article"
+        )
+        confirmed_batch = st.text_input(
+            "Chargennummer:",
+            value=item_data.get('batch_number', ''),
+            key="popup_step1_batch"
+        )
+
+    with col2:
+        # === DREI MENGENTYPEN ===
+        st.write("#### 📊 Mengen-Erfassung")
+
+        # 1. Bestellmenge (aus Bestellung, optional)
+        ordered_quantity_input = st.number_input(
+            "1️⃣ Bestellmenge (aus Bestellung):",
+            value=int(item_data.get('ordered_quantity', 0)) if item_data.get('ordered_quantity') else 0,
+            min_value=0,
+            key="popup_step1_ordered_qty",
+            help="Ursprünglich bestellte Menge beim Lieferanten"
+        )
+
+        # 2. Lieferscheinmenge (vom OCR, automatisch befüllt)
+        delivery_slip_quantity_input = st.number_input(
+            "2️⃣ Lieferscheinmenge (vom OCR):",
+            value=int(item_data.get('delivery_slip_quantity', 0)) if item_data.get('delivery_slip_quantity') else int(item_data.get('quantity', 0)) if item_data.get('quantity') else 0,
+            min_value=0,
+            key="popup_step1_slip_qty",
+            help="Auf dem Lieferschein angegebene Menge (OCR-extrahiert)"
+        )
+
+        # 3. Liefermenge (manuell gezählt, WICHTIG!) - aus DB laden wenn vorhanden
+        st.markdown("**3️⃣ Liefermenge (gezählt) ⚠️:**")
+        st.markdown("*Bitte zählen Sie die Ware manuell und geben Sie die tatsächliche Menge ein!*")
+
+        # FIXED: Load delivered_quantity from DB if available
+        existing_delivered_qty = item_data.get('delivered_quantity')
+        default_delivered_value = str(existing_delivered_qty) if existing_delivered_qty not in [None, 0] else ""
+
+        delivered_quantity_str = st.text_input(
+            "Gezählte Menge:",
+            value=default_delivered_value,  # FIXED: Show existing value from DB or empty
+            key="popup_step1_delivered_qty",
+            placeholder="Bitte Ware zählen und Menge eingeben...",
+            help="Tatsächlich physisch gelieferte Menge - BITTE MANUELL ZÄHLEN!"
+        )
+
+        # Validierung und Konvertierung
+        delivered_quantity_input = None
+        if delivered_quantity_str.strip():
+            try:
+                delivered_quantity_input = int(delivered_quantity_str)
+                if delivered_quantity_input < 0:
+                    st.error("❌ Menge kann nicht negativ sein!")
+                    delivered_quantity_input = None
+            except ValueError:
+                st.error("❌ Bitte geben Sie eine gültige Zahl ein!")
+                delivered_quantity_input = None
+
+    # === ABWEICHUNGS-WARNUNGEN ===
+    # Nur anzeigen wenn Liefermenge eingegeben wurde
+    if delivered_quantity_input is not None:
+        if delivery_slip_quantity_input != delivered_quantity_input:
+            diff = delivered_quantity_input - delivery_slip_quantity_input
+            st.warning(f"⚠️ **Abweichung Lieferschein:** {diff:+d} (Geliefert: {delivered_quantity_input}, Lieferschein: {delivery_slip_quantity_input})")
+
+        if ordered_quantity_input > 0 and ordered_quantity_input != delivered_quantity_input:
+            diff = delivered_quantity_input - ordered_quantity_input
+            st.warning(f"⚠️ **Abweichung Bestellung:** {diff:+d} (Geliefert: {delivered_quantity_input}, Bestellt: {ordered_quantity_input})")
+    else:
+        st.info("💡 **Hinweis:** Bitte zählen Sie die Ware und geben Sie die tatsächliche Liefermenge ein.")
+
+    # === STORAGE LOCATION ===
+    st.write("### 📦 Lagerplatz")
+
+    # Load storage location from database_integration like Article view does
+    try:
+        from warehouse.application.services.data_integration_service import data_integration_service
+        existing_storage = data_integration_service.get_storage_location_from_article(confirmed_article or item_data.get('article_number', ''))
+    except Exception:
+        existing_storage = item_data.get('storage_location', '')
+
+    confirmed_storage_location = st.text_input(
+        "Lagerplatznummer:",
+        value=existing_storage or '',
+        key="popup_step1_storage",
+        help="Lagerplatz für diesen Artikel"
+    )
+
+    st.write("---")
+
+    # === ORDER INFORMATION ===
+    st.write("### 📋 Bestellung")
+
+    col_order1, col_order2 = st.columns([2, 1])
+    with col_order1:
+        # Order ID input field - check multiple possible keys for order number from extraction
+        extracted_order_number = (
+            item_data.get('order_number', '') or
+            item_data.get('bestellnummer', '') or
+            item_data.get('purchase_order', '') or
+            item_data.get('po_number', '') or
+            item_data.get('order_nr', '') or
+            item_data.get('bestell_nr', '') or
+            item_data.get('bestellung', '') or
+            item_data.get('purchase_order_number', '') or
+            ''
+        )
+        order_number = st.text_input(
+            "Bestellnummer:",
+            value=extracted_order_number,
+            key="popup_step1_order",
+            help="Bestellnummer aus dem Lieferschein"
+        )
+
+    with col_order2:
+        # Order document upload info
+        st.write("📁 **Bestelldokument hochladen:**")
+
+    # File uploader for order document (always visible)
+        uploaded_order_doc = st.file_uploader(
+            "Bestelldokument auswählen:",
+            type=['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
+            key="popup_step1_order_doc_upload",
+            help="Bestelldokument wird in den Artikelordner gespeichert"
+        )
+
+        if uploaded_order_doc:
+            # Show uploaded document info
+            st.success(f"📄 Bestelldokument '{uploaded_order_doc.name}' hochgeladen")
+            st.write(f"📊 Dateigröße: {uploaded_order_doc.size} bytes")
+            st.write(f"📋 Dateityp: {uploaded_order_doc.type}")
+
+            # Action button for the uploaded document
+            if st.button("🤖 KI-Analyse & Speichern", key="ai_analyze_order_doc_btn", use_container_width=True, type="primary"):
+                try:
+                    # Import unified document processing service
+                    from warehouse.application.services.document_processing import process_document
+
+                    st.info("🤖 Starte KI-Analyse des Bestelldokuments...")
+
+                    # NEW: STEP 1: Save document using new storage service
+                    try:
+                        if CENTRALIZED_SERVICES_AVAILABLE:
+                            storage_service = get_document_storage_service()
+
+                            # Create safe filename for temporary storage
+                            safe_order_number = order_number if order_number and order_number.strip() else "UNBEKANNT"
+                            order_doc_filename = f"Bestellung_{safe_order_number}_{uploaded_order_doc.name}"
+
+                            # Save document using new storage service
+                            temp_result = storage_service.save_document(
+                                document_data=uploaded_order_doc.getbuffer(),
+                                document_name=order_doc_filename,
+                                document_type="order",
+                                batch_number=confirmed_batch or item_data.get('batch_number', ''),
+                                delivery_number=item_data.get('delivery_number', ''),
+                                article_number=confirmed_article or item_data.get('article_number', ''),
+                                supplier_name="",  # Will be filled later
+                                is_temporary=True  # Mark as temporary
+                            )
+
+                            if temp_result.success:
+                                st.info(f"📝 Bestelldokument mit neuem Storage Service gespeichert: {temp_result.file_path}")
+
+                                # Store result in session state
+                                st.session_state.temp_order_document_path = temp_result.file_path
+                                st.session_state.temp_order_document_filename = order_doc_filename
+                                st.session_state.temp_order_storage_folder = temp_result.storage_folder
+                            else:
+                                st.warning(f"⚠️ Storage Service Fehler: {temp_result.error}")
+                                raise Exception(f"Storage Service failed: {temp_result.error}")
+                        else:
+                            raise ImportError("Centralized services not available")
+
+                    except Exception as storage_error:
+                        # FALLBACK: Use old path_manager method
+                        st.warning(f"⚠️ Fallback zu altem System: {storage_error}")
+                        from warehouse.application.services import determine_manufacturer
+                        import tempfile
+
+                        # Initialize storage service
+                        storage_service = get_document_storage_service()
+
+                        safe_order_number = order_number if order_number and order_number.strip() else "UNBEKANNT"
+                        order_doc_filename = f"Bestellung_{safe_order_number}_{uploaded_order_doc.name}"
+                        temp_order_path = storage_service.get_temp_path(order_doc_filename)
+
+                        with open(temp_order_path, 'wb') as f:
+                            f.write(uploaded_order_doc.getbuffer())
+
+                        st.info(f"📝 Bestelldokument temporär gespeichert - wird nach Datenbestätigung in den korrekten Artikelordner verschoben")
+
+                        st.session_state.temp_order_document_path = temp_order_path
+                        st.session_state.temp_order_document_filename = order_doc_filename
+
+                    # STEP 2: Run AI Analysis
+                    # Get current data for validation
+                    current_article = st.session_state.get("popup_step1_article", item_data.get('article_number', ''))
+                    current_order = order_number.strip() if order_number else ""
+
+                    # Run AI analysis with unified service
+                    # Read uploaded file data
+                    uploaded_order_doc.seek(0)  # Reset file pointer
+                    document_data = uploaded_order_doc.read()
+
+                    # Create context for order document processing
+                    context = {
+                        "expected_order_number": current_order,
+                        "expected_article_number": current_article
+                    }
+
+                    # Process as order document
+                    order_result = process_document(
+                        document_data=document_data,
+                        document_type="order",
+                        **context
+                    )
+
+                    # Convert unified service result to expected GUI format
+                    if order_result and not order_result.get("error"):
+                        validation_status = order_result.get("validation_status", {})
+                        articles = order_result.get("articles", [])
+
+                        # Find matching article for validation
+                        article_found = False
+                        article_quantity = 0
+                        article_details = None
+
+                        for article in articles:
+                            article_number = article.get("article_number", "").strip()
+                            if (article_number.lower() == current_article.lower() or
+                                article_number in current_article or
+                                current_article in article_number):
+                                article_found = True
+                                article_quantity = article.get("quantity", 0)
+                                article_details = article
+                                break
+
+                        # Check order number match
+                        extracted_order = order_result.get("order_number", "").strip()
+                        order_number_match = (
+                            extracted_order.lower() == current_order.lower() or
+                            extracted_order in current_order or
+                            current_order in extracted_order
+                        ) if current_order and extracted_order else False
+
+                        analysis_result = {
+                            "success": True,
+                            "extracted_data": order_result,  # Full order data
+                            "validation_results": {
+                                "order_number_match": order_number_match,
+                                "article_found": article_found,
+                                "article_quantity": article_quantity,
+                                "article_details": article_details,
+                                "all_articles": articles
+                            }
+                        }
+                    else:
+                        analysis_result = {
+                            "success": False,
+                            "error": order_result.get("error", "Processing failed") if order_result else "No result"
+                        }
+
+                    if analysis_result['success']:
+                        extracted_data = analysis_result['extracted_data']
+                        validation_results = analysis_result['validation_results']
+
+                        st.success("✅ KI-Analyse erfolgreich! Daten werden automatisch gespeichert...")
+
+                        # Show extracted order information
+                        st.write("### 📋 Extrahierte Bestelldaten:")
+                        col_ai1, col_ai2 = st.columns(2)
+
+                        with col_ai1:
+                            st.write(f"**Bestellnummer:** {extracted_data.get('order_number', 'Nicht gefunden')}")
+                            st.write(f"**Bestelldatum:** {extracted_data.get('order_date', 'Nicht gefunden')}")
+                            st.write(f"**Lieferant:** {extracted_data.get('supplier', 'Nicht gefunden')}")
+
+                        with col_ai2:
+                            if validation_results['order_number_match']:
+                                st.success("✅ Bestellnummer stimmt überein")
+                            else:
+                                st.warning("⚠️ Bestellnummer stimmt nicht überein")
+
+                                if validation_results['article_found']:
+                                    st.success(f"✅ Artikel gefunden (Menge: {validation_results['article_quantity']})")
+                                else:
+                                    st.warning("⚠️ Artikel nicht in Bestellung gefunden")
+
+                            # Show only the matching article (not all articles)
+                            if validation_results['article_found'] and validation_results['article_details']:
+                                matching_article = validation_results['article_details']
+                                st.write("### 📦 Gefundener Artikel:")
+
+                                # Display matching article details in a cleaner format
+                                st.success(f"✅ **{matching_article.get('article_number')}** - {matching_article.get('description', 'N/A')}")
+
+                                col_art1, col_art2 = st.columns(2)
+                                with col_art1:
+                                    st.metric("Bestellmenge", f"{matching_article.get('quantity', 0)} {matching_article.get('unit', 'Stück')}")
+                                with col_art2:
+                                    st.metric("Artikelnummer", matching_article.get('article_number', 'N/A'))
+
+                                # Automatic save for order quantity (always for the matching article)
+                                article = matching_article  # Use matching article instead of iterating
+
+                                # Check if this order data hasn't been saved yet
+                                save_key = f"order_data_saved_{current_article}_{extracted_data.get('order_number', '')}"
+
+                                if save_key not in st.session_state:
+                                    # Show automatic save notification
+                                    st.info("🤖 **Automatisches Speichern**: Bestellnummer und Artikelnummer stimmen überein - Daten werden automatisch gespeichert...")
+
+                                    # Automatically save order data when article and order number match
+                                    # Save order data to database
+                                    from warehouse.application.services.document_processing import save_order_data_to_database
+                                    save_result = save_order_data_to_database(
+                                        article_number=current_article,
+                                        order_quantity=article.get('quantity', 0),
+                                        order_number=extracted_data.get('order_number', ''),
+                                        order_date=extracted_data.get('order_date', '')
+                                    )
+
+                                    # Mark as saved to prevent duplicate saves
+                                    st.session_state[save_key] = True
+
+                                    # Store save result for display
+                                    st.session_state[f"save_result_{save_key}"] = save_result
+
+
+                                # Display save result (from automatic save)
+                                if f"save_result_{save_key}" in st.session_state:
+                                    save_result = st.session_state[f"save_result_{save_key}"]
+
+                                    if save_result['success']:
+                                        st.success("✅ **Bestelldaten erfolgreich gespeichert!**")
+
+                                        # Detailed success information
+                                        success_details = []
+
+                                        # Validation results
+                                        if validation_results.get('order_number_match'):
+                                            success_details.append(f"🔗 **Bestellnummer bestätigt**: {extracted_data.get('order_number', 'N/A')}")
+                                        if validation_results.get('article_found'):
+                                            success_details.append(f"📦 **Artikel bestätigt**: {current_article}")
+
+                                        # Database save results
+                                        if save_result['item_updated']:
+                                            qty = save_result['details'].get('item_quantity_saved', 0)
+                                            success_details.append(f"📊 **Bestellmenge gespeichert**: {qty} Stück (Item-Tabelle)")
+
+                                        if save_result['order_created_or_updated']:
+                                            action = save_result['details'].get('order_action', 'aktualisiert')
+                                            success_details.append(f"📋 **Bestellung {action}**: {extracted_data.get('order_number', 'N/A')}")
+
+                                            if 'order_date_saved' in save_result['details']:
+                                                date_saved = save_result['details']['order_date_saved']
+                                                success_details.append(f"📅 **Bestelldatum gespeichert**: {date_saved}")
+                                            elif 'order_date_updated' in save_result['details']:
+                                                date_updated = save_result['details']['order_date_updated']
+                                                success_details.append(f"📅 **Bestelldatum aktualisiert**: {date_updated}")
+
+                                        # Display detailed success info
+                                        for detail in success_details:
+                                            st.write(detail)
+
+                                        st.info("💡 **Bereit für Dokumenterstellung**: Die Platzhalter in Dokumenten werden jetzt mit den gespeicherten Bestelldaten gefüllt.")
+
+                                    else:
+                                        st.error("❌ **Fehler beim Speichern der Bestelldaten!**")
+                                        for error in save_result['errors']:
+                                            st.error(f"• {error}")
+
+                                        # Show partial success if any
+                                        if save_result['item_updated']:
+                                            st.warning("⚠️ Bestellmenge wurde in Item-Tabelle gespeichert, aber Order-Tabelle konnte nicht aktualisiert werden.")
+
+                            else:
+                                # No matching article found - show all articles as fallback
+                                st.write("### 📦 Alle Artikel aus Bestellung:")
+                                st.warning("⚠️ Passender Artikel nicht gefunden - alle extrahierten Artikel werden angezeigt")
+
+                                articles = extracted_data.get('articles', [])
+                                if articles:
+                                    for i, article in enumerate(articles):
+                                        with st.expander(f"Artikel {i+1}: {article.get('article_number', 'Unknown')}"):
+                                            st.write(f"**Artikelnummer:** {article.get('article_number', 'N/A')}")
+                                            st.write(f"**Beschreibung:** {article.get('description', 'N/A')}")
+                                            st.write(f"**Menge:** {article.get('quantity', 0)}")
+                                            st.write(f"**Einheit:** {article.get('unit', 'N/A')}")
+
+                            # Show warnings if any
+                            if validation_results.get('warnings'):
+                                st.write("### ⚠️ Hinweise:")
+                                for warning in validation_results['warnings']:
+                                    st.warning(warning)
+
+                    else:
+                        st.error(f"❌ KI-Analyse fehlgeschlagen: {analysis_result.get('error', 'Unbekannter Fehler')}")
+
+                except Exception as e:
+                    st.error(f"❌ Fehler bei KI-Analyse & Speichern: {e}")
+                    import traceback
+                    st.error(f"Debug: {traceback.format_exc()}")
+
+            if st.button("❌ Bestelldokument entfernen", key="remove_order_doc_btn", use_container_width=False):
+                if 'order_document_step1' in st.session_state:
+                    del st.session_state['order_document_step1']
+
+        # Show success message if document was saved (but no uploaded file currently)
+        if st.session_state.get('order_document_step1_saved', False) and not uploaded_order_doc:
+            st.success("✅ Bestelldokument wurde erfolgreich im Artikelordner gespeichert!")
+            if st.button("📁 Weiteres Dokument hochladen", key="upload_another_doc_btn"):
+                st.session_state.order_document_step1_saved = False
+
+    st.write("---")
+
+    # === ARTIKEL ORDNER ===
+    st.write("**📁 Artikel-Ordner zum Speichern der Dokumente:**")
+
+    # NEW: Use centralized storage service for path resolution
+    try:
+        folder_path = None
+        folder_warnings = []
+
+        if CENTRALIZED_SERVICES_AVAILABLE:
+            try:
+                storage_service = get_document_storage_service()
+
+                # Get document path using new storage service
+                folder_path, warnings = storage_service.get_document_path(
+                    batch_number=confirmed_batch or item_data.get('batch_number', ''),
+                    delivery_number=item_data.get('delivery_number', ''),
+                    article_number=confirmed_article or item_data.get('article_number', ''),
+                    supplier_name="",  # Will be auto-determined
+                    create_folders=True
+                )
+                folder_warnings.extend(warnings)
+
+                # Show storage service info
+                if folder_path:
+                    st.info(f"✨ **Neuer Storage Service**: Pfad automatisch ermittelt")
+
+                    # Get storage statistics
+                    try:
+                        stats = storage_service.get_storage_statistics()
+                        if stats.get('base_storage_exists'):
+                            st.caption(f"📁 Storage Base: {stats.get('base_storage_path', 'N/A')}")
+                    except Exception:
+                        pass
+
+            except Exception as storage_error:
+                logger.warning(f"Storage service failed: {storage_error}")
+                st.warning(f"⚠️ Storage Service Fehler: {storage_error}")
+                raise storage_error
+
+        if not folder_path:
+            # FALLBACK: Use old path_manager method
+            st.info("🔄 **Fallback**: Verwende altes Path Manager System")
+            from warehouse.application.services import determine_manufacturer
+            from warehouse.application.services.data_integration_service import data_integration_service
+
+            # Get delivery data for supplier name
+            delivery_data = data_integration_service.get_complete_delivery_data(
+                item_data.get('delivery_number', ''),
+                confirmed_batch or item_data.get('batch_number', '')
+            )
+
+            # Use centralized services
+            manufacturer = determine_manufacturer(confirmed_article)
+            storage_service = get_document_storage_service()
+            folder_path = storage_service.get_delivery_folder_path(
+                supplier_name=delivery_data.get('supplier_name', 'Primec'),
+                manufacturer=manufacturer,
+                article_number=confirmed_article,
+                batch_number=confirmed_batch or item_data.get('batch_number', ''),
+                delivery_number=item_data.get('delivery_number', '')
+            )
+
+        # Display folder path
+        col5, col6 = st.columns([3, 1])
+        with col5:
+            st.code(str(folder_path), language=None)
+
+            # Show warnings if any
+            for warning in folder_warnings:
+                st.caption(f"⚠️ {warning}")
+
+        with col6:
+            if st.button("📂 Ordner öffnen", key="open_folder_step1_btn"):
+                try:
+                    # Open folder in Explorer
+                    import platform
+
+                    if platform.system() == "Windows":
+                        import os
+                        os.startfile(str(folder_path))
+                    elif platform.system() == "Darwin":  # macOS
+                        import subprocess
+                        subprocess.run(['open', str(folder_path)], check=True)
+                    else:  # Linux
+                        import subprocess
+                        subprocess.run(['xdg-open', str(folder_path)], check=True)
+
+                    st.success("📂 Ordner geöffnet!")
+                except Exception as e:
+                    st.error(f"❌ Fehler beim Öffnen des Ordners: {e}")
+
+    except Exception as e:
+        st.warning(f"⚠️ Ordner-Pfad konnte nicht ermittelt werden: {e}")
+        logger.error(f"Folder path resolution failed: {e}")
+
+    st.write("---")
+
+    # === AKTIONEN ===
+    col_btn1, col_btn2 = st.columns(2)
+
+    with col_btn1:
+        button_clicked = st.button("✅ Daten bestätigen → Dokumente erstellen", type="primary", use_container_width=True)
+
+        # STEP 1 PROCESSING - Data validation and storage location save
+        if button_clicked:
+            logger.info("🔥 STEP 1: Data confirmation button clicked!")
+
+            # Validate required fields
+            if not confirmed_article.strip():
+                st.error("❌ Artikelnummer ist erforderlich!")
+                st.stop()
+
+            if not confirmed_batch.strip():
+                st.error("❌ Chargennummer ist erforderlich!")
+                st.stop()
+
+            # Save storage location information first
+            try:
+                item_service = st.session_state.services['item']
+
+                st.write("💾 Speichere Lagerplatz-Information...")
+
+                item_service.save_item_info(
+                    article_number=confirmed_article,
+                    designation="",  # Will be updated later if needed
+                    revision_number=None,
+                    drawing_reference="",
+                    storage_location=confirmed_storage_location,
+                    manufacturer="",
+                    material_specification="",
+                    description=""
+                )
+
+                st.success(f"✅ Lagerplatz für {confirmed_article} gespeichert")
+
+            except Exception as e:
+                st.error(f"❌ Fehler beim Speichern der Lagerplatz-Information: {e}")
+                # Continue with workflow even if ItemInfo fails
+
+            order_document_path = None
+
+            # Update item with basic data (batch, quantity, order number)
+            try:
+                item_service = st.session_state.services['item']
+
+                # Build data for Step 1 processing - MIT ALLEN DREI MENGENTYPEN
+                step1_data = {
+                    'article_number': confirmed_article,
+                    'batch_number': confirmed_batch,
+                    'original_article_number': item_data.get('article_number', ''),
+                    'original_batch_number': item_data.get('batch_number', ''),
+                    'delivery_number': item_data.get('delivery_number', ''),
+                    # === DREI MENGENTYPEN ===
+                    'ordered_quantity': ordered_quantity_input if ordered_quantity_input > 0 else None,
+                    'delivery_slip_quantity': delivery_slip_quantity_input,
+                    'delivered_quantity': delivered_quantity_input,
+                    'order_number': order_number,
+                    'order_document_path': order_document_path,
+                    'storage_location': confirmed_storage_location
+                }
+
+                # Update item with basic data (similar to original logic but without certificates)
+                original_article = step1_data.get('original_article_number', '')
+                current_article = step1_data['article_number']
+                original_batch = step1_data.get('original_batch_number', '')
+                current_batch = step1_data['batch_number']
+
+                # Handle article/batch number changes
+                if original_article and original_article != current_article:
+                    new_quantity = None
+                    if 'delivered_quantity' in step1_data and step1_data['delivered_quantity']:
+                        try:
+                            new_quantity = int(step1_data['delivered_quantity'])
+                        except ValueError:
+                            pass
+
+                    # FIXED: Get all three quantity types from step1_data
+                    delivery_slip_qty = step1_data.get('delivery_slip_quantity')
+                    ordered_qty = step1_data.get('ordered_quantity')
+
+                    item_service.update_item(
+                        article_number=original_article,  # Use original to find the item
+                        batch_number=original_batch if original_batch else current_batch,
+                        delivery_number=step1_data['delivery_number'],
+                        new_article_number=current_article,
+                        new_batch_number=current_batch if original_batch and original_batch != current_batch else None,
+                        new_quantity=new_quantity,
+                        employee_name=st.session_state.get('current_user', 'System'),
+                        order_number=step1_data.get('order_number'),
+                        delivery_slip_quantity=delivery_slip_qty,  # FIXED
+                        ordered_quantity=ordered_qty  # FIXED
+                    )
+
+                    success_msg = f"✅ Artikelnummer erfolgreich geändert: '{original_article}' → '{current_article}'"
+                    if original_batch and original_batch != current_batch:
+                        success_msg += f", Chargennummer geändert: '{original_batch}' → '{current_batch}'"
+                    if new_quantity is not None:
+                        success_msg += f", Menge aktualisiert auf: {new_quantity}"
+                    st.success(success_msg)
+
+                elif original_batch and original_batch != current_batch:
+                    # Batch number changed
+                    new_quantity = None
+                    if 'delivered_quantity' in step1_data and step1_data['delivered_quantity']:
+                        try:
+                            new_quantity = int(step1_data['delivered_quantity'])
+                        except ValueError:
+                            pass
+
+                    # FIXED: Get all three quantity types from step1_data
+                    delivery_slip_qty = step1_data.get('delivery_slip_quantity')
+                    ordered_qty = step1_data.get('ordered_quantity')
+
+                    item_service.update_item(
+                        article_number=step1_data['article_number'],
+                        batch_number=original_batch,  # Use original to find the item
+                        delivery_number=step1_data['delivery_number'],
+                        new_batch_number=current_batch,  # Set new batch number
+                        new_quantity=new_quantity,  # Update quantity if provided
+                        employee_name=st.session_state.get('current_user', 'System'),
+                        order_number=step1_data.get('order_number'),
+                        delivery_slip_quantity=delivery_slip_qty,  # FIXED
+                        ordered_quantity=ordered_qty  # FIXED
+                    )
+
+                    success_msg = f"✅ Chargennummer erfolgreich geändert: '{original_batch}' → '{current_batch}'"
+                    if new_quantity is not None:
+                        success_msg += f", Menge aktualisiert auf: {new_quantity}"
+                    st.success(success_msg)
+
+                elif 'delivered_quantity' in step1_data and step1_data['delivered_quantity']:
+                    # No batch change, but update quantity
+                    try:
+                        delivered_qty = int(step1_data['delivered_quantity'])
+
+                        # FIXED: Get all three quantity types from step1_data
+                        delivery_slip_qty = step1_data.get('delivery_slip_quantity')
+                        ordered_qty = step1_data.get('ordered_quantity')
+
+                        item_service.update_item(
+                            article_number=step1_data['article_number'],
+                            batch_number=step1_data['batch_number'],
+                            delivery_number=step1_data['delivery_number'],
+                            new_quantity=delivered_qty,
+                            employee_name=st.session_state.get('current_user', 'System'),
+                            order_number=step1_data.get('order_number'),
+                            delivery_slip_quantity=delivery_slip_qty,  # FIXED: Pass LSQ from correct field
+                            ordered_quantity=ordered_qty  # FIXED: Pass ordered_quantity
+                        )
+                        st.success(f"✅ Liefermenge auf {delivered_qty} aktualisiert!")
+                        if delivery_slip_qty:
+                            st.success(f"✅ Lieferscheinmenge: {delivery_slip_qty}")
+                        if ordered_qty:
+                            st.success(f"✅ Bestellmenge: {ordered_qty}")
+                    except ValueError:
+                        st.warning("⚠️ Ungültige Mengeneingabe - wurde nicht gespeichert")
+                else:
+                    # Just update order number if provided
+                    if step1_data.get('order_number'):
+                        item_service.update_item(
+                            article_number=step1_data['article_number'],
+                            batch_number=step1_data['batch_number'],
+                            delivery_number=step1_data['delivery_number'],
+                            employee_name=st.session_state.get('current_user', 'System'),
+                            order_number=step1_data.get('order_number')
+                        )
+                        st.success("📋 Bestellnummer erfolgreich gespeichert!")
+
+                st.session_state.step1_confirmed_data = step1_data
+
+                status_batch = step1_data['batch_number']
+
+                # Use new workflow method to complete data check
+                item_service.complete_data_check(
+                    article_number=step1_data['article_number'],
+                    batch_number=status_batch,
+                    delivery_number=step1_data['delivery_number'],
+                    employee=st.session_state.get('current_user', 'System')
+                )
+                st.success("✅ Datenprüfung abgeschlossen")
+
+                st.success("🎉 **Schritt 1 abgeschlossen!**")
+                st.info("📄 **Automatische Dokument-Erstellung läuft...**")
+
+                # NEW: Generate documents using centralized generation service
+                try:
+                    logger.info("🔥 DEBUG: Starting document generation process...")
+                    documents_created = []
+                    generation_errors = []
+
+                    logger.info(f"🔥 DEBUG: CENTRALIZED_SERVICES_AVAILABLE check: {CENTRALIZED_SERVICES_AVAILABLE}")
+                    if CENTRALIZED_SERVICES_AVAILABLE:
+                        logger.info("🔥 DEBUG: Using CENTRALIZED services path")
+                        st.write("✨ **Neue Generation Service**: Erstelle Begleitschein, Wareneingangskontrollschein und Barcode...")
+
+                        # Import and create DocumentGenerationService
+                        try:
+                            generation_service = DocumentGenerationService()
+                        except Exception as service_error:
+                            st.error(f"❌ Service Error: {service_error}")
+                            logger.error(f"🔥 DEBUG: Service creation error: {service_error}")
+                            raise service_error
+
+                        # Debug: Check barcode capabilities
+                        try:
+                            barcode_capabilities = generation_service.barcode_generator.validate_generation_capabilities()
+                            if barcode_capabilities.get('status') == 'not_ready':
+                                st.warning(f"⚠️ Barcode Generation nicht bereit: {barcode_capabilities}")
+                            else:
+                                st.info(f"✅ Barcode Status: {barcode_capabilities.get('status', 'unknown')}")
+                        except Exception as cap_error:
+                            st.warning(f"⚠️ Barcode Capability Check failed: {cap_error}")
+
+                        # Generate Begleitschein
+                        try:
+                            begleitschein_result = generation_service.generate_document(
+                                document_type="begleitschein",
+                                batch_number=step1_data['batch_number'],
+                                delivery_number=step1_data['delivery_number'],
+                                article_number=step1_data['article_number'],
+                                supplier_name="",  # Will be auto-determined
+                                quantity=int(step1_data.get('delivered_quantity', 0)) if step1_data.get('delivered_quantity') else 0,
+                                employee_name=st.session_state.get('current_user', 'System'),
+                                additional_data={
+                                    'status': 'Daten bestätigt',
+                                    'order_number': step1_data.get('order_number', '')
+                                }
+                            )
+
+                            if begleitschein_result.success:
+                                documents_created.append({
+                                    'type': 'Begleitschein',
+                                    'path': str(begleitschein_result.document_path),
+                                    'result': begleitschein_result
+                                })
+                                st.write(f"  ✅ Begleitschein: {begleitschein_result.document_path}")
+                            else:
+                                generation_errors.append(f"Begleitschein: {begleitschein_result.error}")
+
+                        except Exception as e:
+                            generation_errors.append(f"Begleitschein Fehler: {e}")
+
+                        # Generate Wareneingangskontrolle
+                        try:
+                            wareneingang_result = generation_service.generate_document(
+                                document_type="wareneingangskontrolle",
+                                batch_number=step1_data['batch_number'],
+                                delivery_number=step1_data['delivery_number'],
+                                article_number=step1_data['article_number'],
+                                supplier_name="",  # Will be auto-determined
+                                quantity=int(step1_data.get('delivered_quantity', 0)) if step1_data.get('delivered_quantity') else 0,
+                                employee_name=st.session_state.get('current_user', 'System'),
+                                additional_data={
+                                    'we_date': datetime.now().strftime('%d.%m.%Y'),
+                                    'artikel': step1_data['article_number'],
+                                    'charge': step1_data['batch_number']
+                                }
+                            )
+
+                            if wareneingang_result.success:
+                                documents_created.append({
+                                    'type': 'Wareneingangskontrolle',
+                                    'path': str(wareneingang_result.document_path),
+                                    'result': wareneingang_result
+                                })
+                                st.write(f"  ✅ Wareneingangskontrolle: {wareneingang_result.document_path}")
+                            else:
+                                generation_errors.append(f"Wareneingangskontrolle: {wareneingang_result.error}")
+
+                        except Exception as e:
+                            generation_errors.append(f"Wareneingangskontrolle Fehler: {e}")
+
+                        # Generate Barcode/Label
+                        try:
+                            logger.info("🔥 DEBUG: Starting barcode generation...")
+                            barcode_result = generation_service.generate_document(
+                                document_type="barcode",
+                                batch_number=step1_data['batch_number'],
+                                delivery_number=step1_data['delivery_number'],
+                                article_number=step1_data['article_number'],
+                                supplier_name="",  # Will be auto-determined
+                                quantity=int(step1_data.get('delivered_quantity', 0)) if step1_data.get('delivered_quantity') else 0,
+                                employee_name=st.session_state.get('current_user', 'System'),
+                                additional_data={
+                                    'barcode_type': 'CODE128',
+                                    'filename_prefix': 'label',
+                                    'open_after_creation': False,
+                                    'storage_location': step1_data.get('storage_location', 'LAGER-001')
+                                }
+                            )
+
+                            if barcode_result.success:
+                                documents_created.append({
+                                    'type': 'Barcode/Label',
+                                    'path': str(barcode_result.document_path),
+                                    'result': barcode_result
+                                })
+                                st.write(f"  ✅ Barcode/Label: {barcode_result.document_path}")
+                                logger.info(f"🔥 DEBUG: Barcode generated successfully: {barcode_result.document_path}")
+                            else:
+                                generation_errors.append(f"Barcode/Label: {barcode_result.error}")
+                                logger.error(f"🔥 DEBUG: Barcode generation failed: {barcode_result.error}")
+
+                        except Exception as e:
+                            generation_errors.append(f"Barcode/Label Fehler: {e}")
+                            logger.error(f"🔥 DEBUG: Barcode generation exception: {e}")
+                            import traceback
+                            logger.error(f"🔥 DEBUG: Barcode traceback: {traceback.format_exc()}")
+
+                        # Handle order document movement using storage service
+                        if hasattr(st.session_state, 'temp_order_document_path') and st.session_state.temp_order_document_path:
+                            try:
+                                storage_service = get_document_storage_service()
+
+                                # Move order document to final location
+                                final_order_result = storage_service.move_temp_document(
+                                    temp_file_path=str(st.session_state.temp_order_document_path),
+                                    filename=st.session_state.temp_order_document_filename,
+                                    batch_number=step1_data['batch_number'],
+                                    delivery_number=step1_data['delivery_number'],
+                                    article_number=step1_data['article_number'],
+                                    supplier_name=""  # Will be auto-determined
+                                )
+
+                                if final_order_result.success:
+                                    documents_created.append({
+                                        'type': 'Bestelldokument',
+                                        'path': str(final_order_result.file_path),
+                                        'result': final_order_result
+                                    })
+                                    st.write(f"  ✅ Bestelldokument: {final_order_result.file_path}")
+                                    st.success("✅ Bestelldokument erfolgreich in Lieferungsordner verschoben!")
+                                else:
+                                    st.warning(f"⚠️ Bestelldokument konnte nicht verschoben werden: {final_order_result.error}")
+
+                                # Cleanup session state
+                                del st.session_state.temp_order_document_path
+                                del st.session_state.temp_order_document_filename
+                                if hasattr(st.session_state, 'temp_order_storage_folder'):
+                                    del st.session_state.temp_order_storage_folder
+
+                            except Exception as e:
+                                st.warning(f"⚠️ Bestelldokument konnte nicht verschoben werden: {e}")
+                                logger.error(f"Order document move failed: {e}")
+
+                        # Show results
+                        logger.info(f"🔥 DEBUG: Document generation completed. Created: {len(documents_created)}, Errors: {len(generation_errors)}")
+                        if documents_created:
+                            st.success(f"✅ **{len(documents_created)} Dokumente erfolgreich erstellt:**")
+                            for doc in documents_created:
+                                st.write(f"  - 📄 {doc['type']}: {doc['path']}")
+
+                            st.session_state.step1_generated_documents = documents_created
+                            st.success("🎉 **Begleitschein, Wareneingangskontrollschein und Barcode sind bereit zum Drucken!**")
+                            st.info("📄 **Nächster Schritt:** Bestätigen Sie die Zertifikate und dass Label/Begleitschein korrekt angebracht wurden.")
+
+                        if generation_errors:
+                            st.warning("⚠️ Einige Dokumente konnten nicht erstellt werden:")
+                            for error in generation_errors:
+                                st.error(f"❌ {error}")
+                            if documents_created:
+                                st.info("📄 **Erfolgreich erstellte Dokumente können verwendet werden.**")
+
+                    else:
+                        logger.info("🔥 DEBUG: Using FALLBACK services path")
+                        # FIXED: Use standardized DocumentGenerationService instead of fallback
+                        st.info("🔄 **Retry**: Verwende standardisierte Document Generation")
+
+                        try:
+                            from warehouse.application.services.document_generation.document_types import DocumentType
+
+                            # Initialize generation service using global DocumentGenerationService
+                            doc_service = DocumentGenerationService()
+
+                            # Generate delivery documents with complete data
+                            documents_created = []
+                            document_errors = []
+
+                            # Generate Begleitschein
+                            try:
+                                begleit_result = doc_service.generate_document(
+                                    document_type=DocumentType.BEGLEITSCHEIN,
+                                    batch_number=step1_data['batch_number'],
+                                    delivery_number=step1_data['delivery_number'],
+                                    article_number=step1_data.get('article_number', ''),
+                                    supplier_name=step1_data.get('supplier_name', ''),
+                                    quantity=step1_data.get('quantity', 0),
+                                    employee_name=st.session_state.get('current_user', 'System')
+                                )
+                                if begleit_result.success:
+                                    documents_created.append(f"Begleitschein: {begleit_result.document_path.name}")
+                                else:
+                                    document_errors.append(f"Begleitschein: {begleit_result.error}")
+                            except Exception as e:
+                                document_errors.append(f"Begleitschein: {e}")
+
+                            # Generate Wareneingangskontrolle
+                            try:
+                                kontrolle_result = doc_service.generate_document(
+                                    document_type=DocumentType.WARENEINGANGSKONTROLLE,
+                                    batch_number=step1_data['batch_number'],
+                                    delivery_number=step1_data['delivery_number'],
+                                    article_number=step1_data.get('article_number', ''),
+                                    supplier_name=step1_data.get('supplier_name', ''),
+                                    quantity=step1_data.get('quantity', 0),
+                                    employee_name=st.session_state.get('current_user', 'System')
+                                )
+                                if kontrolle_result.success:
+                                    documents_created.append(f"Wareneingangskontrolle: {kontrolle_result.document_path.name}")
+                                else:
+                                    document_errors.append(f"Wareneingangskontrolle: {kontrolle_result.error}")
+                            except Exception as e:
+                                document_errors.append(f"Wareneingangskontrolle: {e}")
+
+                            # Generate Barcode/Label (Fallback Implementation)
+                            try:
+                                logger.info("🔥 DEBUG: Starting fallback barcode generation...")
+                                barcode_result = doc_service.generate_document(
+                                    document_type=DocumentType.BARCODE,
+                                    batch_number=step1_data['batch_number'],
+                                    delivery_number=step1_data['delivery_number'],
+                                    article_number=step1_data.get('article_number', ''),
+                                    supplier_name=step1_data.get('supplier_name', ''),
+                                    quantity=step1_data.get('quantity', 0),
+                                    employee_name=st.session_state.get('current_user', 'System')
+                                )
+                                if barcode_result.success:
+                                    documents_created.append(f"Barcode/Label: {barcode_result.document_path.name}")
+                                    logger.info(f"🔥 DEBUG: Fallback barcode generated successfully: {barcode_result.document_path.name}")
+                                else:
+                                    document_errors.append(f"Barcode/Label: {barcode_result.error}")
+                                    logger.error(f"🔥 DEBUG: Fallback barcode generation failed: {barcode_result.error}")
+                            except Exception as e:
+                                document_errors.append(f"Barcode/Label: {e}")
+                                logger.error(f"🔥 DEBUG: Fallback barcode generation exception: {e}")
+                                import traceback
+                                logger.error(f"🔥 DEBUG: Fallback barcode traceback: {traceback.format_exc()}")
+
+                            # FIXED: Show results from standardized generation
+                            if documents_created:
+                                st.success("✅ **Dokumente erfolgreich erstellt:**")
+                                for doc_info in documents_created:
+                                    st.write(f"  - 📄 {doc_info}")
+                                st.session_state.step1_generated_documents = documents_created
+                                st.success("🎉 **Dokumente sind bereit zum Drucken!**")
+
+                            if document_errors:
+                                st.warning("⚠️ **Einige Dokumente konnten nicht erstellt werden:**")
+                                for error_info in document_errors:
+                                    st.error(f"❌ {error_info}")
+
+                        except Exception as retry_error:
+                            st.error(f"❌ Standardisierte Generation failed: {retry_error}")
+                            logger.error(f"Document generation retry failed: {retry_error}")
+                            st.info("📄 **Sie können trotzdem mit Schritt 2 fortfahren** und die Dokumente manuell erstellen.")
+
+                    # Final success message or fallback
+                    if not documents_created and not generation_errors:
+                        st.info("📄 **Sie können mit Schritt 2 fortfahren** und die Dokumente manuell erstellen.")
+
+                except Exception as e:
+                    logger.error("🔥 DEBUG: Document generation exception occurred!")
+                    st.warning("⚠️ Automatische Dokument-Erstellung fehlgeschlagen:")
+                    st.error(f"❌ {e}")
+                    import traceback
+                    logger.error(f"🔥 DOCUMENT GENERATION ERROR: {traceback.format_exc()}")
+                    st.info("📄 **Sie können trotzdem mit Schritt 2 fortfahren** und die Dokumente manuell erstellen.")
+
+                logger.info("🔥 DEBUG: Finished document generation try/except block, proceeding to final cleanup...")
+                # NOTE: Cleanup and st.rerun() moved to end of entire step1 process (after barcode generation)
+
+            except Exception as e:
+                logger.error(f"🔥 STEP 1 ERROR: {e}")
+                import traceback
+                logger.error(f"🔥 STEP 1 Traceback: {traceback.format_exc()}")
+                st.error(f"❌ Fehler in Schritt 1: {e}")
+
+            # FINAL: Cleanup and navigation after ALL document generation (including barcode) is complete
+            logger.info("🔥 DEBUG: Starting final cleanup and navigation...")
+            if 'cached_items' in st.session_state:
+                del st.session_state.cached_items
+
+            st.session_state['popup_action'] = 'step1_completed'
+            st.success("✅ Gehe zu Schritt 2...")
+            logger.info("🔥 DEBUG: About to call st.rerun()...")
+            st.rerun()
+
+    with col_btn2:
+        if st.button("❌ Abbrechen", use_container_width=True):
+            st.session_state['popup_action'] = 'cancel'
+            cleanup_keys = [
+                'order_document_step1',
+                'order_document_step1_saved',
+                'order_document_for_ai_analysis'
+            ]
+            for key in cleanup_keys:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()

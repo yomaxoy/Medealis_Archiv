@@ -1,4 +1,6 @@
+"""
 # src/warehouse/domain/exceptions/item_exceptions.py
+"""
 
 from warehouse.domain.exceptions.base_exceptions import BaseDomainException
 
@@ -6,8 +8,11 @@ from warehouse.domain.exceptions.base_exceptions import BaseDomainException
 class ItemNotFoundException(BaseDomainException):
     """Artikel wurde nicht gefunden."""
 
-    def __init__(self, article_number: str, batch_number: str):
-        message = f"Artikel {article_number} mit Charge {batch_number} nicht gefunden"
+    def __init__(self, article_number: str, batch_number: str, delivery_number: str = None):
+        if delivery_number:
+            message = f"Artikel {article_number} mit Charge {batch_number} in Lieferung {delivery_number} nicht gefunden"
+        else:
+            message = f"Artikel {article_number} mit Charge {batch_number} nicht gefunden"
         super().__init__(message)
 
 

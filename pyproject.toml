@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medealis-archiv"
+version = "2.0.0"
+description = "Warehouse Management System f�r Medizinprodukte"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "sqlalchemy>=1.4.0",
+    "streamlit>=1.28.0",
+    "pandas>=1.3.0",
+    "plotly>=5.0.0",
+    "pillow>=8.0.0",
+    "openpyxl>=3.0.0",
+    "PyPDF2>=3.0.0",
+    "python-docx>=0.8.11"
+]
+
+[tool.pylint.MASTER]
+init-hook = 'import sys; sys.path.append("src")'
+
+[tool.mypy]
+mypy_path = "src"
+ignore_missing_imports = true
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
