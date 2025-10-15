@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ArticleNumber:
-    """5-stellige Artikelnummer (z.B. A0001, B0002, CT003)."""
+    """Artikelnummer (z.B. A0001, B0002, CT003, NE0001_SI00151)."""
 
     value: str
 
@@ -13,16 +13,15 @@ class ArticleNumber:
         if not self.value:
             raise ValueError("Artikelnummer darf nicht leer sein")
 
-        if len(self.value) != 5:
-            if len(self.value) != 6:
-                raise ValueError("Artikelnummer muss genau 5 oder 6 Zeichen lang sein")
+        # Längenvalidierung entfernt - Artikelnummern können unterschiedliche Längen haben
 
-        # Erstes Zeichen muss Buchstabe sein, Rest alphanumerisch
+        # Erstes Zeichen muss Buchstabe sein, Rest alphanumerisch oder Unterstrich
         if not self.value[0].isalpha():
             raise ValueError("Artikelnummer muss mit Buchstaben beginnen")
 
-        if not self.value.isalnum():
-            raise ValueError("Artikelnummer darf nur Buchstaben und Zahlen enthalten")
+        # Erlaubte Zeichen: Buchstaben, Zahlen, Unterstriche und Bindestriche
+        if not all(c.isalnum() or c in '_-' for c in self.value):
+            raise ValueError("Artikelnummer darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten")
 
     def __str__(self) -> str:
         return self.value

@@ -4,7 +4,7 @@ Ein Python-basiertes Verwaltungssystem für den Wareneingang bei Medealis GmbH.
 
 ## 🚀 Features
 
-- **📄 Lieferschein-Verarbeitung**: Automatische Texterkennung aus Word-Dokumenten mit KI-Unterstützung
+- **📄 Lieferschein-Verarbeitung**: Automatische Texterkennung aus PDF-Dokumenten mit KI-Unterstützung
 - **📦 Wareneingangskontrolle**: Vollständige Verwaltung von Lieferungen und Artikeln
 - **🔍 Sichtprüfung**: Strukturierte Qualitätskontrolle mit Dokumentation
 - **📊 Barcode-Generierung**: Automatische Erstellung von Barcodes für Artikel
@@ -36,14 +36,22 @@ Ein Python-basiertes Verwaltungssystem für den Wareneingang bei Medealis GmbH.
 3. **Abhängigkeiten installieren**:
    ```bash
    pip install -r requirements.txt
+
+   # Optional: Für DSGVO-konforme lokale OCR-Funktionalität:
+   pip install -r requirements_local_ocr.txt
    ```
 
-4. **OpenAI API Key konfigurieren**:
-   - Beim ersten Start wird nach dem API Key gefragt
-   - Dieser wird verschlüsselt in `~/.medealis/config.json` gespeichert
+4. **API Keys konfigurieren** (optional):
+   - **Claude AI**: Setze `ANTHROPIC_API_KEY` in `.env` für KI-gestützte Extraktion
+   - **OpenAI**: Setze `OPENAI_API_KEY` in `.env` für alternative KI-Features
+   - **Lokal**: Nutze OCR ohne API-Keys für DSGVO-Konformität
 
 5. **Anwendung starten**:
    ```bash
+   # Streamlit Web-Interface (Hauptanwendung):
+   streamlit run src/warehouse/presentation/admin/main_admin_app.py
+
+   # Oder CLI-Interface:
    python src/main.py
    ```
 
@@ -51,44 +59,53 @@ Ein Python-basiertes Verwaltungssystem für den Wareneingang bei Medealis GmbH.
 
 ```
 medealis-archiv/
-├── src/
-│   ├── config/                 # Konfigurationsdateien
-│   │   ├── app_constants.py
-│   │   └── app_settings.py
-│   ├── controllers/            # MVC Controller
-│   │   ├── base_controller.py
-│   │   ├── item_controller.py
-│   │   ├── delivery_controller.py
-│   │   └── document_controller.py
-│   ├── database/              # Datenbankschicht
-│   │   ├── database.py
-│   │   ├── db_connection.py
-│   │   └── db_migration.py
-│   ├── models/                # Datenmodelle
-│   │   ├── base_model.py
-│   │   ├── item_model.py
-│   │   ├── delivery_model.py
-│   │   └── document_model.py
-│   ├── services/              # Business Logic
-│   │   ├── data_extraction.py
-│   │   ├── data_parser.py
-│   │   ├── document_service.py
-│   │   └── barcode_service.py
-│   ├── utils/                 # Hilfsfunktionen
-│   │   ├── path_manager.py
-│   │   └── path_utils.py
-│   ├── views/                 # GUI Views
-│   │   ├── base_views/
-│   │   ├── dialogs/
-│   │   └── windows/
-│   └── main.py               # Haupteinstiegspunkt
-├── templates/                 # Word-Vorlagen
-│   ├── Fo00040_Checklist for incoming goods inspection.docx
-│   ├── Fo00057_Begleitschein.docx
-│   └── Fo001xx_Sichtkontrolle.docx
-├── requirements.txt
-├── README.md
-└── .gitignore
+├── src/                            # Source Code
+│   ├── warehouse/                  # Clean Architecture Implementation
+│   │   ├── domain/                # Domain Layer (Business Logic)
+│   │   │   ├── entities/          # Business Entities (Item, Delivery, Supplier, Order)
+│   │   │   ├── value_objects/     # Value Objects (ArticleNumber, BatchNumber)
+│   │   │   ├── enums/            # Domain Enums (ItemStatus, DeliveryStatus)
+│   │   │   ├── repositories/     # Repository Interfaces
+│   │   │   ├── services/         # Domain Services (BarcodeService, InspectionService)
+│   │   │   ├── events/          # Domain Events
+│   │   │   └── exceptions/      # Domain Exceptions
+│   │   ├── application/          # Application Layer (Use Cases)
+│   │   │   └── services/        # Application Services (DeliveryService, ItemService)
+│   │   ├── infrastructure/      # Infrastructure Layer (Technical Details)
+│   │   │   ├── database/        # SQLAlchemy Implementation
+│   │   │   │   ├── models/      # Database Models
+│   │   │   │   ├── repositories/ # Repository Implementations
+│   │   │   │   └── connection.py # Database Connection
+│   │   │   ├── external_services/ # API Integrations (Claude, OpenAI)
+│   │   │   └── file_system/     # File Operations
+│   │   ├── presentation/        # Presentation Layer (UI)
+│   │   │   └── admin/          # Admin Interface (Streamlit-based)
+│   │   │       ├── views/      # UI Views
+│   │   │       ├── popups/     # Modal Dialogs
+│   │   │       ├── utils/      # UI Utilities
+│   │   │       └── main_admin_app.py # Main Streamlit Application
+│   │   └── shared/             # Shared Utilities
+│   │       └── utils/          # Common Utilities (date_parser.py)
+│   ├── reset_DB.py             # Database Reset Utility (Domain-based)
+│   ├── simple_reset_db.py      # Simple Database Reset Utility
+│   └── main.py                 # CLI Entry Point
+├── resources/                   # Application Resources
+│   └── templates/              # Document Templates
+│       ├── Begleitschein.txt
+│       ├── Sichtkontrolle.txt
+│       ├── Fo00040_PDB_Template.docx
+│       ├── Fo00141_Sichtkontrolle.docx
+│       └── Fo0113_Wareneingangskontrolle.docx
+├── tests/                      # Test Files
+│   └── test_clean_architecture.py # Architecture Integration Tests
+├── config/                     # Configuration Files
+│   └── settings.py             # Application Settings
+├── requirements.txt            # Python Dependencies
+├── requirements_local_ocr.txt  # OCR Dependencies (DSGVO-compliant)
+├── pyproject.toml             # Modern Python Package Configuration
+├── DEVELOPMENT_NOTES.md        # Development Documentation
+├── README.md                  # This file
+└── .gitignore                 # Git ignore patterns
 ```
 
 ## 🔧 Verwendung
@@ -96,13 +113,13 @@ medealis-archiv/
 ### 1. Neue Lieferung erfassen
 1. "Neue Lieferung" im Hauptmenü wählen
 2. Mitarbeitername eingeben
-3. Lieferschein-Dokument (.docx) auswählen
-4. Automatische Texterkennung und Datenextraktion
+3. Lieferschein-Dokument (.pdf) hochladen
+4. OCR-Texterkennung und strukturierte Datenextraktion
 
 ### 2. Wareneingangskontrolle
 1. "Wareneingangskontrolle" öffnen
 2. Lieferschein auswählen
-3. Artikel-Daten überprüfen und bestätigen
+3. Artikel-Daten überprüfen und bestätigen (Artikelnummer, Chargennummer, Anzahl)
 4. Dokumente verwalten (Zeugnisse, etc.)
 5. Sichtprüfung durchführen
 
@@ -121,26 +138,103 @@ Das System verwendet SQLite mit folgenden Haupttabellen:
 
 ## 🔐 Sicherheit
 
-- OpenAI API Keys werden verschlüsselt gespeichert (Fernet-Verschlüsselung)
-- Lokale Datenbank ohne Netzwerkzugriff
+- API Keys werden verschlüsselt gespeichert (Fernet-Verschlüsselung)
+- Lokale SQLite-Datenbank ohne Netzwerkzugriff
+- DSGVO-konforme OCR-Verarbeitung (keine Datenübertragung an externe APIs)
 - Konfigurationsdateien werden im Benutzerverzeichnis gespeichert
 
 ## 🏗️ Architektur
 
-Das System folgt dem **MVC-Pattern**:
-- **Models**: Datenbankzugriff und Business Logic
-- **Views**: GUI-Komponenten (Tkinter)
-- **Controllers**: Verbindung zwischen Models und Views
+Das System folgt der **Clean Architecture** mit **Domain-Driven Design (DDD)**:
 
-**Design Patterns**:
-- Singleton Pattern (PathManager, DatabaseConnection)
-- Factory Pattern (Document Models)
-- Observer Pattern (GUI Event Handling)
+### 🎯 Architektur-Ebenen
+
+#### **1. Domain Layer (Geschäftslogik)**
+- **Entities**: Kern-Geschäftsobjekte (Item, Delivery, Supplier, Order)
+  - `Item`: Artikel mit flexiblem Status-System und Rückverfolgbarkeit
+  - `Delivery`: Lieferungs-Aggregat mit automatischem Status-Management
+- **Value Objects**: Unveränderliche Objekte (ArticleNumber, BatchNumber)
+- **Enums**: Geschäftswerte (ItemStatus, DeliveryStatus, PriorityLevel)
+- **Domain Services**: Geschäftslogik (BarcodeService, InspectionService)
+- **Repository Interfaces**: Abstraktionen für Datenzugriff
+- **Domain Events**: Geschäftsereignisse für Entkopplung
+- **Exceptions**: Domänen-spezifische Fehlerbehandlung
+
+#### **2. Application Layer (Use Cases)**
+- **Application Services**: Orchestrierung von Use Cases
+  - `DeliveryService`: Koordiniert Lieferungs-Workflows
+  - `ItemService`: Artikel-Management und Sichtprüfung
+  - `SupplierService`: Lieferanten-Verwaltung mit find-or-create Pattern
+  - `DocumentService`: Template-basierte Dokumentenerstellung
+
+#### **3. Infrastructure Layer (Technische Details)**
+- **Database**: SQLAlchemy mit SQLite
+  - **Models**: ORM-Entitäten für Persistierung
+  - **Repositories**: Konkrete Repository-Implementierungen
+  - **Mappers**: Domain ↔ Infrastructure Mapping
+- **External Services**: Claude AI-Integration (optional)
+- **File System**: Dokumentenverwaltung
+
+#### **4. Presentation Layer (Benutzeroberfläche)**
+- **Admin Interface**: Streamlit-basierte Web-Anwendung
+- **Views**: Delivery Management, Item Management, Document Generation
+- **Popups**: Modal Dialoge für komplexe Operationen
+- **Utils**: UI-spezifische Hilfsfunktionen
+
+### 🔧 Design Patterns
+
+#### **Domain-Driven Design**
+- **Aggregate Pattern**: Delivery als Aggregat Root mit Items
+- **Repository Pattern**: Abstrakte Datenzugriff-Schnittstellen
+- **Value Object Pattern**: ArticleNumber, BatchNumber mit Validierung
+- **Domain Events**: Entkoppelte Kommunikation zwischen Kontexten
+
+#### **Clean Architecture Patterns**
+- **Dependency Inversion**: Domain abhängt nicht von Infrastructure
+- **Interface Segregation**: Kleine, spezifische Repository-Interfaces
+- **Single Responsibility**: Jede Schicht hat eine klare Verantwortung
+
+#### **Weitere Patterns**
+- **Factory Pattern**: Entity-Erstellung mit Validierung
+- **Strategy Pattern**: Verschiedene Status-Implementierungen
+- **Observer Pattern**: Event-Handling in der GUI
+- **Unit of Work**: Transaktionale Konsistenz in Repositories
+
+### 📊 Status-Management-System
+
+#### **Artikel-Workflow (Item)**
+```
+ARTIKEL_ANGELEGT → DATEN_GEPRUEFT → SICHT_GEPRUEFT → DOKUMENTE_GEPRUEFT → VERMESSEN → ABGESCHLOSSEN
+                                                                           ↓
+                                                                      AUSSCHUSS
+```
+
+#### **Lieferungs-Workflow (Delivery)**
+```
+EMPFANGEN → ERFASST → IN_BEARBEITUNG → ABGESCHLOSSEN
+```
+
+- **Automatische Status-Updates**: Lieferungsstatus wird automatisch basierend auf Artikel-Status aktualisiert
+- **Dictionary-basiertes Tracking**: Jeder Arbeitsschritt wird mit Zeitstempel und Mitarbeiter protokolliert
+- **Validation Logic**: Geschäftsregeln verhindern ungültige Zustandsübergänge
+
+### 🗄️ Datenmodell
+
+#### **Kern-Entitäten**
+- **Item**: Artikel mit Rückverfolgbarkeit (ArticleNumber + BatchNumber + DeliveryNumber)
+- **Delivery**: Lieferungs-Aggregat mit automatischem Status-Management
+- **Supplier**: Lieferanten-Stammdaten
+- **Order**: Bestellungs-Kontext (geplante Erweiterung)
+
+#### **Rückverfolgbarkeit**
+- **Unique Identifier**: `{ArticleNumber}#{BatchNumber}#{DeliveryNumber}`
+- **Audit Trail**: Vollständige Nachverfolgung aller Änderungen
+- **Compliance**: Medizinprodukte-konforme Dokumentation
 
 ## 🚨 Bekannte Einschränkungen
 
 - **Windows-abhängig**: Office-Integration funktioniert nur unter Windows
-- **OpenAI API**: Internetverbindung für KI-Features erforderlich
+- **Claude API**: Internetverbindung für KI-Features erforderlich (optional)
 - **Single-User**: Keine Multi-User-Unterstützung
 - **Lokale Datenbank**: Keine zentrale Datenhaltung
 
@@ -153,24 +247,26 @@ Das System folgt dem **MVC-Pattern**:
 
 ### Testing
 ```bash
-# Tests ausführen (wenn implementiert)
-python -m pytest tests/
+# Architektur-Tests ausführen
+python tests/test_clean_architecture.py
 ```
 
 ### Build für Deployment
 ```bash
 # PyInstaller für .exe (Windows)
 pip install pyinstaller
-pyinstaller --onedir --windowed src/main.py
+pyinstaller --onedir --windowed src/warehouse/presentation/admin/main_admin_app.py
 ```
 
 ## 📝 Changelog
 
-### Version 1.0.0 (Initial Release)
-- Grundlegende Lieferungsverwaltung
-- KI-gestützte Dokumentenerkennung
-- Barcode-Generierung
-- Sichtprüfung und Qualitätskontrolle
+### Version 1.0.0 (Clean Architecture Implementation)
+- **Clean Architecture**: Domain-Driven Design mit klarer Schichtentrennung
+- **OCR-basierte Dokumentenerkennung**: DSGVO-konforme Lieferschein-Verarbeitung
+- **Lieferungsverwaltung**: Vollständiger Workflow mit Status-Tracking
+- **Artikel-Management**: Sichtprüfung und Qualitätskontrolle
+- **Template-System**: Automatische Dokumentenerstellung (PDB, Begleitschein, Sichtkontrolle)
+- **Barcode-Generierung**: Code 128 für Artikel-Identifikation
 
 ## 📞 Support
 

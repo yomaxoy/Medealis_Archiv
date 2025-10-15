@@ -1,0 +1,26 @@
+# =============================================================================
+# Windows Service Dependencies für Medealis Warehouse Management System
+# =============================================================================
+# Installation: pip install -r requirements-service.txt
+# Voraussetzung: pip install -r requirements.txt
+# =============================================================================
+# Verwendung: Betrieb als Windows Service auf Server
+# Siehe: service/README.md für Deployment-Anleitung
+# =============================================================================
+
+# Windows Service Support
+pywin32>=305
+pywin32-ctypes>=0.2.0
+
+# Windows Management Instrumentation (nur Windows)
+wmi>=1.5.1; platform_system == "Windows"
+
+# System-Monitoring
+psutil>=5.9.0
+
+# =============================================================================
+# Nach Installation:
+# 1. Service installieren: cd service && install_service.bat
+# 2. Firewall konfigurieren: firewall_config.bat
+# 3. Service starten: start_service.bat
+# =============================================================================

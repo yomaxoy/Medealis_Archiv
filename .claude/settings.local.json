@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python test:*)",
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(pip install:*)",
+      "Read(C:\\Users\\krueg\\OneDrive\\Dokumente\\Medealis\\alt_Medealis_Archiv\\src\\controllers/**)",
+      "Bash(tasklist:*)",
+      "Bash(venvScripts:*)",
+      "Bash(call venvScriptsactivate.bat)",
+      "Bash(venv/Scripts/python.exe src/streamlit_app.py:*)",
+      "Bash(venv/Scripts/streamlit.exe run src/streamlit_app.py --server.port=8501 --server.address=localhost)",
+      "Bash(venv/Scripts/streamlit.exe run src/streamlit_app.py --server.port=8502)",
+      "Bash(venv/Scripts/python.exe -m pip install:*)",
+      "Bash(venv/Scripts/python.exe:*)",
+      "Bash(venv/Scripts/streamlit.exe run src/streamlit_app.py --server.port=8503)",
+      "Bash(dir:*)",
+      "Bash(venv/Scripts/streamlit.exe run:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c:*)",
+      "Read(c:\\Users\\krueg\\OneDrive\\Dokumente\\Medealis\\alt_Medealis_Archiv\\src\\services/**)",
+      "Bash(set ANTHROPIC_API_KEY=sk-ant-api03-dummy-key-for-testing)",
+      "Read(//c/**)",
+      "Bash(streamlit run:*)",
+      "Bash(find:*)",
+      "Bash(del \"FIXES_SUMMARY.md\" \"CLAUDE_TO_OCR_SWITCH.md\" \"KORRIGIERTE_DOCUMENT_SERVICE_STRATEGIE.md\" \"INFRASTRUCTURE_REORGANISATION_PLAN.md\" \"PROJEKT_CLEANUP_ANALYSE.md\")",
+      "Bash(cut:*)",
+      "Bash(del:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

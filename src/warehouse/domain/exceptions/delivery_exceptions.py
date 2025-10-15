@@ -1,4 +1,6 @@
+"""
 # src/warehouse/domain/exceptions/delivery_exceptions.py
+"""
 
 from warehouse.domain.exceptions.base_exceptions import BaseDomainException
 
