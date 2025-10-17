@@ -28,41 +28,49 @@ if %errorLevel% neq 0 (
     exit /b 1
 )
 
-echo [1/5] Pruefe Python-Installation...
-python --version
+REM Wechsle zum Service-Verzeichnis
+cd /d "%~dp0"
+
+REM Setze Pfad zur virtuellen Umgebung
+set VENV_PYTHON=%~dp0..\.venv\Scripts\python.exe
+
+echo [1/5] Pruefe Python-Installation (.venv)...
+if not exist "%VENV_PYTHON%" (
+    echo FEHLER: Virtuelle Umgebung nicht gefunden!
+    echo Erwarteter Pfad: %VENV_PYTHON%
+    echo.
+    echo Bitte zuerst die virtuelle Umgebung erstellen:
+    echo   python -m venv .venv
+    echo   .venv\Scripts\pip install -r requirements.txt
+    pause
+    exit /b 1
+)
+
+"%VENV_PYTHON%" --version
 if %errorLevel% neq 0 (
-    echo FEHLER: Python ist nicht installiert oder nicht im PATH!
+    echo FEHLER: Python konnte nicht ausgefuehrt werden!
     pause
     exit /b 1
 )
 
 echo [2/5] Pruefe pywin32-Installation...
-python -c "import win32serviceutil" 2>nul
+"%VENV_PYTHON%" -c "import win32serviceutil" 2>nul
 if %errorLevel% neq 0 (
-    echo pywin32 nicht gefunden - installiere...
-    pip install pywin32
-    if %errorLevel% neq 0 (
-        echo FEHLER: pywin32-Installation fehlgeschlagen!
-        pause
-        exit /b 1
-    )
-
-    REM Registriere pywin32-DLLs
-    python -c "import win32api; print(win32api.__file__)" >temp_path.txt
-    set /p PYWIN32_PATH=<temp_path.txt
-    for %%i in ("%PYWIN32_PATH%") do set PYWIN32_DIR=%%~dpi
-
-    echo Registriere pywin32-DLLs...
-    python "%PYWIN32_DIR%..\scripts\pywin32_postinstall.py" -install
-    del temp_path.txt
+    echo FEHLER: pywin32 ist nicht in der virtuellen Umgebung installiert!
+    echo.
+    echo Bitte installieren mit:
+    echo   .venv\Scripts\pip install pywin32
+    echo   .venv\Scripts\python .venv\Scripts\pywin32_postinstall.py -install
+    pause
+    exit /b 1
 )
 
 echo [3/5] Stoppe existierenden Service (falls vorhanden)...
-python medealis_service.py stop 2>nul
+"%VENV_PYTHON%" medealis_service.py stop 2>nul
 timeout /t 2 /nobreak >nul
 
 echo [4/5] Installiere Medealis Service...
-python medealis_service.py install
+"%VENV_PYTHON%" medealis_service.py install
 if %errorLevel% neq 0 (
     echo FEHLER: Service-Installation fehlgeschlagen!
     pause
@@ -81,9 +89,14 @@ echo  Installation erfolgreich!
 echo ========================================
 echo.
 echo Service-Name: MedealisWarehouse
-echo Zugriff:      http://localhost:8501
-echo              http://%COMPUTERNAME%:8501
-echo              http://IP-ADRESSE:8501
+echo.
+echo Zugriff:
+echo   Admin App: http://localhost:8501
+echo   User App:  http://localhost:8502
+echo.
+echo   Im Netzwerk:
+echo   Admin App: http://%COMPUTERNAME%:8501
+echo   User App:  http://%COMPUTERNAME%:8502
 echo.
 echo Naechste Schritte:
 echo   1. Service starten:  start_service.bat

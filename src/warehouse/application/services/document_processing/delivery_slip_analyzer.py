@@ -368,7 +368,6 @@ Prüfe dies, aber lass dich nicht davon beeinflussen falls der Text etwas andere
             self.logger.warning(f"Could not load known suppliers: {e}")
             # Fallback zu häufigen Lieferanten
             return [
-                "Primec GmbH",
                 "Primec",
                 "PRIMEC",
                 "Medealis",
@@ -391,7 +390,7 @@ Prüfe dies, aber lass dich nicht davon beeinflussen falls der Text etwas andere
 
             # Häufige Patterns
             if "primec" in filename_lower:
-                return "Primec GmbH"
+                return "Primec"
             elif "medealis" in filename_lower:
                 return "Medealis"
             elif "dental" in filename_lower:

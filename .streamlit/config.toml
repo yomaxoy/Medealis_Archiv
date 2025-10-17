@@ -23,7 +23,8 @@ runOnSave = false
 maxUploadSize = 50
 
 # Enable CORS für Netzwerk-Zugriff
-enableCORS = false
+# NOTE: Setting to true to avoid conflict with enableXsrfProtection
+enableCORS = true
 
 # WebSocket-Kompression für bessere Performance
 enableWebsocketCompression = true
@@ -61,8 +62,7 @@ toolbarMode = "minimal"
 # Zeige Running-Indikator
 showErrorDetails = false
 
-# Timeout für Client-Verbindungen (in Sekunden)
-timeout = 60
+# NOTE: client.timeout option has been removed in newer Streamlit versions
 
 
 [runner]
@@ -73,6 +73,5 @@ fastReruns = true
 postScriptGC = true
 
 
-[deprecation]
-# Deaktiviere Deprecation-Warnings für Produktion
-showPyplotGlobalUse = false
+# [deprecation]
+# NOTE: deprecation.showPyplotGlobalUse option has been removed in newer Streamlit versions

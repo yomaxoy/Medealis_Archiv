@@ -405,7 +405,7 @@ class DocumentCheckPopup(InspectionPopup):
 
                             if save_result.success:
                                 st.success(f"✅ Dokument gespeichert: {doc.name}")
-                                logger.info(f"✅ Document saved: {doc.name} to {save_result.path}")
+                                logger.info(f"✅ Document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}")
                             else:
                                 st.error(f"❌ Fehler beim Speichern von {doc.name}: {save_result.error}")
                                 logger.error(f"❌ Failed to save {doc.name}: {save_result.error}")

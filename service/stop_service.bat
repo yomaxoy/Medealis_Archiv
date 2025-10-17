@@ -13,7 +13,20 @@ if %errorLevel% neq 0 (
     exit /b 1
 )
 
-python medealis_service.py stop
+REM Wechsle zum Service-Verzeichnis
+cd /d "%~dp0"
+
+REM Setze Pfad zur virtuellen Umgebung
+set VENV_PYTHON=%~dp0..\.venv\Scripts\python.exe
+
+if not exist "%VENV_PYTHON%" (
+    echo FEHLER: Virtuelle Umgebung nicht gefunden!
+    echo Erwarteter Pfad: %VENV_PYTHON%
+    pause
+    exit /b 1
+)
+
+"%VENV_PYTHON%" medealis_service.py stop
 
 if %errorLevel% equ 0 (
     echo.

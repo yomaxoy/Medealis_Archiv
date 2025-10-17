@@ -72,7 +72,7 @@ class TestStorageContext:
             supplier_name="primec"
         )
 
-        assert result.supplier_normalized == "Primec GmbH"
+        assert result.supplier_normalized == "Primec"
 
     def test_manufacturer_determination(self):
         """Test manufacturer determination from article number."""
@@ -95,7 +95,7 @@ class TestStorageContext:
             batch_number="P-123456789012",
             delivery_number="DEL-001",
             article_number="CT0001",
-            supplier_name="Primec GmbH"
+            supplier_name="Primec"
         )
 
         # Minimal context
@@ -130,7 +130,7 @@ class TestPathResolver:
             batch_number="P-123456789012",
             delivery_number="DEL-001",
             article_number="CT0001",
-            supplier_normalized="Primec GmbH",
+            supplier_normalized="Primec",
             manufacturer="C-Tech"
         )
 
@@ -138,7 +138,7 @@ class TestPathResolver:
 
         assert result.success
         assert result.path.exists()
-        assert "Primec_GmbH" in str(result.path)
+        assert "Primec" in str(result.path)
         assert "C-Tech" in str(result.path)
 
     def test_resolve_storage_path_incomplete_context(self, mock_path_resolver):
@@ -385,7 +385,7 @@ class TestIntegration:
             batch_number="P-123456789012",
             delivery_number="DEL-001",
             article_number="CT0001",
-            supplier_name="Primec GmbH"
+            supplier_name="Primec"
         )
 
         assert save_result.success

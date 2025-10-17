@@ -11,6 +11,18 @@ from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
+# Load .env file if available
+try:
+    from dotenv import load_dotenv
+    env_file = Path(__file__).parent.parent.parent.parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+        logger.debug(f"Loaded .env file: {env_file}")
+except ImportError:
+    logger.debug("python-dotenv not available")
+except Exception as e:
+    logger.debug(f"Could not load .env file: {e}")
+
 try:
     import anthropic
     from anthropic import Anthropic

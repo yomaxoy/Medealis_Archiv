@@ -16,6 +16,9 @@ if %errorLevel% neq 0 (
     exit /b 1
 )
 
+REM Wechsle zum Service-Verzeichnis
+cd /d "%~dp0"
+
 echo WARNUNG: Der Medealis Service wird deinstalliert!
 echo.
 set /p confirm="Fortfahren? (J/N): "
@@ -26,13 +29,23 @@ if /i not "%confirm%"=="J" (
     exit /b 0
 )
 
+REM Setze Pfad zur virtuellen Umgebung
+set VENV_PYTHON=%~dp0..\.venv\Scripts\python.exe
+
+if not exist "%VENV_PYTHON%" (
+    echo FEHLER: Virtuelle Umgebung nicht gefunden!
+    echo Erwarteter Pfad: %VENV_PYTHON%
+    pause
+    exit /b 1
+)
+
 echo.
 echo [1/3] Stoppe Service...
-python medealis_service.py stop 2>nul
+"%VENV_PYTHON%" medealis_service.py stop 2>nul
 timeout /t 3 /nobreak >nul
 
 echo [2/3] Deinstalliere Service...
-python medealis_service.py remove
+"%VENV_PYTHON%" medealis_service.py remove
 
 echo [3/3] Entferne Firewall-Regel...
 netsh advfirewall firewall delete rule name="Medealis Warehouse - Streamlit" >nul 2>&1

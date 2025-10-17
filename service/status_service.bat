@@ -17,21 +17,34 @@ echo  Netzwerk-Status
 echo ----------------------------------------
 echo.
 
-REM Prüfe ob Port 8501 offen ist
+REM Prüfe ob Ports offen sind
+echo Admin App (Port 8501):
 netstat -an | findstr "8501"
+echo.
+echo User App (Port 8502):
+netstat -an | findstr "8502"
 
 echo.
 echo ----------------------------------------
 echo  Zugriffs-URLs
 echo ----------------------------------------
 echo.
-echo Lokal:    http://localhost:8501
-echo Computer: http://%COMPUTERNAME%:8501
+echo Lokal:
+echo   Admin App: http://localhost:8501
+echo   User App:  http://localhost:8502
+echo.
+echo Computer:
+echo   Admin App: http://%COMPUTERNAME%:8501
+echo   User App:  http://%COMPUTERNAME%:8502
 echo.
 
 REM IP-Adressen anzeigen
 echo IP-Adressen dieses Rechners:
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do echo   http://%%a:8501
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+    echo   Admin: http://%%a:8501
+    echo   User:  http://%%a:8502
+    echo.
+)
 
 echo.
 pause

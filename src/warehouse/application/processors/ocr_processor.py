@@ -28,11 +28,20 @@ class OCRProcessor:
             import os
 
             # Set Tesseract path for Windows
-            tesseract_paths = [
+            # Check .env file first, then fallback to standard locations
+            tesseract_paths = []
+
+            # Try environment variable from .env file first
+            env_tesseract_path = os.getenv('TESSERACT_PATH')
+            if env_tesseract_path:
+                tesseract_paths.append(env_tesseract_path)
+
+            # Add standard locations as fallback
+            tesseract_paths.extend([
                 r'C:\Program Files\Tesseract-OCR\tesseract.exe',
                 r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
                 r'C:\Tesseract-OCR\tesseract.exe'
-            ]
+            ])
 
             tesseract_dir = None
             for path in tesseract_paths:

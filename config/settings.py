@@ -55,7 +55,7 @@ class Settings:
 
     # Manufacturer Mapping
     MANUFACTURER_MAPPING = {
-        "A0": "Zubehör",
+        "A0": "Zubehörteile",
         "B0": "Bego",
         "C0": "Camlog",
         "D0": "Dentsply",

@@ -266,48 +266,104 @@ class PDFConverter:
 
         return default_order
 
-    def _convert_with_win32com(self, docx_path: Path, pdf_path: Path):
+    def _convert_with_win32com(self, docx_path: Path, pdf_path: Path, retry_count: int = 3):
         """Konvertierung mit win32com (Windows, am stabilsten)."""
         if not WIN32_AVAILABLE:
             raise ImportError("win32com not available")
 
-        word_app = None
-        try:
-            # COM für diesen Thread initialisieren
-            pythoncom.CoInitialize()
+        import time
+        import pywintypes
 
-            # Word Application öffnen
-            word_app = win32.Dispatch('Word.Application')
-            word_app.Visible = False  # Unsichtbar
-            word_app.DisplayAlerts = 0  # Keine Dialoge
+        last_error = None
 
-            # Dokument öffnen
-            doc = word_app.Documents.Open(str(docx_path))
+        for attempt in range(retry_count):
+            word_app = None
+            doc = None
 
-            # Als PDF speichern (FileFormat=17 = PDF)
-            doc.SaveAs2(str(pdf_path), FileFormat=17)
-
-            # Dokument schließen
-            doc.Close()
-
-            logger.debug(f"win32com conversion successful: {pdf_path.name}")
-
-        except Exception as e:
-            raise Exception(f"win32com conversion failed: {str(e)}")
-
-        finally:
-            # Word Application sicher schließen
-            if word_app:
+            try:
+                # COM für diesen Thread initialisieren
                 try:
-                    word_app.Quit()
+                    pythoncom.CoInitialize()
+                except:
+                    pass  # Already initialized
+
+                # Bei Retry: Warte kurz bevor neuer Versuch
+                if attempt > 0:
+                    wait_time = attempt * 1.0  # 1s, 2s, 3s
+                    logger.info(f"Retry {attempt}/{retry_count-1} after {wait_time}s wait...")
+                    time.sleep(wait_time)
+
+                # Word Application öffnen - verwende DispatchEx für neue Instanz
+                word_app = win32.DispatchEx('Word.Application')
+                word_app.Visible = False  # Unsichtbar
+                word_app.DisplayAlerts = 0  # Keine Dialoge
+
+                # Dokument öffnen (mit absoluten Pfaden)
+                abs_docx_path = str(docx_path.resolve())
+                abs_pdf_path = str(pdf_path.resolve())
+
+                doc = word_app.Documents.Open(
+                    abs_docx_path,
+                    ReadOnly=True,
+                    ConfirmConversions=False,
+                    AddToRecentFiles=False
+                )
+
+                # Als PDF speichern (FileFormat=17 = PDF)
+                doc.SaveAs(abs_pdf_path, FileFormat=17)
+
+                # Dokument schließen
+                doc.Close(SaveChanges=False)
+                doc = None
+
+                logger.debug(f"win32com conversion successful: {pdf_path.name}")
+                return  # Erfolg!
+
+            except pywintypes.com_error as e:
+                last_error = e
+                error_code = e.args[0] if e.args else None
+
+                # RPC_E_CALL_REJECTED = -2147418111 oder RPC_E_SERVERCALL_RETRYLATER = -2147417846
+                if error_code in [-2147418111, -2147417846]:
+                    logger.warning(f"Word busy (attempt {attempt + 1}/{retry_count}), will retry...")
+                    # Cleanup und retry
+                else:
+                    # Anderer Fehler - nicht retry-bar
+                    raise Exception(f"win32com conversion failed: {str(e)}")
+
+            except Exception as e:
+                last_error = e
+                raise Exception(f"win32com conversion failed: {str(e)}")
+
+            finally:
+                # Dokument sicher schließen
+                if doc:
+                    try:
+                        doc.Close(SaveChanges=False)
+                    except:
+                        pass
+
+                # Word Application sicher schließen
+                if word_app:
+                    try:
+                        word_app.Quit()
+                    except:
+                        pass
+
+                    # Explizit freigeben
+                    try:
+                        del word_app
+                    except:
+                        pass
+
+                # COM wieder freigeben
+                try:
+                    pythoncom.CoUninitialize()
                 except:
                     pass
 
-            # COM wieder freigeben
-            try:
-                pythoncom.CoUninitialize()
-            except:
-                pass
+        # Alle Retries fehlgeschlagen
+        raise Exception(f"win32com conversion failed after {retry_count} attempts: {str(last_error)}")
 
     def _convert_with_docx2pdf(self, docx_path: Path, pdf_path: Path):
         """Konvertierung mit docx2pdf library."""

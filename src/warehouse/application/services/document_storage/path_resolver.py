@@ -107,6 +107,45 @@ class PathResolver:
         return f"{self._sharepoint_qm_base}/Keyence_QR-Codes_Messprogramme"
 
     @property
+    def server_qr_code_path(self) -> Path:
+        """
+        Server-Pfad für QR-Code-Vorlagen (Keyence Messprogramme).
+
+        PRIMÄRE Quelle für QR-Codes die in Labels eingefügt werden.
+
+        Struktur auf A:\:
+        A:\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes\
+
+        Returns:
+            Path zum Server QR-Code-Verzeichnis
+        """
+        qr_path = Path(
+            r"A:\Qualitätsmanagement\QM_MEDEALIS"
+            r"\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes"
+        )
+
+        # Validiere dass Laufwerk erreichbar ist
+        if not Path("A:\\").exists():
+            self.logger.warning(
+                "Server-Laufwerk A:\\ nicht verfügbar! "
+                "QR-Codes können nicht vom Server geladen werden."
+            )
+
+        return qr_path
+
+    @property
+    def local_qr_code_path(self) -> Path:
+        """
+        FALLBACK: Lokaler Pfad für QR-Code-Vorlagen.
+
+        Wird verwendet wenn Server A:\ nicht verfügbar ist.
+
+        Returns:
+            Path zum lokalen QR-Code-Verzeichnis
+        """
+        return Path.home() / "Medealis" / "Wareneingang" / "QR-Codes Messprogramme"
+
+    @property
     def server_storage_path(self) -> Path:
         """
         Basis-Pfad für SERVER-Speicherung (Netzlaufwerk A:\).
@@ -372,35 +411,59 @@ class PathResolver:
             self.logger.error(error_msg)
             return PathResult(path=Path(), error=error_msg)
 
-    def create_folder_structure(self, path: Path) -> PathResult:
+    def create_folder_structure(self, path: Path, max_retries: int = 3) -> PathResult:
         """
-        Erstellt Ordnerstruktur für gegebenen Pfad.
+        Erstellt Ordnerstruktur für gegebenen Pfad mit Retry-Logik.
+
+        Diese Methode ist die EINZIGE die Ordner erstellen sollte.
+        Verwendet Retry-Mechanismus für transiente Fehler (z.B. temporäre Locks).
 
         Args:
             path: Pfad für den Ordner erstellt werden sollen
+            max_retries: Maximale Anzahl Wiederholungsversuche (default: 3)
 
         Returns:
             PathResult mit Erstellungs-Status
         """
+        import time
+
         try:
             if path.exists():
                 return PathResult(path=path, existed=True)
 
-            # Erstelle Ordner mit parents=True
-            path.mkdir(parents=True, exist_ok=True)
+            # Retry-Logik für transiente Fehler
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    # Erstelle Ordner mit parents=True
+                    path.mkdir(parents=True, exist_ok=True)
 
-            self.logger.debug(f"Created folder structure: {path}")
-            return PathResult(path=path, created=True)
+                    self.logger.debug(f"Created folder structure: {path}")
 
-        except PermissionError as e:
-            error_msg = f"Permission denied creating folder {path}: {str(e)}"
-            self.logger.error(error_msg)
-            return PathResult(path=path, error=error_msg)
+                    result = PathResult(path=path, created=True)
+                    if attempt > 0:
+                        result.add_warning(f"Folder created after {attempt + 1} attempts")
+                    return result
 
-        except OSError as e:
-            error_msg = f"OS error creating folder {path}: {str(e)}"
-            self.logger.error(error_msg)
-            return PathResult(path=path, error=error_msg)
+                except OSError as e:
+                    last_error = e
+                    # Bei transientem Fehler: kurz warten und retry
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {e}, retrying...")
+                        time.sleep(0.1 * (attempt + 1))  # Exponential backoff: 0.1s, 0.2s, 0.3s
+                        continue
+                    # Letzter Versuch fehlgeschlagen
+                    break
+
+            # Alle Versuche fehlgeschlagen
+            if isinstance(last_error, PermissionError):
+                error_msg = f"Permission denied creating folder {path}: {str(last_error)}"
+                self.logger.error(error_msg)
+                return PathResult(path=path, error=error_msg)
+            else:
+                error_msg = f"Failed to create folder {path} after {max_retries} attempts: {str(last_error)}"
+                self.logger.error(error_msg)
+                return PathResult(path=path, error=error_msg)
 
         except Exception as e:
             error_msg = f"Unexpected error creating folder {path}: {str(e)}"
@@ -510,7 +573,8 @@ class PathResolver:
         if not component or not isinstance(component, str):
             return "Unknown"
 
-        # Ersetze problematische Zeichen
+        # Ersetze NUR problematische Zeichen für Windows-Dateisystem
+        # Umlaute (ä, ö, ü, ß) BLEIBEN ERHALTEN - NTFS unterstützt Unicode!
         replacements = {
             " ": "_",
             "/": "-",
@@ -521,14 +585,7 @@ class PathResolver:
             '"': "",
             "<": "",
             ">": "",
-            "|": "-",
-            "ä": "ae",
-            "ö": "oe",
-            "ü": "ue",
-            "ß": "ss",
-            "Ä": "AE",
-            "Ö": "OE",
-            "Ü": "UE"
+            "|": "-"
         }
 
         cleaned = component

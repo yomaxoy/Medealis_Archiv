@@ -95,6 +95,7 @@ class EnvironmentConfig:
             'SHAREPOINT_TENANT_ID',
             'USE_SHAREPOINT',
             'USE_SERVER_STORAGE',  # NEU: Server-Storage aktivieren
+            'ANTHROPIC_API_KEY',  # Claude API Key
             'DEBUG'
         ]
 
