@@ -1,36 +1,37 @@
-# Core Dependencies
-tkinter-tooltip==2.0.0
+# =============================================================================
+# Medealis Warehouse Management System - Core Dependencies
+# =============================================================================
+# Basis-Installation für Produktiv-Betrieb
+# Installation: pip install -r requirements.txt
+# =============================================================================
+
+# Core UI & Document Processing
 python-docx==0.8.11
 Pillow==10.0.1
 barcode[images]==1.4.0
-cryptography==41.0.7
-openai==1.3.0
-appdirs==1.4.4
 
-# Database
-# SQLite ist bereits in Python enthalten
+# Streamlit Web Framework
+streamlit>=1.28.0
+requests>=2.28.0
+
+# AI Services
+anthropic>=0.25.0          # Claude AI für intelligente Dokumentenverarbeitung
+httpx>=0.24.0              # HTTP Client für Anthropic
 
 # PDF Processing
 PyPDF2==3.0.1
+PyMuPDF>=1.23.0
 
-# Development Dependencies
-pytest==7.4.3
-pytest-cov==4.1.0
-pytest-mock==3.12.0
-black==23.11.0
-flake8==6.1.0
-mypy==1.7.1
-pre-commit==3.5.0
+# Utilities
+appdirs==1.4.4
+cryptography==41.0.7
 
-# Documentation
-sphinx==7.2.6
-sphinx-rtd-theme==1.3.0
+# Optional: OpenAI (falls Claude nicht verfügbar)
+openai==1.3.0
 
-# Build & Packaging
-pyinstaller==6.2.0
-setuptools==69.0.0
-wheel==0.42.0
-
-# Type Hints
-types-Pillow==10.1.0.2
-types-requests==2.31.0.10
+# =============================================================================
+# Optionale Features - siehe separate Requirements-Dateien:
+# - requirements-dev.txt       Development-Tools (pytest, black, etc.)
+# - requirements-ocr.txt       OCR-Feature für Lieferschein-Scanning
+# - requirements-service.txt   Windows Service (Server-Deployment)
+# =============================================================================

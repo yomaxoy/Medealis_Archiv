@@ -13,10 +13,8 @@ class DeliveryStatus(Enum):
 
     # Grundstatus
     EMPFANGEN = "Empfangen"  # Lieferschein eingescannt/erfasst
-    ERFASST = "Erfasst"  # Alle Artikel initial angelegt
+    ERFASST = "Erfasst"  # Alle Artikel initial angelegt (Artikel Daten bestätigt)
     IN_BEARBEITUNG = "In Bearbeitung"  # Mindestens ein Artikel wird bearbeitet
-    QUALITAETSPRUEFUNG = "Qualitätsprüfung"  # Artikel in Sicht-/Maßprüfung
-    DOKUMENTATION = "Dokumentation"  # Dokumentenerstellung läuft
     ABGESCHLOSSEN = "Abgeschlossen"  # Alle Artikel komplett bearbeitet
 
     @property

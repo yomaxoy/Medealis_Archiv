@@ -28,7 +28,7 @@ class Settings:
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
     # Datenbank
-    DATABASE_NAME = "archiv.db"
+    DATABASE_NAME = "warehouse_new.db"
     DATABASE_DIR = Path.home() / ".medealis"
     DATABASE_PATH = DATABASE_DIR / DATABASE_NAME
 
@@ -39,7 +39,8 @@ class Settings:
     TEMP_DIR = DATA_DIR / "temp"
 
     # API Keys
-    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
     # UI Einstellungen
     WINDOW_WIDTH = 1000
@@ -54,7 +55,7 @@ class Settings:
 
     # Manufacturer Mapping
     MANUFACTURER_MAPPING = {
-        "A0": "Zubehör",
+        "A0": "Zubehörteile",
         "B0": "Bego",
         "C0": "Camlog",
         "D0": "Dentsply",

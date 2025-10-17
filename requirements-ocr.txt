@@ -1,0 +1,29 @@
+# =============================================================================
+# OCR-Feature für Medealis Warehouse Management System
+# =============================================================================
+# Installation: pip install -r requirements-ocr.txt
+# Voraussetzung: pip install -r requirements.txt
+# =============================================================================
+# WICHTIG: Zusätzlich muss Tesseract-OCR installiert werden!
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# Ubuntu/Debian: sudo apt install tesseract-ocr tesseract-ocr-deu
+# macOS: brew install tesseract tesseract-lang
+# =============================================================================
+
+# PDF zu Bild Konvertierung
+pdf2image>=3.1.0
+
+# OCR-Engine (Python-Wrapper)
+pytesseract>=0.3.10
+
+# Erweiterte Dokumentenverarbeitung (optional)
+docling>=1.0.0
+
+# Hinweis: Pillow wird bereits von requirements.txt installiert
+
+# =============================================================================
+# Verwendung:
+# - Lieferschein-Scanning im User- und Admin-GUI
+# - DSGVO-konforme lokale Verarbeitung (keine Cloud-APIs)
+# - Fallback: Claude AI wird verwendet, wenn OCR nicht verfügbar
+# =============================================================================

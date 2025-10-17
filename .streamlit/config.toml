@@ -1,0 +1,77 @@
+# =============================================================================
+# Streamlit Server-Konfiguration für Medealis Warehouse Management System
+# =============================================================================
+#
+# Diese Konfiguration optimiert Streamlit für den Produktiv-Einsatz
+# als Windows Service im Firmennetzwerk.
+#
+
+[server]
+# Server läuft auf allen Netzwerk-Interfaces (erreichbar im LAN)
+address = "0.0.0.0"
+
+# Standard-Port für Streamlit
+port = 8501
+
+# Headless-Modus (kein Browser-Auto-Start)
+headless = true
+
+# Deaktiviere File-Watching (spart Ressourcen im Produktiv-Betrieb)
+runOnSave = false
+
+# Max Upload-Größe (in MB) - für PDF-Uploads
+maxUploadSize = 50
+
+# Enable CORS für Netzwerk-Zugriff
+# NOTE: Setting to true to avoid conflict with enableXsrfProtection
+enableCORS = true
+
+# WebSocket-Kompression für bessere Performance
+enableWebsocketCompression = true
+
+
+[browser]
+# Keine Usage-Statistiken sammeln
+gatherUsageStats = false
+
+# Server-Adresse für Client-Verbindungen (automatisch ermittelt)
+serverAddress = "localhost"
+
+
+[theme]
+# Standard Streamlit Theme
+primaryColor = "#FF4B4B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
+
+
+[logger]
+# Log-Level für Produktion
+level = "info"
+
+# Log-Format
+messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+
+[client]
+# Toolbar-Modus (minimal für Produktiv-Umgebung)
+toolbarMode = "minimal"
+
+# Zeige Running-Indikator
+showErrorDetails = false
+
+# NOTE: client.timeout option has been removed in newer Streamlit versions
+
+
+[runner]
+# Schnellere Rerun-Zeiten
+fastReruns = true
+
+# Post-Script-GC (Garbage Collection nach jedem Script-Run)
+postScriptGC = true
+
+
+# [deprecation]
+# NOTE: deprecation.showPyplotGlobalUse option has been removed in newer Streamlit versions
