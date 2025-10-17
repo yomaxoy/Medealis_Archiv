@@ -697,6 +697,9 @@ def show_document_confirmation_step2_popup(item_data, step1_data=None):
                     employee=st.session_state.get('current_user', 'System'),
                     certificates=certificates_dict
                 )
+
+                # Set the new status after successful document check
+                new_status = "Dokumente geprüft"
                 st.success("✅ Dokumentenprüfung abgeschlossen")
 
                 # Process document information for summary

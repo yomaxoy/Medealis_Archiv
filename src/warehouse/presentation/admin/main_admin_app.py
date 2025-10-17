@@ -3,10 +3,8 @@ Main Admin Application - Admin Presentation Layer
 Entry point for the admin interface with clean architecture integration.
 """
 
-import streamlit as st
 import sys
 import os
-import logging
 from pathlib import Path
 
 # Add src to path for imports
@@ -14,6 +12,21 @@ current_dir = Path(__file__).parent
 src_dir = current_dir.parent.parent.parent
 if str(src_dir) not in sys.path:
     sys.path.append(str(src_dir))
+
+# Load .env file BEFORE anything else - ALWAYS load to ensure API keys are available
+try:
+    from dotenv import load_dotenv
+    env_file = src_dir / ".env"
+    if env_file.exists():
+        # Always load with override=True to ensure values are set
+        load_dotenv(env_file, override=True)
+except ImportError:
+    pass  # python-dotenv not available
+except Exception:
+    pass  # Could not load .env file
+
+import streamlit as st
+import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

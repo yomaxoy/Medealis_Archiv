@@ -638,29 +638,70 @@ class BarcodeGenerator:
             return {"status": "error", "error": str(e)}
 
     def _get_qr_code_for_article(self, article_number: str) -> Optional[Path]:
-        """Suche QR-Code PNG basierend auf Artikelnummer."""
-        try:
-            qr_base_path = Path("C:/Users/krueg/Medealis/Wareneingang/QR-Codes Messprogramme")
+        """
+        Suche QR-Code PNG basierend auf Artikelnummer.
 
-            if not qr_base_path.exists():
-                logger.warning(f"QR-Code Verzeichnis nicht gefunden: {qr_base_path}")
+        PRIMÄR: Server A:\ (Keyence Messprogramme Ordner)
+        FALLBACK: Lokaler Pfad (~/Medealis/Wareneingang/QR-Codes Messprogramme)
+
+        Args:
+            article_number: Artikelnummer für QR-Code-Suche
+
+        Returns:
+            Path zum gefundenen QR-Code oder None
+        """
+        try:
+            from ..document_storage.path_resolver import path_resolver
+
+            # Liste von Pfaden zum Durchsuchen (Priorität: Server → Lokal)
+            search_paths = []
+
+            # PRIMÄR: Server-Pfad (wenn verfügbar)
+            server_qr_path = path_resolver.server_qr_code_path
+            if server_qr_path.exists():
+                search_paths.append(("Server", server_qr_path))
+                logger.info(f"QR-Code Suche: Server-Pfad verfügbar: {server_qr_path}")
+            else:
+                logger.warning(f"QR-Code Suche: Server-Pfad nicht verfügbar: {server_qr_path}")
+
+            # FALLBACK: Lokaler Pfad
+            local_qr_path = path_resolver.local_qr_code_path
+            if local_qr_path.exists():
+                search_paths.append(("Lokal", local_qr_path))
+                logger.info(f"QR-Code Suche: Lokaler Fallback-Pfad verfügbar: {local_qr_path}")
+            else:
+                logger.warning(f"QR-Code Suche: Lokaler Pfad nicht verfügbar: {local_qr_path}")
+
+            # Prüfe ob überhaupt ein Pfad verfügbar ist
+            if not search_paths:
+                logger.error("QR-Code Suche: Weder Server noch lokaler Pfad verfügbar!")
                 return None
 
-            # Suche nach Datei die mit Artikelnummer beginnt
-            for qr_file in qr_base_path.glob(f"{article_number}*.png"):
-                logger.info(f"QR-Code gefunden: {qr_file}")
-                return qr_file
+            # Durchsuche Pfade in Prioritätsreihenfolge
+            for source_name, qr_base_path in search_paths:
+                logger.info(f"QR-Code Suche: Durchsuche {source_name}-Pfad: {qr_base_path}")
 
-            # Fallback: Exakte Suche
-            exact_match = qr_base_path / f"{article_number}.png"
-            if exact_match.exists():
-                return exact_match
+                # Suche nach Datei die mit Artikelnummer beginnt
+                for qr_file in qr_base_path.glob(f"{article_number}*.png"):
+                    logger.info(f"✅ QR-Code gefunden ({source_name}): {qr_file}")
+                    return qr_file
 
-            logger.info(f"Kein QR-Code gefunden für Artikel: {article_number}")
+                # Fallback: Exakte Suche
+                exact_match = qr_base_path / f"{article_number}.png"
+                if exact_match.exists():
+                    logger.info(f"✅ QR-Code gefunden (exakt, {source_name}): {exact_match}")
+                    return exact_match
+
+                logger.debug(f"Kein QR-Code in {source_name}-Pfad gefunden für: {article_number}")
+
+            # Kein QR-Code in allen Pfaden gefunden
+            logger.info(f"❌ Kein QR-Code gefunden für Artikel: {article_number} (durchsuchte Pfade: {len(search_paths)})")
             return None
 
         except Exception as e:
             logger.error(f"Fehler bei QR-Code Suche: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
 

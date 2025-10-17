@@ -37,17 +37,21 @@ Dieses Verzeichnis enthält alle Dateien für den Windows Service-Betrieb.
 ### Erstinstallation
 
 ```cmd
-# 1. Als Administrator öffnen
-# 2. Service installieren
+# 1. API Keys konfigurieren (WICHTIG!)
+# Siehe SETUP_API_KEYS.md für Details
+# Erstelle .env Datei im Hauptverzeichnis mit ANTHROPIC_API_KEY
+
+# 2. Als Administrator öffnen
+# 3. Service installieren
 install_service.bat
 
-# 3. Firewall konfigurieren
+# 4. Firewall konfigurieren
 firewall_config.bat
 
-# 4. Service starten
+# 5. Service starten
 start_service.bat
 
-# 5. Backup-Task installieren
+# 6. Backup-Task installieren
 install_backup_task.bat
 ```
 
@@ -68,7 +72,9 @@ backup_now.bat
 **Service-Name**: `MedealisWarehouse`
 **Display-Name**: Medealis Warehouse Management System
 **Startup-Type**: Automatic
-**Port**: 8501
+**Ports**:
+- Admin App: 8501
+- User App: 8502
 
 ---
 
@@ -78,9 +84,12 @@ backup_now.bat
 - Der Service startet automatisch beim Windows-Start
 - Backups werden täglich um 02:00 Uhr erstellt
 - Alte Backups (>30 Tage) werden automatisch gelöscht
+- **⚠️ API Keys erforderlich**: Siehe [SETUP_API_KEYS.md](SETUP_API_KEYS.md) für Claude & OCR Setup
 
 ---
 
 ## 🆘 Hilfe
 
-Bei Problemen siehe: `../SERVER_DEPLOYMENT_GUIDE.md`
+- **API Keys Setup**: [SETUP_API_KEYS.md](SETUP_API_KEYS.md)
+- **Server Deployment**: `../SERVER_DEPLOYMENT_GUIDE.md`
+- **Event Viewer**: Windows Logs → Application → Filter: "MedealisWarehouse"

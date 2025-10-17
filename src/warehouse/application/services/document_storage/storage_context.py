@@ -436,7 +436,7 @@ class StorageContext:
 
         # Basic Mapping-Regeln
         if "primec" in supplier_lower:
-            return "Primec GmbH"
+            return "Primec"
         elif "megagen" in supplier_lower:
             return "MEGAGEN"
         elif "ctech" in supplier_lower or "c-tech" in supplier_lower:
@@ -492,11 +492,11 @@ class StorageContext:
             "P4": "General Implants",
             "S4": "General Implants",
             # 1-character prefixes second
-            "A": "Zubehör",
+            "A": "Zubehörteile",
             "B": "Bego",
             "C": "Camlog",
             "D": "Dentsply",
-            "E": "Zubehör",
+            "E": "Zubehörteile",
             "L": "Lasak",
             "M": "Medentis",  # CRITICAL: M after MG!
             "N": "Nobel Biocare",
@@ -575,6 +575,6 @@ def determine_manufacturer(article_number: str) -> str:
     Examples:
         >>> determine_manufacturer("MG0001")  # "MegaGen"
         >>> determine_manufacturer("M12345")  # "Medentis"
-        >>> determine_manufacturer("A1234")   # "Zubehör"
+        >>> determine_manufacturer("A1234")   # "Zubehörteile"
     """
     return storage_context.determine_manufacturer(article_number)

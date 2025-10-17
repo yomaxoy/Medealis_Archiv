@@ -328,6 +328,8 @@ class DocumentStorageService:
         ZENTRALE API für Pfad-Auflösung.
         Nutzt neue Storage-Komponenten für konsistente Pfad-Erstellung.
 
+        WICHTIG: Verwendet Server-Storage als primär, lokalen Pfad als Fallback!
+
         Args:
             batch_number: Chargennummer (Pflichtfeld)
             delivery_number: Lieferscheinnummer (optional)
@@ -339,6 +341,8 @@ class DocumentStorageService:
             Tuple von (Pfad, Warnungen)
         """
         try:
+            from pathlib import Path as PathLib
+
             # Hole Storage-Kontext
             context = self.storage_context.get_complete_storage_context(
                 batch_number=batch_number,
@@ -347,10 +351,25 @@ class DocumentStorageService:
                 supplier_name=supplier_name
             )
 
-            # Löse Pfad auf
-            path_result = self.path_resolver.resolve_storage_path(
-                context, create_folders=create_folders
-            )
+            # Löse Pfad auf - PRIMÄR Server, FALLBACK Lokal
+            if self.use_server_storage and PathLib("A:\\").exists():
+                # SERVER-Pfad verwenden (PRIMÄR)
+                path_result = self.path_resolver.resolve_server_storage_path(
+                    context, create_folders=create_folders
+                )
+                self.logger.debug(f"get_document_path: Using SERVER path: {path_result.path}")
+            else:
+                # LOKALER Pfad als Fallback
+                path_result = self.path_resolver.resolve_storage_path(
+                    context, create_folders=create_folders
+                )
+
+                if self.use_server_storage:
+                    # Server sollte verwendet werden, ist aber nicht verfügbar
+                    self.logger.warning("get_document_path: Server not available, using local fallback")
+                    path_result.add_warning("Server-Speicherung nicht verfügbar - verwende lokalen Fallback")
+                else:
+                    self.logger.debug(f"get_document_path: Using LOCAL path: {path_result.path}")
 
             if not path_result.success:
                 self.logger.warning(f"Path resolution failed for batch {batch_number}: {path_result.error}")
@@ -842,49 +861,60 @@ class DocumentStorageService:
         """
         Listet alle Lieferscheine für einen Lieferanten auf.
 
+        WICHTIG: Verwendet FLACHE Ordnerstruktur (alle Lieferscheine direkt im Ordner)
+
         Args:
             supplier_name: Name des Lieferanten
-            year: Optionales Jahr-Filter
-            month: Optionales Monat-Filter
+            year: Optionales Jahr-Filter (filtert nach Datei-Datum)
+            month: Optionales Monat-Filter (filtert nach Datei-Datum)
 
         Returns:
             Liste von Lieferschein-Informationen
         """
         try:
-            # Hole Basis-Pfad
+            # Hole Basis-Pfad (FLACHE Struktur: Lieferant/Lieferscheine/)
             delivery_slip_path, warnings = self.get_delivery_slip_path(supplier_name)
 
             if not delivery_slip_path.exists():
+                self.logger.warning(f"Delivery slip path does not exist: {delivery_slip_path}")
                 return []
 
             delivery_slips = []
 
-            # Durchsuche Ordner-Struktur
-            if year and month:
-                # Spezifisches Jahr/Monat
-                month_name = datetime(year, month, 1).strftime("%B")
-                month_folder = f"{month:02d}-{month_name}"
-                search_path = delivery_slip_path / str(year) / month_folder
-                if search_path.exists():
-                    delivery_slips.extend(self._scan_delivery_slip_folder(search_path, supplier_name))
-            elif year:
-                # Spezifisches Jahr, alle Monate
-                year_path = delivery_slip_path / str(year)
-                if year_path.exists():
-                    for month_folder in year_path.iterdir():
-                        if month_folder.is_dir():
-                            delivery_slips.extend(self._scan_delivery_slip_folder(month_folder, supplier_name))
-            else:
-                # Alle Jahre/Monate
-                for year_folder in delivery_slip_path.iterdir():
-                    if year_folder.is_dir() and year_folder.name.isdigit():
-                        for month_folder in year_folder.iterdir():
-                            if month_folder.is_dir():
-                                delivery_slips.extend(self._scan_delivery_slip_folder(month_folder, supplier_name))
+            # FLACHE STRUKTUR: Scanne direkt alle Dateien im Ordner
+            self.logger.info(f"Scanning flat delivery slip folder: {delivery_slip_path}")
+            delivery_slips = self._scan_delivery_slip_folder(delivery_slip_path, supplier_name)
+
+            # FILTER NACH JAHR/MONAT (optional, basierend auf Datei-Datum)
+            if year or month:
+                filtered_slips = []
+                for slip in delivery_slips:
+                    try:
+                        # Extrahiere Datum aus modified_time
+                        file_date = datetime.fromtimestamp(slip.get('modified_time', 0))
+
+                        # Filter nach Jahr
+                        if year and file_date.year != year:
+                            continue
+
+                        # Filter nach Monat
+                        if month and file_date.month != month:
+                            continue
+
+                        filtered_slips.append(slip)
+
+                    except Exception as e:
+                        self.logger.warning(f"Error filtering slip by date: {e}")
+                        # Bei Fehler: Datei trotzdem einbeziehen
+                        filtered_slips.append(slip)
+
+                delivery_slips = filtered_slips
+                self.logger.info(f"Filtered delivery slips by year={year}, month={month}: {len(delivery_slips)} results")
 
             # Sortiere nach Datum (neueste zuerst)
             delivery_slips.sort(key=lambda x: x.get('modified_time', 0), reverse=True)
 
+            self.logger.info(f"Listed {len(delivery_slips)} delivery slips for {supplier_name}")
             return delivery_slips
 
         except Exception as e:
@@ -1047,6 +1077,52 @@ class DocumentStorageService:
                     self.last_merge_source = primary_source  # Mark as server/local source
             else:
                 self.logger.warning(f"[MERGE] Primary path not found: {path_result.path if path_result.path else 'N/A'}")
+
+            # 2b. LIEFERSCHEIN aus separatem Lieferscheine-Ordner holen (FLACHE STRUKTUR)
+            if delivery_number and supplier_name:
+                self.logger.info(f"[MERGE] Looking for delivery slip in separate folder: {supplier_name} / {delivery_number}")
+
+                # Bestimme Lieferschein-Pfad (Server oder Lokal) - FLACHE STRUKTUR
+                if self.use_server_storage and PathLib("A:\\").exists():
+                    # SERVER-Lieferschein-Pfad
+                    delivery_slip_path_result = self.path_resolver.resolve_server_delivery_slip_path(
+                        supplier_name=supplier_name,
+                        create_folders=False
+                    )
+                else:
+                    # LOKALER Lieferschein-Pfad
+                    delivery_slip_path_result = self.path_resolver.resolve_delivery_slip_path(
+                        supplier_name=supplier_name,
+                        create_folders=False
+                    )
+
+                if delivery_slip_path_result.success and delivery_slip_path_result.path.exists():
+                    self.logger.info(f"[MERGE] Delivery slip folder found (FLAT): {delivery_slip_path_result.path}")
+
+                    # Suche nach Lieferschein mit passender Lieferscheinnummer
+                    # FLACHE STRUKTUR: Durchsuche direkt den Ordner (kein Jahr/Monat!)
+                    delivery_slip_found = False
+                    for pdf_file in delivery_slip_path_result.path.glob("*.pdf"):
+                        # Prüfe ob Lieferscheinnummer im Dateinamen vorkommt
+                        if delivery_number.lower() in pdf_file.name.lower():
+                            # Kopiere Lieferschein zu Temp-Ordner
+                            import shutil
+                            temp_file = temp_folder / pdf_file.name
+                            shutil.copy2(pdf_file, temp_file)
+                            downloaded_files.append(temp_file)
+                            self.logger.info(f"[MERGE] ✓ Loaded delivery slip from {primary_source}: {pdf_file.name}")
+                            delivery_slip_found = True
+                            break  # Nur ersten Match verwenden
+
+                    if not delivery_slip_found:
+                        self.logger.warning(f"[MERGE] Delivery slip not found in flat folder for: {delivery_number}")
+                else:
+                    self.logger.warning(f"[MERGE] Delivery slip folder not found: {delivery_slip_path_result.path if delivery_slip_path_result.path else 'N/A'}")
+            else:
+                if not delivery_number:
+                    self.logger.info(f"[MERGE] No delivery number provided - skipping delivery slip search")
+                if not supplier_name:
+                    self.logger.info(f"[MERGE] No supplier name provided - skipping delivery slip search")
 
             # 3. FALLBACK: SharePoint-Download (nur wenn keine Dateien lokal gefunden)
             if not downloaded_files and self.use_sharepoint and self.sharepoint_client.is_available():

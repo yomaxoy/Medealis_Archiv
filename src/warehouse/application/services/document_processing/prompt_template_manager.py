@@ -123,9 +123,9 @@ GEWÜNSCHTES JSON-FORMAT (FLACHE STRUKTUR):
 LIEFERANTEN-NORMALISIERUNG (KRITISCH - IMMER ANWENDEN):
 Erkenne und normalisiere Lieferantennamen zu konsistenten Standardschreibweisen:
 
-PRIMEC Variationen → "Primec GmbH":
+PRIMEC Variationen → "Primec":
 - "primec", "Primec", "PRIMEC", "primec gmbh", "Primec gmbh", "PRIMEC GMBH"
-- "primec GmbH", "PRIMEC GmbH" → alle zu "Primec GmbH"
+- "primec GmbH", "PRIMEC GmbH", "Primec GmbH" → alle zu "Primec"
 
 MEGAGEN Variationen → "MEGAGEN":
 - "megagen", "Megagen", "MEGAGEN"
@@ -142,7 +142,7 @@ STRAUMANN Variationen → "Straumann":
 NOBEL Variationen → "Nobel Biocare":
 - "nobel", "Nobel", "NOBEL", "nobel biocare", "Nobel Biocare", "NOBEL BIOCARE"
 
-Beispiel: Wenn du "primec" oder "PRIMEC" erkennst → IMMER ausgeben als "Primec GmbH"
+Beispiel: Wenn du "primec" oder "PRIMEC" erkennst → IMMER ausgeben als "Primec"
 
 CHARGENNUMMER-OPTIMIERUNG (ERWEITERTE SUCHE):
 Suche nach Chargennummern mit folgenden Strategien:
@@ -298,7 +298,7 @@ FINALE VERARBEITUNGSREGELN:
 BEISPIEL KORREKTE AUSGABE (BLOCK-ANALYSE ANGEWENDET):
 {{
     "delivery_number": "LS24-077",
-    "supplier_name": "Primec GmbH",
+    "supplier_name": "Primec",
     "delivery_date": "11.06.2024",
     "employee_name": "Automatischer Import",
     "supplier_id": "",

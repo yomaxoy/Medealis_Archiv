@@ -402,7 +402,7 @@ class DataConfirmationPopup(InspectionPopup):
 
                             if save_result.success:
                                 st.success(f"✅ Bestelldokument gespeichert: {doc.name}")
-                                logger.info(f"✅ Order document saved: {doc.name} to {save_result.path}")
+                                logger.info(f"✅ Order document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}")
                             else:
                                 st.error(f"❌ Fehler beim Speichern von {doc.name}: {save_result.error}")
                                 logger.error(f"❌ Failed to save order document {doc.name}: {save_result.error}")

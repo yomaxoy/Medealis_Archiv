@@ -203,6 +203,13 @@ class StorageValidator:
         """
         Prüft Storage-Berechtigungen für Pfad.
 
+        WICHTIG: Diese Methode erstellt KEINE Ordner mehr!
+        Ordner-Erstellung erfolgt in PathResolver.create_folder_structure()
+
+        Diese Methode prüft nur:
+        - Wenn Pfad existiert: Lese/Schreib-Berechtigung
+        - Wenn Pfad nicht existiert: Warnung (kein Fehler!)
+
         Args:
             path: Zu prüfender Pfad
 
@@ -212,14 +219,18 @@ class StorageValidator:
         result = ValidationResult(is_valid=True)
 
         try:
-            # Erstelle Test-Verzeichnis falls es nicht existiert
+            # Prüfe ob Pfad existiert
             if not path.exists():
-                try:
-                    path.mkdir(parents=True, exist_ok=True)
-                    result.add_warning("Created directory for permission testing")
-                except PermissionError:
-                    result.add_error(f"Cannot create directory: {path}")
-                    return result
+                # KEINE Ordner-Erstellung mehr hier!
+                # Das macht create_folder_structure() mit besserer Fehlerbehandlung
+                result.add_warning(f"Path does not exist yet (will be created): {path}")
+                # Kein Error! Ordner wird später erstellt
+                result.metadata['path'] = str(path)
+                result.metadata['exists'] = False
+                result.metadata['is_directory'] = None
+                return result
+
+            # Pfad existiert bereits - prüfe Berechtigungen
 
             # Prüfe Schreibberechtigung
             if not os.access(path, os.W_OK):
