@@ -27,10 +27,48 @@ class Settings:
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
+    # Storage Configuration
+    USE_SERVER_STORAGE = os.getenv("USE_SERVER_STORAGE", "true").lower() == "true"
+    SERVER_BASE_PATH = Path(r"A:\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Medealis Archiv")
+
     # Datenbank
     DATABASE_NAME = "warehouse_new.db"
-    DATABASE_DIR = Path.home() / ".medealis"
-    DATABASE_PATH = DATABASE_DIR / DATABASE_NAME
+
+    @classmethod
+    def _get_database_path(cls) -> Path:
+        r"""
+        Ermittelt den Datenbank-Pfad basierend auf Verfügbarkeit.
+
+        Primär: A:\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Medealis Archiv\database\
+        Fallback: C:\Users\<Username>\.medealis\
+
+        Returns:
+            Path: Pfad zum Datenbankverzeichnis
+        """
+        if cls.USE_SERVER_STORAGE:
+            server_db_dir = cls.SERVER_BASE_PATH / "database"
+            try:
+                # Prüfe ob Server-Laufwerk verfügbar und beschreibbar
+                if server_db_dir.parent.exists():
+                    server_db_dir.mkdir(parents=True, exist_ok=True)
+                    # Test Schreibrechte
+                    test_file = server_db_dir / ".write_test"
+                    test_file.touch()
+                    test_file.unlink()
+                    print(f"Datenbank-Speicherort: Server (A:\\) - {server_db_dir}")
+                    return server_db_dir
+            except (OSError, PermissionError) as e:
+                print(f"Server-Speicherung nicht verfügbar ({e}), verwende lokalen Fallback")
+
+        # Fallback: Lokaler Speicher
+        local_db_dir = Path.home() / ".medealis"
+        local_db_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Datenbank-Speicherort: Lokal - {local_db_dir}")
+        return local_db_dir
+
+    # Datenbank-Pfade werden dynamisch ermittelt
+    DATABASE_DIR = None  # Wird über Property gesetzt
+    DATABASE_PATH = None  # Wird über Property gesetzt
 
     # Verzeichnisse
     USER_DATA_DIR = Path.home() / "Medealis" / "Wareneingang"
@@ -73,12 +111,30 @@ class Settings:
     ITEM_STATUS_COMPLETED = "Abgeschlossen"
 
     @classmethod
+    def get_database_dir(cls) -> Path:
+        """Gibt das Datenbankverzeichnis zurück (cached nach erstem Aufruf)."""
+        if cls.DATABASE_DIR is None:
+            cls.DATABASE_DIR = cls._get_database_path()
+        return cls.DATABASE_DIR
+
+    @classmethod
+    def get_database_path(cls) -> Path:
+        """Gibt den vollständigen Datenbank-Pfad zurück."""
+        if cls.DATABASE_PATH is None:
+            cls.DATABASE_PATH = cls.get_database_dir() / cls.DATABASE_NAME
+        return cls.DATABASE_PATH
+
+    @classmethod
     def ensure_directories(cls):
         """Stellt sicher, dass alle benötigten Verzeichnisse existieren."""
-        directories = [cls.DATABASE_DIR, cls.USER_DATA_DIR, cls.LOG_DIR, cls.TEMP_DIR]
+        # DATABASE_DIR wird dynamisch über get_database_dir() erstellt
+        directories = [cls.USER_DATA_DIR, cls.LOG_DIR, cls.TEMP_DIR]
 
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
+
+        # Datenbank-Verzeichnis separat sicherstellen
+        cls.get_database_dir()
 
     @classmethod
     def get_template_path(cls, template_name: str) -> Path:

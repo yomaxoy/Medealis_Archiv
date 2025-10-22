@@ -37,7 +37,7 @@ def initialize_database(database_path: str = None) -> None:
         # Standard-Pfad aus config
         try:
             from config.settings import settings
-            database_path = settings.DATABASE_PATH
+            database_path = settings.get_database_path()
         except ImportError:
             # Fallback wenn config nicht verfügbar
             db_dir = Path.home() / ".medealis"
