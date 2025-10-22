@@ -638,10 +638,10 @@ class BarcodeGenerator:
             return {"status": "error", "error": str(e)}
 
     def _get_qr_code_for_article(self, article_number: str) -> Optional[Path]:
-        """
+        r"""
         Suche QR-Code PNG basierend auf Artikelnummer.
 
-        PRIMÄR: Server A:\ (Keyence Messprogramme Ordner)
+        PRIMÄR: Server-Pfad (\\10.190.140.10\Allgemein - Keyence Messprogramme Ordner)
         FALLBACK: Lokaler Pfad (~/Medealis/Wareneingang/QR-Codes Messprogramme)
 
         Args:

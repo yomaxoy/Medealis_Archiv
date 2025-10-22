@@ -6,6 +6,7 @@ für GUI-Warnungen bei Server-Ausfall.
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Any
 from dataclasses import dataclass
@@ -115,7 +116,8 @@ class StorageAvailabilityChecker:
     ) -> StorageOption:
         """Prüft Server-Storage Verfügbarkeit."""
         server_enabled = env_config.is_server_storage_enabled()
-        server_available = Path("A:\\").exists()
+        # Prüfe UNC-Pfad direkt (robuster als gemapptes Laufwerk)
+        server_available = path_resolver.server_storage_path.exists()
 
         # Basis-Pfad
         base_path = str(path_resolver.server_storage_path)
@@ -142,8 +144,8 @@ class StorageAvailabilityChecker:
             status_message = "Server-Storage ist deaktiviert (USE_SERVER_STORAGE=false)"
             recommendation = "In .env aktivieren: USE_SERVER_STORAGE=true"
         elif not server_available:
-            status_message = "❌ Server nicht erreichbar! Laufwerk A:\\ nicht verbunden"
-            recommendation = "Laufwerk verbinden: net use A: \\\\10.190.140.10\\Allgemein"
+            status_message = f"❌ Server nicht erreichbar! Pfad: {path_resolver.server_storage_path}"
+            recommendation = "Netzwerkverbindung prüfen oder IT-Support kontaktieren"
         else:
             status_message = "✅ Server verfügbar und bereit"
             recommendation = "Primäre Speicher-Option"
@@ -282,7 +284,7 @@ class StorageAvailabilityChecker:
         warning = {
             "title": "⚠️ Server-Speicherung nicht verfügbar",
             "message": (
-                "Der Firmenserver (Laufwerk A:\\) ist nicht erreichbar.\n"
+                f"Der Firmenserver ({path_resolver.server_storage_path}) ist nicht erreichbar.\n"
                 "Das System wird automatisch auf eine Fallback-Option ausweichen."
             ),
             "severity": "warning",

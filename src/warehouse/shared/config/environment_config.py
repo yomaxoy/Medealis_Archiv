@@ -189,7 +189,8 @@ class EnvironmentConfig:
         return {
             'storage_mode': self.get_storage_mode(),
             'server_storage_enabled': self.is_server_storage_enabled(),
-            'server_available': Path("A:\\").exists(),
+            # Prüfe UNC-Pfad direkt (robuster als gemapptes Laufwerk)
+            'server_available': os.path.exists(r"\\10.190.140.10\Allgemein"),
             'sharepoint_enabled': self.is_sharepoint_enabled(),
             'sharepoint_configured': all(sp_config.values()),
             'missing_sharepoint_config': [

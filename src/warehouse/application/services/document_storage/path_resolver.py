@@ -64,7 +64,7 @@ class PathResolver:
         self._document_output_path = None
         self._temp_path = None
 
-        # Server-Pfade (Netzlaufwerk A:\)
+        # Server-Pfade (UNC: \\10.190.140.10\Allgemein)
         self._server_storage_path = None
 
         # SharePoint Basis-Pfade
@@ -108,37 +108,38 @@ class PathResolver:
 
     @property
     def server_qr_code_path(self) -> Path:
-        """
+        r"""
         Server-Pfad für QR-Code-Vorlagen (Keyence Messprogramme).
 
         PRIMÄRE Quelle für QR-Codes die in Labels eingefügt werden.
 
-        Struktur auf A:\:
-        A:\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes\
+        Verwendet DIREKT den UNC-Pfad statt gemapptem Laufwerk A:\.
+
+        Struktur:
+        \\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes\
 
         Returns:
             Path zum Server QR-Code-Verzeichnis
         """
         qr_path = Path(
-            r"A:\Qualitätsmanagement\QM_MEDEALIS"
+            r"\\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS"
             r"\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes"
         )
 
-        # Validiere dass Laufwerk erreichbar ist
-        if not Path("A:\\").exists():
+        # Validiere dass Server erreichbar ist
+        if not qr_path.exists():
             self.logger.warning(
-                "Server-Laufwerk A:\\ nicht verfügbar! "
-                "QR-Codes können nicht vom Server geladen werden."
+                f"Server QR-Code-Pfad nicht verfügbar: {qr_path}"
             )
 
         return qr_path
 
     @property
     def local_qr_code_path(self) -> Path:
-        """
+        r"""
         FALLBACK: Lokaler Pfad für QR-Code-Vorlagen.
 
-        Wird verwendet wenn Server A:\ nicht verfügbar ist.
+        Wird verwendet wenn Server-Pfad nicht verfügbar ist.
 
         Returns:
             Path zum lokalen QR-Code-Verzeichnis
@@ -147,29 +148,31 @@ class PathResolver:
 
     @property
     def server_storage_path(self) -> Path:
-        """
-        Basis-Pfad für SERVER-Speicherung (Netzlaufwerk A:\).
+        r"""
+        Basis-Pfad für SERVER-Speicherung (Netzlaufwerk).
 
         DIES IST DER NEUE STANDARD für Produktiv-Speicherung!
 
-        Struktur auf A:\:
-        A:\Qualitätsmanagement\QM_Medealis\03. Produkte\Chargenverwaltung\Produktionsunterlagen\
+        Verwendet DIREKT den UNC-Pfad (\\10.190.140.10\Allgemein) statt gemapptem Laufwerk A:\,
+        da gemappte Laufwerke nicht immer in Python-Prozessen sichtbar sind.
+
+        Struktur:
+        \\10.190.140.10\Allgemein\Qualitätsmanagement\QM_Medealis\03. Produkte\Chargenverwaltung\Produktionsunterlagen\
 
         Returns:
             Path zum Server-Basis-Verzeichnis
         """
         if self._server_storage_path is None:
-            # Netzlaufwerk A:\ mit vollständigem Pfad
+            # DIREKT UNC-Pfad verwenden (robuster als gemappter Laufwerksbuchstabe)
             self._server_storage_path = Path(
-                r"A:\Qualitätsmanagement\QM_Medealis"
+                r"\\10.190.140.10\Allgemein\Qualitätsmanagement\QM_Medealis"
                 r"\03. Produkte\Chargenverwaltung\Produktionsunterlagen"
             )
 
-            # Validiere dass Laufwerk erreichbar ist
-            if not Path("A:\\").exists():
+            # Validiere dass Server erreichbar ist
+            if not self._server_storage_path.exists():
                 self.logger.warning(
-                    "Server-Laufwerk A:\\ nicht verfügbar! "
-                    "Bitte Netzlaufwerk verbinden."
+                    f"Server-Pfad nicht erreichbar: {self._server_storage_path}"
                 )
 
         return self._server_storage_path
@@ -253,14 +256,14 @@ class PathResolver:
         context: StorageContextData,
         create_folders: bool = True
     ) -> PathResult:
-        """
-        NEUE STANDARD-METHODE für Server-Speicherung (Netzlaufwerk A:\).
+        r"""
+        STANDARD-METHODE für Server-Speicherung (UNC-Pfad).
 
         Erstellt Pfad auf dem Firmenserver für zentrale Dokumentenverwaltung.
-        Diese Methode sollte künftig als STANDARD verwendet werden!
+        Verwendet direkt UNC-Pfad (\\10.190.140.10\Allgemein).
 
         Pfad-Struktur (identisch zur lokalen Struktur):
-        A:\Qualitätsmanagement\...\Produktionsunterlagen\
+        \\10.190.140.10\Allgemein\Qualitätsmanagement\...\Produktionsunterlagen\
             {Lieferant}\{Hersteller}\{Artikelnummer}\{Chargennummer}\{Lieferscheinnummer}\
 
         Args:
@@ -280,7 +283,7 @@ class PathResolver:
             ... )
             >>> result = path_resolver.resolve_server_storage_path(context)
             >>> print(result.path)
-            A:\Qualitätsmanagement\...\Primec_GmbH\MegaGen\MG0001\20240415-1234\LS24-077
+            \\10.190.140.10\Allgemein\Qualitätsmanagement\...\Primec_GmbH\MegaGen\MG0001\20240415-1234\LS24-077
         """
         try:
             self.logger.info(f"Resolving SERVER storage path for batch: {context.batch_number}")
@@ -291,11 +294,14 @@ class PathResolver:
                 error_msg = f"Incomplete storage context: {', '.join(validation_issues)}"
                 return PathResult(path=Path(), error=error_msg)
 
-            # Validiere dass Server verfügbar ist
-            if not Path("A:\\").exists():
+            # Validiere dass Server verfügbar ist (prüfe direkt den UNC-Pfad)
+            server_available = self.server_storage_path.exists()
+            self.logger.info(f"🔍 DEBUG path_resolver: Server storage available = {server_available}")
+
+            if not server_available:
                 error_msg = (
-                    "Server-Laufwerk A:\\ nicht verfügbar! "
-                    "Bitte Netzlaufwerk verbinden oder IT-Support kontaktieren."
+                    f"Server-Speicherpfad nicht verfügbar: {self.server_storage_path}\n"
+                    "Bitte Netzwerkverbindung prüfen oder IT-Support kontaktieren."
                 )
                 self.logger.error(error_msg)
                 return PathResult(path=Path(), error=error_msg)
@@ -768,11 +774,11 @@ class PathResolver:
         document_type: DocumentType = DocumentType.LIEFERSCHEIN,
         create_folders: bool = True
     ) -> PathResult:
-        """
-        SERVER-Version der Lieferschein-Pfad-Auflösung (Netzlaufwerk A:\).
+        r"""
+        SERVER-Version der Lieferschein-Pfad-Auflösung (UNC-Pfad).
 
-        Erstellt FLACHE Pfad-Struktur auf Server: A:\...\Produktionsunterlagen\{Supplier}\Lieferscheine
-        Beispiel: A:\Qualitätsmanagement\...\Primec_GmbH\Lieferscheine\
+        Erstellt FLACHE Pfad-Struktur auf Server: \\10.190.140.10\Allgemein\...\Produktionsunterlagen\{Supplier}\Lieferscheine
+        Beispiel: \\10.190.140.10\Allgemein\Qualitätsmanagement\...\Primec_GmbH\Lieferscheine\
 
         VORTEIL: Zentrale Server-Speicherung für alle Lieferscheine
         IDENTISCH zur lokalen Struktur, nur auf anderem Laufwerk
@@ -792,11 +798,11 @@ class PathResolver:
             if not supplier_name or not isinstance(supplier_name, str):
                 return PathResult(path=Path(), error="Invalid supplier name provided")
 
-            # Validiere dass Server verfügbar ist
-            if not Path("A:\\").exists():
+            # Validiere dass Server verfügbar ist (prüfe direkt den UNC-Pfad)
+            if not self.server_storage_path.exists():
                 error_msg = (
-                    "Server-Laufwerk A:\\ nicht verfügbar! "
-                    "Bitte Netzlaufwerk verbinden oder IT-Support kontaktieren."
+                    f"Server-Speicherpfad nicht verfügbar: {self.server_storage_path}\n"
+                    "Bitte Netzwerkverbindung prüfen oder IT-Support kontaktieren."
                 )
                 self.logger.error(error_msg)
                 return PathResult(path=Path(), error=error_msg)

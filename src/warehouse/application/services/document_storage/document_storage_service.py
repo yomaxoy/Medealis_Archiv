@@ -5,6 +5,7 @@ Vereinheitlicht die Speicher-Logik die vorher in verschiedenen Services verstreu
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, Tuple, List
 from datetime import datetime
@@ -147,12 +148,18 @@ class DocumentStorageService:
             safe_filename, sanitize_warnings = self.storage_validator.sanitize_filename(document_name)
 
             # 5. PATH RESOLUTION - Löse Storage-Pfad auf (SERVER oder LOKAL)
-            from pathlib import Path as PathLib
-
             # NEU: Server-Storage als primär, lokal als Fallback
             server_unavailable_info = None  # Für GUI-Warnung
 
-            if self.use_server_storage and PathLib("A:\\").exists():
+            # Prüfe Server-Verfügbarkeit direkt über UNC-Pfad (robuster als Laufwerksbuchstabe)
+            server_available = self.path_resolver.server_storage_path.exists()
+
+            self.logger.info(f"🔍 DEBUG: Server storage check:")
+            self.logger.info(f"  - use_server_storage: {self.use_server_storage}")
+            self.logger.info(f"  - Server path: {self.path_resolver.server_storage_path}")
+            self.logger.info(f"  - Server available: {server_available}")
+
+            if self.use_server_storage and server_available:
                 # SERVER-Speicherung (PRIMÄR)
                 path_result = self.path_resolver.resolve_server_storage_path(context, create_folders=True)
                 storage_location = "server"
@@ -164,7 +171,7 @@ class DocumentStorageService:
 
                 if self.use_server_storage:
                     # Server sollte verwendet werden, ist aber nicht verfügbar
-                    self.logger.warning("Server storage enabled but A:\\ not available, using local fallback")
+                    self.logger.warning(f"Server storage enabled but not available ({self.path_resolver.server_storage_path}), using local fallback")
 
                     # Sammle Informationen für GUI-Warnung
                     server_unavailable_info = {
@@ -172,7 +179,7 @@ class DocumentStorageService:
                         "actual_storage": "local",
                         "server_path": str(self.path_resolver.server_storage_path),
                         "local_path": str(path_result.path) if path_result.success else "N/A",
-                        "reason": "Server-Laufwerk A:\\ nicht verfügbar"
+                        "reason": f"Server-Speicherpfad nicht erreichbar: {self.path_resolver.server_storage_path}"
                     }
                 else:
                     self.logger.info("Using LOCAL storage (server disabled)")
@@ -341,8 +348,6 @@ class DocumentStorageService:
             Tuple von (Pfad, Warnungen)
         """
         try:
-            from pathlib import Path as PathLib
-
             # Hole Storage-Kontext
             context = self.storage_context.get_complete_storage_context(
                 batch_number=batch_number,
@@ -352,7 +357,8 @@ class DocumentStorageService:
             )
 
             # Löse Pfad auf - PRIMÄR Server, FALLBACK Lokal
-            if self.use_server_storage and PathLib("A:\\").exists():
+            # Prüfe Server-Verfügbarkeit direkt über UNC-Pfad
+            if self.use_server_storage and self.path_resolver.server_storage_path.exists():
                 # SERVER-Pfad verwenden (PRIMÄR)
                 path_result = self.path_resolver.resolve_server_storage_path(
                     context, create_folders=create_folders
@@ -610,12 +616,11 @@ class DocumentStorageService:
             self.logger.info(f"Saving delivery slip: '{document_name}' for supplier: '{supplier_name}'")
 
             # 1. DELIVERY SLIP PATH RESOLUTION (SERVER oder LOKAL)
-            from pathlib import Path as PathLib
-
             # NEU: Server-Storage als primär, lokal als Fallback
             server_unavailable_info = None  # Für GUI-Warnung
 
-            if self.use_server_storage and PathLib("A:\\").exists():
+            # Prüfe Server-Verfügbarkeit direkt über UNC-Pfad
+            if self.use_server_storage and self.path_resolver.server_storage_path.exists():
                 # SERVER-Speicherung (PRIMÄR)
                 path_result = self.path_resolver.resolve_server_delivery_slip_path(
                     supplier_name=supplier_name,
@@ -632,7 +637,7 @@ class DocumentStorageService:
                 storage_location = "local"
 
                 if self.use_server_storage:
-                    self.logger.warning("Server storage enabled but A:\\ not available, using local fallback for delivery slip")
+                    self.logger.warning(f"Server storage enabled but not available ({self.path_resolver.server_storage_path}), using local fallback for delivery slip")
 
                     # Sammle Informationen für GUI-Warnung
                     server_unavailable_info = {
@@ -640,7 +645,7 @@ class DocumentStorageService:
                         "actual_storage": "local",
                         "server_path": str(self.path_resolver.server_storage_path / supplier_name / "Lieferscheine"),
                         "local_path": str(path_result.path) if path_result.success else "N/A",
-                        "reason": "Server-Laufwerk A:\\ nicht verfügbar",
+                        "reason": f"Server-Pfad nicht verfügbar ({self.path_resolver.server_storage_path})",
                         "document_type": "delivery_slip"
                     }
 
@@ -1046,10 +1051,9 @@ class DocumentStorageService:
             )
 
             # 2. PRIMARY: Server/Lokaler Ordner (wo Dokumente gespeichert wurden)
-            from pathlib import Path as PathLib
-
             # Bestimme primäre Quelle basierend auf Storage-Konfiguration
-            if self.use_server_storage and PathLib("A:\\").exists():
+            # Prüfe Server-Verfügbarkeit direkt über UNC-Pfad
+            if self.use_server_storage and self.path_resolver.server_storage_path.exists():
                 # SERVER-Speicherung (PRIMÄR)
                 path_result = self.path_resolver.resolve_server_storage_path(context, create_folders=False)
                 primary_source = "server"
@@ -1083,7 +1087,8 @@ class DocumentStorageService:
                 self.logger.info(f"[MERGE] Looking for delivery slip in separate folder: {supplier_name} / {delivery_number}")
 
                 # Bestimme Lieferschein-Pfad (Server oder Lokal) - FLACHE STRUKTUR
-                if self.use_server_storage and PathLib("A:\\").exists():
+                # Prüfe Server-Verfügbarkeit direkt über UNC-Pfad
+                if self.use_server_storage and self.path_resolver.server_storage_path.exists():
                     # SERVER-Lieferschein-Pfad
                     delivery_slip_path_result = self.path_resolver.resolve_server_delivery_slip_path(
                         supplier_name=supplier_name,
