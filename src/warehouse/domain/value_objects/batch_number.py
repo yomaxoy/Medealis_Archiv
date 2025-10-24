@@ -1,55 +1,101 @@
 # src/warehouse/domain/value_objects/batch_number.py
 
 from dataclasses import dataclass
+import re
 
 
 @dataclass(frozen=True)
 class BatchNumber:
-    """19-stellige Chargennummer (z.B. P-293520240528)."""
+    """
+    Chargennummer für verschiedene Lieferanten.
+
+    Unterstützte Formate:
+    - Primec: P-XXXXXXXXXXXX-XXXX (z.B. P-293520240528-1234)
+    - Terrats Medical: 6-stellige Ziffern (z.B. 123456)
+    - Standard: Buchstabe + Zahlen (z.B. B123456, CH789)
+    """
 
     value: str
 
     def __post_init__(self):
         if not self.value:
             raise ValueError("Chargennummer darf nicht leer sein")
-        
-        # Strikte Validierung nur für vollständige P-Format Nummern
-        # Erlaube auch einfachere Formate beim Import (ohne strikte Validation)
-        if self.value.startswith("P-") and "-" in self.value[2:]:
-            # Nur validieren wenn es das vollständige P-Format zu sein scheint
-            parts = self.value.split("-")
-            if len(parts) == 3:
-                # Vollständige Validierung nur wenn alle Teile numerisch sind
-                if parts[1].isdigit() and parts[2].isdigit():
-                    # Prüfe ersten Teil (12 Ziffern nach P-)
-                    if len(parts[1]) != 12:
-                        raise ValueError("Nach 'P-' müssen genau 12 Ziffern folgen")
-                    
-                    # Prüfe zweiten Teil (4 oder 5 Ziffern)
-                    if len(parts[2]) not in [4, 5]:
-                        raise ValueError("Nach dem zweiten Bindestrich müssen 4 oder 5 Ziffern folgen")
-        
-        # Für alle anderen Formate: Nur grundlegende Validierung
-        # (nicht leer, keine gefährlichen Zeichen)
+
+        # Keine führenden/nachfolgenden Leerzeichen
         if len(self.value.strip()) != len(self.value):
             raise ValueError("Chargennummer darf keine führenden/nachfolgenden Leerzeichen haben")
-    
+
+        # Validierung verschiedener Formate
+        if not self._is_valid_format():
+            raise ValueError(
+                f"Ungültiges Chargennummern-Format: '{self.value}'. "
+                "Erlaubt: Primec (P-XXXXXXXXXXXX-XXXX), Terrats (6 Ziffern), Standard (Buchstabe+Zahlen)"
+            )
+
+    def _is_valid_format(self) -> bool:
+        """
+        Prüft ob Chargennummer einem bekannten Format entspricht.
+
+        Returns:
+            True wenn Format valide ist
+        """
+        # Format 1: Primec - P-XXXXXXXXXXXX-XXXX
+        if self.value.startswith("P-") and "-" in self.value[2:]:
+            parts = self.value.split("-")
+            if len(parts) == 3:
+                if parts[1].isdigit() and parts[2].isdigit():
+                    # Strikte Validierung für vollständiges Primec-Format
+                    if len(parts[1]) == 12 and len(parts[2]) in [4, 5]:
+                        return True
+
+        # Format 2: Terrats Medical - 6 Ziffern
+        if re.match(r'^\d{6}$', self.value):
+            return True
+
+        # Format 3: Standard - Buchstabe + Zahlen (mindestens 5 Zeichen)
+        if len(self.value) >= 5:
+            if self.value[0].isalpha() and any(c.isdigit() for c in self.value):
+                return True
+
+        # Format 4: Nur Zahlen mit 6+ Stellen (flexibler Fallback)
+        if self.value.isdigit() and len(self.value) >= 6:
+            return True
+
+        return False
+
     def is_complete_format(self) -> bool:
         """Prüft ob die Chargennummer das vollständige P-XXXXXXXXXXXX-XXXX Format hat"""
         if not self.value.startswith("P-"):
             return False
-        
+
         parts = self.value.split("-")
         if len(parts) != 3:
             return False
-        
+
         # Prüfe Format
-        return (len(parts[1]) == 12 and parts[1].isdigit() and 
+        return (len(parts[1]) == 12 and parts[1].isdigit() and
                 len(parts[2]) in [4, 5] and parts[2].isdigit())
-    
+
     def needs_completion(self) -> bool:
         """Prüft ob die Chargennummer noch vervollständigt werden muss"""
         return not self.is_complete_format()
+
+    def get_supplier_hint(self) -> str:
+        """
+        Leitet Lieferanten-Hinweis aus Chargennummer ab.
+
+        Returns:
+            Lieferanten-Name oder "Unknown"
+        """
+        # Terrats Medical Pattern - 6 Ziffern
+        if re.match(r'^\d{6}$', self.value):
+            return "Terrats Medical"
+
+        # Primec Pattern - P-Format
+        if self.value.startswith("P-"):
+            return "Primec"
+
+        return "Unknown"
 
     def __str__(self) -> str:
         return self.value

@@ -370,6 +370,8 @@ Prüfe dies, aber lass dich nicht davon beeinflussen falls der Text etwas andere
             return [
                 "Primec",
                 "PRIMEC",
+                "Terrats Medical",
+                "TERRATS",
                 "Medealis",
                 "Standard Implants",
                 "Dental Implants"

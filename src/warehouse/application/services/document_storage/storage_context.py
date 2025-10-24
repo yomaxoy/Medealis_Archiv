@@ -437,6 +437,8 @@ class StorageContext:
         # Basic Mapping-Regeln
         if "primec" in supplier_lower:
             return "Primec"
+        elif "terrats" in supplier_lower:
+            return "Terrats Medical"
         elif "megagen" in supplier_lower:
             return "MEGAGEN"
         elif "ctech" in supplier_lower or "c-tech" in supplier_lower:
@@ -476,13 +478,18 @@ class StorageContext:
         if not article_number:
             return "Standard_Implantate"
 
+        # Spezial-Check für Terrats Medical: 71000XX-X Format
+        import re
+        if re.match(r'^71000\d{2}-\d{1,3}$', article_number):
+            return "Terrats Medical"
+
         article_upper = article_number.upper()
 
         # FIXED: Prefix-Mapping - LÄNGERE PREFIXES ZUERST!
         # Dictionary wird nach Prefix-Länge sortiert (längste zuerst)
         manufacturer_map = {
             # 2-character prefixes first (to avoid "M" matching "MG")
-            "AS": "Astra Dentspy",
+            "AS": "Dentspy",
             "BR": "Bredent",
             "CT": "C-Tech",
             "DY": "Dyna",

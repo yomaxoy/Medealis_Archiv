@@ -127,6 +127,10 @@ PRIMEC Variationen → "Primec":
 - "primec", "Primec", "PRIMEC", "primec gmbh", "Primec gmbh", "PRIMEC GMBH"
 - "primec GmbH", "PRIMEC GmbH", "Primec GmbH" → alle zu "Primec"
 
+TERRATS MEDICAL Variationen → "Terrats Medical":
+- "terrats", "Terrats", "TERRATS", "terrats medical", "Terrats Medical", "TERRATS MEDICAL"
+- "Terrats Medical GmbH", "TERRATS MEDICAL GmbH", "Terrats Medical GmbH" → alle zu "Terrats Medical"
+
 MEGAGEN Variationen → "MEGAGEN":
 - "megagen", "Megagen", "MEGAGEN"
 - "Megagen GmbH", "MEGAGEN GmbH" → alle zu "MEGAGEN"
@@ -143,41 +147,40 @@ NOBEL Variationen → "Nobel Biocare":
 - "nobel", "Nobel", "NOBEL", "nobel biocare", "Nobel Biocare", "NOBEL BIOCARE"
 
 Beispiel: Wenn du "primec" oder "PRIMEC" erkennst → IMMER ausgeben als "Primec"
+Beispiel: Wenn du "terrats medical" oder "TERRATS" erkennst → IMMER ausgeben als "Terrats Medical"
 
 CHARGENNUMMER-OPTIMIERUNG (ERWEITERTE SUCHE):
 Suche nach Chargennummern mit folgenden Strategien:
 
 Standard-Formate:
-- P-YYYYMMDD (z.B. "P-20240417")
-- Buchstabe + Zahlen (z.B. "B123456", "CH789")
+- Primec: P-YYYYMMDDHHMMSS-XXXX (z.B. "P-293520240528-1234")
+- Terrats Medical: 6-stellige Ziffern (z.B. "123456") - Spalte "Lot-Nummer" oder "Lot"
+- Standard: Buchstabe + Zahlen (z.B. "B123456", "CH789")
 - Nur Zahlen mit 6+ Stellen (z.B. "240417")
 
 Erweiterte Suche bei fehlender Chargennummer:
-- Prüfe Spalten "Charge", "Batch", "Lot", "Serial"
+- Prüfe Spalten "Charge", "Batch", "Lot", "Lot-Nummer", "Serial"
 - Suche in Artikel-Beschreibung nach Mustern
 - Prüfe Datum-ähnliche Zahlenfolgen
 - Fallback: "BATCH-[ARTIKEL]-[DATUM]" wenn nichts gefunden
 
-BESTELLNUMMERN-EXTRAKTION (BLOCK-BASIERTE ANALYSE - KRITISCH):
-🔥 WICHTIG: Du MUSST diese exakte 5-Schritt-Methodik befolgen, keine Abweichungen!
+BESTELLNUMMERN-EXTRAKTION - LIEFERANTEN-SPEZIFISCH:
+🔥 WICHTIG: Erkenne AUTOMATISCH das Layout-Muster des Lieferanten!
+
+═══════════════════════════════════════════════════════════════════
+PRIMEC LAYOUT (Block-basierte Struktur):
+═══════════════════════════════════════════════════════════════════
+Mehrere Bestellungen pro Lieferschein möglich, zwischen Artikel-Blöcken.
 
 SCHRITT 1: DOKUMENT IN ARTIKEL-BLÖCKE TEILEN
-Teile das Dokument in logische BLÖCKE auf:
 BLOCK 1 = Alles von Dokumentstart bis zur ERSTEN "Bestellnummer:"
 BLOCK 2 = Alles von ERSTER "Bestellnummer:" bis zur ZWEITEN "Bestellnummer:"
 BLOCK 3 = Alles von ZWEITER "Bestellnummer:" bis Dokumentende
-(weitere Blöcke falls mehr Bestellnummern vorhanden)
 
-SCHRITT 2: BESTELLNUMMER-TRENNER IDENTIFIZIEREN
-Suche nach diesen EXAKTEN Mustern:
-- "Bestellnummer: \\d{5} vom \\d{2}\\.\\d{2}\\.\\d{4}"
-- "Best.-Nr.: XXXXX", "Bestellung XXXXX", "Order: XXXXX"
-- "PO: XXXXX", "Purchase Order XXXXX", "Ref: XXXXX"
-Diese Zeilen sind BLOCK-TRENNER, nicht Artikel-Eigenschaften!
+SCHRITT 2: BESTELLNUMMER-TRENNER (Primec)
+Suche nach: "Bestellnummer: \\d{5} vom \\d{2}\\.\\d{2}\\.\\d{4}"
 
-SCHRITT 3: ARTIKEL-ZUORDNUNG PRO BLOCK
-ABSOLUTE REGEL: Artikel gehören zum BLOCK in dem sie stehen!
-Für PRIMEC-STRUKTUR (typisches Layout):
+SCHRITT 3: ARTIKEL-ZUORDNUNG (Primec Block-Struktur)
 ┌─ BLOCK 1 (bis erste Bestellnummer)
 │  ├─ CT0003 (Pos 1.1) ← Artikel OHNE direkte Bestellnummer
 │  └─ Ende bei "Bestellnummer: 10170"
@@ -186,6 +189,45 @@ Für PRIMEC-STRUKTUR (typisches Layout):
 │  └─ Ende bei "Bestellnummer: 10172"
 └─ BLOCK 3 (nach zweiter Bestellnummer)
    └─ MG0001 (Pos 2.1) ← Artikel bekommt 10172
+
+═══════════════════════════════════════════════════════════════════
+TERRATS MEDICAL LAYOUT (Einfache Tabellen-Struktur):
+═══════════════════════════════════════════════════════════════════
+NUR EINE Bestellung pro Lieferschein, Bestellnummer UNTERHALB der Tabelle.
+
+ERKENNUNGS-MERKMALE (Terrats Medical):
+✓ Artikelnummern beginnen mit "71000" (z.B. 7100001-1)
+✓ Tabelle mit Spalten: Artikelnr | [LEER] | Beschreibung | Lot-Nummer | Menge | ...
+✓ "Lot-Nummer" Spalte mit 6-stelligen Zahlen
+✓ Bestellnummer NACH/UNTERHALB der Tabelle: "Purchase Order: XXXXX"
+
+SCHRITT 1: ERKENNE TERRATS MEDICAL LAYOUT
+Wenn Artikelnummern 71000XX-X Format haben → TERRATS MEDICAL Layout!
+
+SCHRITT 2: SUCHE BESTELLNUMMER UNTERHALB DER TABELLE
+Suche nach: "Purchase Order: \\d{5}" NACH der Artikel-Tabelle
+
+SCHRITT 3: ALLE ARTIKEL BEKOMMEN DIESELBE BESTELLNUMMER
+Für TERRATS MEDICAL:
+- Finde "Purchase Order: 12345" unterhalb der Tabelle
+- ALLE Artikel in der Tabelle bekommen order_number: "12345"
+- KEINE Block-Logik nötig - nur EINE Bestellung!
+
+Beispiel (Terrats Medical):
+Tabelle:
+7100001-1 | | Dental Implantat | 123456 | 10
+7100002-5 | | Abutment       | 789012 | 5
+
+Unterhalb: "Purchase Order: 12345"
+
+Ergebnis:
+{{
+  "items": [
+    {{"article_number": "7100001-1", "batch_number": "123456", "order_number": "12345"}},
+    {{"article_number": "7100002-5", "batch_number": "789012", "order_number": "12345"}}
+  ],
+  "order_number": "12345"
+}}
 
 SCHRITT 4: EXPLIZITE ZUORDNUNGSLOGIK (PSEUDO-CODE)
 blocks = split_document_by_order_numbers()
