@@ -101,6 +101,7 @@ class GenerationContext:
 
                 'lotno': self.batch_number,
                 'lotnr': self.batch_number,        # Für Begleitschein Template
+                'chargennr': self.batch_number,    # Für Begleitschein Dateiname
                 'batch_number': self.batch_number,  # Added for barcode template compatibility
 
                 'lieferant': self.supplier_name,

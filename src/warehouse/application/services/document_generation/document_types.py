@@ -249,6 +249,7 @@ TEMPLATE_REGISTRY: Dict[DocumentType, TemplateInfo] = {
             "orderdate",           # Bestelldatum
             "itemnr",              # Artikelnummer
             "lotno",               # Chargennummer
+            "chargennr",           # Chargennummer (für Dateiname)
             "qty",                 # Menge
             # Prüfkriterien (als X oder leer)
             "VP", "nVP",           # Verpackung OK/nicht OK

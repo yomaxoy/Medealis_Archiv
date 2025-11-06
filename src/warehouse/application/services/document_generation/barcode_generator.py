@@ -323,16 +323,19 @@ class BarcodeGenerator:
             upper_half_height = usable_height // 2
             lower_half_height = usable_height - upper_half_height
 
-            # UPPER HALF: Three equal columns layout
+            # UPPER HALF: Left side (Article + Storage) + Right side (QR Code)
             upper_y_start = padding_top + 20
-            column_width = usable_width // 3  # Divide into 3 equal columns
-            column_margin = 10
 
-            # COLUMN 1 (Left): Article Number
-            column1_x = padding_left + column_margin
+            # Calculate space for QR code on the right (about 1/3 of width)
+            qr_section_width = usable_width // 3
+            text_section_width = usable_width - qr_section_width - 20  # 20px gap
+
+            margin_left = padding_left + 10
+
+            # ROW 1: Article Number (full width of text section)
             # Header text "Artikelnummer:"
             draw.text(
-                (column1_x, upper_y_start),
+                (margin_left, upper_y_start),
                 "Artikelnummer:",
                 fill="black",
                 font=bold_font_medium,
@@ -340,43 +343,43 @@ class BarcodeGenerator:
             # Article number below header - BOLD
             article_y = upper_y_start + 40
             draw.text(
-                (column1_x, article_y),
+                (margin_left, article_y),
                 article_number,
                 fill="black",
                 font=bold_font_large,
             )
 
-            # COLUMN 2 (Middle): Storage Location
-            column2_x = padding_left + column_width + column_margin
+            # ROW 2: Storage Location (below article number)
+            storage_header_y = article_y + 120  # Space below article number
             # Header text "Lagernummer:"
             draw.text(
-                (column2_x, upper_y_start),
+                (margin_left, storage_header_y),
                 "Lagernummer:",
                 fill="black",
                 font=bold_font_medium,
             )
             # Storage location below header - BOLD
             if storage_location and storage_location.strip():
-                storage_y = upper_y_start + 40
+                storage_y = storage_header_y + 40
                 draw.text(
-                    (column2_x, storage_y),
+                    (margin_left, storage_y),
                     storage_location.strip(),
                     fill="black",
                     font=bold_font_large,
                 )
             else:
                 # Draw empty field for manual writing if no storage location
-                storage_y = upper_y_start + 40
+                storage_y = storage_header_y + 40
                 # Draw line for manual writing
-                line_end_x = column2_x + column_width - column_margin - 20
+                line_end_x = margin_left + text_section_width - 20
                 draw.line(
-                    [column2_x, storage_y + 20, line_end_x, storage_y + 20],
+                    [margin_left, storage_y + 20, line_end_x, storage_y + 20],
                     fill="black",
                     width=2,
                 )
 
-            # COLUMN 3 (Right): QR Code
-            column3_x = padding_left + 2 * column_width + column_margin
+            # QR Code on the right side
+            qr_section_x = padding_left + text_section_width + 20
             qr_code_path = self._get_qr_code_for_article(article_number)
             if qr_code_path and qr_code_path.exists():
                 try:
@@ -384,15 +387,15 @@ class BarcodeGenerator:
                     qr_img = Image.open(qr_code_path)
 
                     # Optimale Größe für rechte obere Ecke berechnen
-                    available_width = column_width - (2 * column_margin)
+                    available_width = qr_section_width - 20
                     available_height = upper_half_height - 60  # Platz für Header + Margin
                     qr_size = min(available_width, available_height, 200)  # Max 200px
 
                     # QR-Code auf optimale Größe skalieren
                     qr_resized = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
 
-                    # Position: Rechts oben, zentriert in der Spalte
-                    qr_x = column3_x + (available_width - qr_size) // 2
+                    # Position: Rechts oben, zentriert in der Sektion
+                    qr_x = qr_section_x + (available_width - qr_size) // 2
                     qr_y = upper_y_start + 10  # Kleiner Abstand vom oberen Rand
 
                     # QR-Code ins Label einfügen
