@@ -11,6 +11,7 @@ class ArticleNumber:
 
     Unterstützte Formate:
     - Standard: Buchstabe + Zahlen (z.B. A0001, B0002, CT003, NE0001_SI00151)
+    - Mit Punkten: Artikelnummern können Punkte enthalten (z.B. A0001.123, CT003.5)
     - Terrats Medical: 71000XX-X, 71000XX-XX, 71000XX-XXX (z.B. 7100001-1, 7100012-45)
     """
 
@@ -20,15 +21,15 @@ class ArticleNumber:
         if not self.value:
             raise ValueError("Artikelnummer darf nicht leer sein")
 
-        # Erlaubte Zeichen: Buchstaben, Zahlen, Unterstriche und Bindestriche
-        if not all(c.isalnum() or c in '_-' for c in self.value):
-            raise ValueError("Artikelnummer darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten")
+        # Erlaubte Zeichen: Buchstaben, Zahlen, Unterstriche, Bindestriche und Punkte
+        if not all(c.isalnum() or c in '_-.' for c in self.value):
+            raise ValueError("Artikelnummer darf nur Buchstaben, Zahlen, Unterstriche, Bindestriche und Punkte enthalten")
 
         # Validierung verschiedener Formate
         if not self._is_valid_format():
             raise ValueError(
                 f"Ungültiges Artikelnummern-Format: '{self.value}'. "
-                "Erlaubt: Buchstaben-Prefix (z.B. CT0001) oder Terrats Medical Format (z.B. 7100001-1)"
+                "Erlaubt: Buchstaben-Prefix (z.B. CT0001, A0001.123) oder Terrats Medical Format (z.B. 7100001-1)"
             )
 
     def _is_valid_format(self) -> bool:

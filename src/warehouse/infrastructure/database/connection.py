@@ -64,18 +64,30 @@ def initialize_database(database_path: str = None) -> None:
     @event.listens_for(_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         """
-        Aktiviert Foreign Key Constraints und WAL-Mode für SQLite.
+        Aktiviert Foreign Key Constraints und optimierte Einstellungen für SQLite.
 
-        WAL (Write-Ahead Logging) ermöglicht:
-        - Mehrere gleichzeitige Leser
-        - Ein Schreiber kann parallel zu Lesern arbeiten
-        - Bessere Concurrency für Multi-User Umgebungen
+        WICHTIG: Verwendet DELETE journal_mode statt WAL für Netzwerk-Kompatibilität.
+        WAL (Write-Ahead Logging) funktioniert nicht zuverlässig über SMB/CIFS-Shares.
         """
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging für Multi-User
+
+        # Prüfe ob Datenbank auf Netzwerk-Pfad liegt
+        import os
+        db_path = str(database_path)
+        is_network = db_path.startswith('\\\\') or (len(db_path) > 1 and db_path[1] == ':' and os.path.exists(f"\\\\?\\UNC\\{db_path[2:]}"))
+
+        if is_network:
+            # DELETE-Mode für Netzwerk-Datenbanken (kompatibel mit SMB/CIFS)
+            cursor.execute("PRAGMA journal_mode=DELETE")
+            print("Database auf Netzwerk erkannt - verwende DELETE journal mode")
+        else:
+            # WAL-Mode für lokale Datenbanken (bessere Performance)
+            cursor.execute("PRAGMA journal_mode=WAL")
+            print("Lokale Database erkannt - verwende WAL journal mode")
+
         cursor.execute("PRAGMA synchronous=NORMAL")  # Balance zwischen Sicherheit und Performance
-        cursor.execute("PRAGMA busy_timeout=5000")  # 5 Sekunden Timeout bei Locks
+        cursor.execute("PRAGMA busy_timeout=10000")  # 10 Sekunden Timeout bei Locks (wichtig für Netzwerk)
         cursor.execute("PRAGMA cache_size=-64000")  # 64MB Cache
         cursor.close()
 

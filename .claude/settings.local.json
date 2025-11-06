@@ -57,7 +57,8 @@
       "Bash(.venv/Scripts/python.exe start_app_with_env.py:*)",
       "Bash(.venv/Scripts/python.exe:*)",
       "Bash(icacls:*)",
-      "Bash(gpresult:*)"
+      "Bash(gpresult:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: Migriere Datenbank-Speicherung zum NAS-Server mit UNC-Pfad\n\nPROBLEM:\n- Datenbank wurde lokal gespeichert statt auf dem NAS-Server\n- Laufwerksbuchstabe A:\\ war nicht sichtbar in Streamlit-Sub-Prozessen\n- Import-Reihenfolge führte zu falschem Caching der Konfiguration\n\nLÖSUNG:\n1. UNC-Pfad statt Laufwerksbuchstabe in config/settings.py\n   - \\10.190.140.10\\Allgemein statt A:\\\n   - Robuster für Sub-Prozesse und verschiedene User-Kontexte\n\n2. Lazy Initialization der Verzeichnisse\n   - ensure_directories() nicht mehr beim Import ausgeführt\n   - Wird in initialize_database() aufgerufen, wenn .env geladen ist\n\n3. Dynamisches Laden von USE_SERVER_STORAGE\n   - _get_use_server_storage() Methode statt Class Variable\n   - Liest Wert zur Laufzeit aus Umgebung\n\n4. Cache-Clearing in connection.py\n   - DATABASE_DIR und DATABASE_PATH werden vor Neuberechnung geleert\n\nERGEBNIS:\n- Datenbank wird korrekt auf NAS gespeichert\n- Automatischer Fallback zu lokal bei Server-Ausfall\n- Multi-User-fähig durch SQLite WAL-Mode\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
