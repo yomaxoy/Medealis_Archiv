@@ -209,15 +209,35 @@ class PathResolver:
             clean_batch = self._clean_path_component(context.batch_number)
             clean_delivery = self._clean_path_component(context.delivery_number)
 
-            # Baue Pfad-Struktur auf: Base / Supplier / Manufacturer / Article / Batch / Delivery
-            storage_path = (
-                self.base_storage_path
-                / clean_supplier
-                / clean_manufacturer
-                / clean_article
-                / clean_batch
-                / clean_delivery
+            # SPEZIALFALL: Wenn Lieferant = Hersteller, überspringe Hersteller-Ordner
+            # (z.B. Terrats Medical ist gleichzeitig Lieferant UND Hersteller)
+            # Dies vermeidet Duplikationen wie TERRATS_Medical/Terrats_Medical/
+            supplier_is_manufacturer = (
+                clean_supplier.lower().replace("_", "").replace("-", "") ==
+                clean_manufacturer.lower().replace("_", "").replace("-", "")
             )
+
+            # Baue Pfad-Struktur auf:
+            # Normal: Base / Supplier / Manufacturer / Article / Batch / Delivery
+            # Spezial (Supplier=Manufacturer): Base / Supplier / Article / Batch / Delivery
+            if supplier_is_manufacturer:
+                self.logger.info(f"Supplier equals manufacturer ({clean_supplier}), skipping manufacturer folder")
+                storage_path = (
+                    self.base_storage_path
+                    / clean_supplier
+                    / clean_article
+                    / clean_batch
+                    / clean_delivery
+                )
+            else:
+                storage_path = (
+                    self.base_storage_path
+                    / clean_supplier
+                    / clean_manufacturer
+                    / clean_article
+                    / clean_batch
+                    / clean_delivery
+                )
 
             # Erstelle Pfad-Ergebnis
             result = PathResult(path=storage_path)
@@ -313,15 +333,35 @@ class PathResolver:
             clean_batch = self._clean_path_component(context.batch_number)
             clean_delivery = self._clean_path_component(context.delivery_number)
 
-            # Baue Server-Pfad-Struktur auf (IDENTISCH zur lokalen Struktur)
-            server_path = (
-                self.server_storage_path
-                / clean_supplier
-                / clean_manufacturer
-                / clean_article
-                / clean_batch
-                / clean_delivery
+            # SPEZIALFALL: Wenn Lieferant = Hersteller, überspringe Hersteller-Ordner
+            # (z.B. Terrats Medical ist gleichzeitig Lieferant UND Hersteller)
+            # Dies vermeidet Duplikationen wie TERRATS_Medical/Terrats_Medical/
+            supplier_is_manufacturer = (
+                clean_supplier.lower().replace("_", "").replace("-", "") ==
+                clean_manufacturer.lower().replace("_", "").replace("-", "")
             )
+
+            # Baue Server-Pfad-Struktur auf (IDENTISCH zur lokalen Struktur):
+            # Normal: Server / Supplier / Manufacturer / Article / Batch / Delivery
+            # Spezial (Supplier=Manufacturer): Server / Supplier / Article / Batch / Delivery
+            if supplier_is_manufacturer:
+                self.logger.info(f"Supplier equals manufacturer ({clean_supplier}), skipping manufacturer folder")
+                server_path = (
+                    self.server_storage_path
+                    / clean_supplier
+                    / clean_article
+                    / clean_batch
+                    / clean_delivery
+                )
+            else:
+                server_path = (
+                    self.server_storage_path
+                    / clean_supplier
+                    / clean_manufacturer
+                    / clean_article
+                    / clean_batch
+                    / clean_delivery
+                )
 
             # Erstelle Pfad-Ergebnis
             result = PathResult(path=server_path)
@@ -732,11 +772,10 @@ class PathResolver:
                 return PathResult(path=Path(), error="Invalid supplier name provided")
 
             # NUTZE STORAGE_CONTEXT NORMALISIERUNG FÜR KONSISTENZ
+            # Die Normalisierung gibt bereits dateisystem-sichere Namen zurück (mit Unterstrichen)
             from .storage_context import storage_context
-            normalized = storage_context._basic_supplier_normalization(supplier_name)
-            # Dann Path-Cleaning für Dateisystem-Sicherheit
-            normalized_supplier = self._clean_path_component(normalized)
-            self.logger.info(f"🔧 DEBUG: Normalized supplier: '{supplier_name}' → '{normalized}' → '{normalized_supplier}'")
+            normalized_supplier = storage_context._basic_supplier_normalization(supplier_name)
+            self.logger.info(f"🔧 DEBUG: Normalized supplier: '{supplier_name}' → '{normalized_supplier}'")
 
             # Baue FLACHEN Lieferschein-Pfad (OHNE Jahr/Monat!)
             delivery_slip_path = (
@@ -808,11 +847,10 @@ class PathResolver:
                 return PathResult(path=Path(), error=error_msg)
 
             # NUTZE STORAGE_CONTEXT NORMALISIERUNG FÜR KONSISTENZ
+            # Die Normalisierung gibt bereits dateisystem-sichere Namen zurück (mit Unterstrichen)
             from .storage_context import storage_context
-            normalized = storage_context._basic_supplier_normalization(supplier_name)
-            # Dann Path-Cleaning für Dateisystem-Sicherheit
-            normalized_supplier = self._clean_path_component(normalized)
-            self.logger.info(f"Normalized supplier: '{supplier_name}' → '{normalized}' → '{normalized_supplier}'")
+            normalized_supplier = storage_context._basic_supplier_normalization(supplier_name)
+            self.logger.info(f"Normalized supplier: '{supplier_name}' → '{normalized_supplier}'")
 
             # Baue FLACHEN Server-Lieferschein-Pfad (OHNE Jahr/Monat!)
             server_delivery_slip_path = (

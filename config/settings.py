@@ -28,11 +28,16 @@ class Settings:
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
     # Storage Configuration
-    USE_SERVER_STORAGE = os.getenv("USE_SERVER_STORAGE", "true").lower() == "true"
-    SERVER_BASE_PATH = Path(r"A:\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Medealis Archiv")
+    # UNC-Pfad statt Laufwerksbuchstabe (robuster für Sub-Prozesse)
+    SERVER_BASE_PATH = Path(r"\\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Medealis Archiv")
 
     # Datenbank
     DATABASE_NAME = "warehouse_new.db"
+
+    @classmethod
+    def _get_use_server_storage(cls) -> bool:
+        """Liest USE_SERVER_STORAGE dynamisch aus Umgebung (nicht beim Import!)."""
+        return os.getenv("USE_SERVER_STORAGE", "true").lower() == "true"
 
     @classmethod
     def _get_database_path(cls) -> Path:
@@ -45,7 +50,7 @@ class Settings:
         Returns:
             Path: Pfad zum Datenbankverzeichnis
         """
-        if cls.USE_SERVER_STORAGE:
+        if cls._get_use_server_storage():
             server_db_dir = cls.SERVER_BASE_PATH / "database"
             try:
                 # Prüfe ob Server-Laufwerk verfügbar und beschreibbar
@@ -55,7 +60,7 @@ class Settings:
                     test_file = server_db_dir / ".write_test"
                     test_file.touch()
                     test_file.unlink()
-                    print(f"Datenbank-Speicherort: Server (A:\\) - {server_db_dir}")
+                    print(f"Datenbank-Speicherort: Server (UNC) - {server_db_dir}")
                     return server_db_dir
             except (OSError, PermissionError) as e:
                 print(f"Server-Speicherung nicht verfügbar ({e}), verwende lokalen Fallback")
@@ -155,5 +160,5 @@ class Settings:
 # Global verfügbare Instanz
 settings = Settings()
 
-# Verzeichnisse beim Import erstellen
-settings.ensure_directories()
+# WICHTIG: ensure_directories() wird NICHT mehr beim Import aufgerufen!
+# Stattdessen wird es in initialize_database() aufgerufen, wenn .env garantiert geladen ist

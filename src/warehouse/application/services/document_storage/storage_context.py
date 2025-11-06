@@ -423,22 +423,25 @@ class StorageContext:
         """
         Basic Supplier-Normalisierung ohne externe Dependencies.
 
+        WICHTIG: Gibt Namen OHNE Leerzeichen zurück (mit Unterstrichen),
+        damit sie direkt für Dateisystem-Pfade verwendet werden können.
+
         Args:
             supplier_name: Original Supplier-Name
 
         Returns:
-            Normalisierter Supplier-Name
+            Normalisierter Supplier-Name (dateisystem-sicher mit Unterstrichen)
         """
         if not supplier_name:
             return "Unbekannt"
 
         supplier_lower = supplier_name.lower().strip()
 
-        # Basic Mapping-Regeln
+        # Basic Mapping-Regeln (mit Unterstrichen statt Leerzeichen für Dateisystem)
         if "primec" in supplier_lower:
             return "Primec"
         elif "terrats" in supplier_lower:
-            return "Terrats Medical"
+            return "Terrats_Medical"  # FIXED: Mit Unterstrich statt Leerzeichen
         elif "megagen" in supplier_lower:
             return "MEGAGEN"
         elif "ctech" in supplier_lower or "c-tech" in supplier_lower:
@@ -446,9 +449,10 @@ class StorageContext:
         elif "straumann" in supplier_lower:
             return "Straumann"
         elif "nobel" in supplier_lower:
-            return "Nobel Biocare"
+            return "Nobel_Biocare"  # FIXED: Mit Unterstrich statt Leerzeichen
         else:
-            return supplier_name
+            # Fallback: Ersetze Leerzeichen durch Unterstriche für unbekannte Lieferanten
+            return supplier_name.replace(" ", "_")
 
     def determine_manufacturer(self, article_number: str) -> str:
         """
@@ -469,11 +473,14 @@ class StorageContext:
         """
         Basic Hersteller-Bestimmung ohne externe Dependencies.
 
+        WICHTIG: Gibt Hersteller-Namen OHNE Leerzeichen zurück (mit Unterstrichen),
+        damit sie direkt für Dateisystem-Pfade verwendet werden können.
+
         Args:
             article_number: Artikelnummer
 
         Returns:
-            Hersteller-Name
+            Hersteller-Name (dateisystem-sicher mit Unterstrichen)
         """
         if not article_number:
             return "Standard_Implantate"
@@ -481,7 +488,7 @@ class StorageContext:
         # Spezial-Check für Terrats Medical: 71000XX-X Format
         import re
         if re.match(r'^71000\d{2}-\d{1,3}$', article_number):
-            return "Terrats Medical"
+            return "Terrats_Medical"  # FIXED: Mit Unterstrich statt Leerzeichen
 
         article_upper = article_number.upper()
 

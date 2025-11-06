@@ -37,6 +37,11 @@ def initialize_database(database_path: str = None) -> None:
         # Standard-Pfad aus config
         try:
             from config.settings import settings
+            # WICHTIG: Cache leeren, falls settings vorher importiert wurde
+            settings.DATABASE_DIR = None
+            settings.DATABASE_PATH = None
+            # ensure_directories() aufrufen, wenn .env garantiert geladen ist
+            settings.ensure_directories()
             database_path = settings.get_database_path()
         except ImportError:
             # Fallback wenn config nicht verfügbar
