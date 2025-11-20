@@ -1,0 +1,75 @@
+# =============================================================================
+# Medealis Warehouse Management System - Docker Compose
+# =============================================================================
+# Startet beide Streamlit-Apps (Admin + User) in separaten Containern
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # Admin-App (Port 8501)
+  medealis-admin:
+    build: .
+    container_name: medealis_admin
+    ports:
+      - "8501:8501"
+    volumes:
+      # Datenbank-Verzeichnis (wird auf Server gemountet)
+      - ${DATABASE_PATH:-./database}:/app/database
+      # Template-Verzeichnis (read-only)
+      - ./resources/templates:/app/resources/templates:ro
+      # User-Daten-Verzeichnis (Dokumente, Wareneingang)
+      - ${USER_DATA_DIR:-./user_data}:/root/Medealis/Wareneingang
+      # Logs
+      - ./data/logs:/app/data/logs
+      # Datenbank-Fallback (lokale SQLite)
+      - ./data/medealis_db:/root/.medealis
+    environment:
+      # Server-Storage aktivieren
+      - USE_SERVER_STORAGE=true
+      # API Keys (über .env Datei)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Umgebung
+      - ENVIRONMENT=production
+      - DEBUG=false
+    env_file:
+      - .env
+    command: streamlit run src/warehouse/presentation/admin/main_admin_app.py --server.port=8501 --server.address=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - medealis-network
+
+  # User-App (Port 8502)
+  medealis-user:
+    build: .
+    container_name: medealis_user
+    ports:
+      - "8502:8502"
+    volumes:
+      # Gleiche Datenbank wie Admin-App
+      - ${DATABASE_PATH:-./database}:/app/database
+      # Template-Verzeichnis (read-only)
+      - ./resources/templates:/app/resources/templates:ro
+      # User-Daten-Verzeichnis (Dokumente, Wareneingang)
+      - ${USER_DATA_DIR:-./user_data}:/root/Medealis/Wareneingang
+      # Logs
+      - ./data/logs:/app/data/logs
+      # Datenbank-Fallback (lokale SQLite)
+      - ./data/medealis_db:/root/.medealis
+    environment:
+      - USE_SERVER_STORAGE=true
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=production
+      - DEBUG=false
+    env_file:
+      - .env
+    command: streamlit run src/warehouse/presentation/user/main_user_app.py --server.port=8502 --server.address=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - medealis-network
+
+networks:
+  medealis-network:
+    driver: bridge
