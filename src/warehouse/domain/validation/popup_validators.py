@@ -355,8 +355,9 @@ class VisualInspectionValidator:
     Validator für Popup 5 - Sichtkontrolle.
 
     Pflichtfelder:
-    - Name (oben im Popup)
-    - Ausschussmenge
+    - Name (oben im Popup, min 2 Zeichen)
+    - Ausschussmenge (>= 0, <= Gesamtmenge)
+    - Qualitätsnotizen (mind. 10 Zeichen bei Zurückweisung)
     """
 
     @staticmethod
@@ -367,7 +368,10 @@ class VisualInspectionValidator:
         Args:
             data: {
                 inspector_name: str,
-                waste_quantity: int
+                waste_quantity: int,
+                total_quantity: int (optional - für Business-Logik-Validierung),
+                quality_notes: str (optional - Pflicht nur bei Zurückweisung),
+                is_rejection: bool (optional - True wenn 100% Ausschuss)
             }
 
         Returns:
@@ -375,13 +379,23 @@ class VisualInspectionValidator:
         """
         result = ValidationResult()
 
-        # Prüfername (Pflicht)
+        # Prüfername (Pflicht, min 2 Zeichen)
         inspector_name = data.get("inspector_name")
         result.merge(
             FieldValidator.validate_required(
                 inspector_name, "inspector_name", "Prüfername"
             )
         )
+        if inspector_name:
+            result.merge(
+                FieldValidator.validate_string_length(
+                    inspector_name,
+                    "inspector_name",
+                    50,
+                    "Prüfername",
+                    min_length=2,
+                )
+            )
 
         # Ausschussmenge (Pflicht, Int >= 0)
         waste_quantity = data.get("waste_quantity")
@@ -395,6 +409,31 @@ class VisualInspectionValidator:
                 waste_quantity, "waste_quantity", "Ausschussmenge", min_value=0
             )
         )
+
+        # Business Logic: Ausschussmenge darf nicht größer als Gesamtmenge sein
+        total_quantity = data.get("total_quantity")
+        if (
+            waste_quantity is not None
+            and total_quantity is not None
+            and isinstance(waste_quantity, int)
+            and isinstance(total_quantity, int)
+        ):
+            if waste_quantity > total_quantity:
+                result.add_error(
+                    f"Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({total_quantity}) sein",
+                    "waste_quantity",
+                )
+
+        # Bei Zurückweisung: Qualitätsnotizen sind Pflicht (mind. 10 Zeichen)
+        is_rejection = data.get("is_rejection", False)
+        quality_notes = data.get("quality_notes", "")
+
+        if is_rejection:
+            if not quality_notes or len(quality_notes.strip()) < 10:
+                result.add_error(
+                    "Bei Zurückweisung ist eine ausführliche Begründung erforderlich (mind. 10 Zeichen)",
+                    "quality_notes",
+                )
 
         return result
 

@@ -241,6 +241,9 @@ class VisualInspectionPopup(InspectionPopup):
         validation_data = {
             "inspector_name": inspector_name,
             "waste_quantity": waste_quantity,
+            "total_quantity": self.quantity,  # Business logic validation
+            "quality_notes": quality_notes,
+            "is_rejection": False,  # Normal inspection, not rejection
         }
 
         validation_result = validation_service.validate_visual_inspection(
@@ -305,16 +308,23 @@ class VisualInspectionPopup(InspectionPopup):
         inspector_name = form_data["visual_inspector_name"].strip()
         quality_notes = form_data["visual_quality_notes"].strip()
 
-        # Validierung für Zurückweisung
-        if not inspector_name or len(inspector_name) < 2:
-            self.show_error("Bitte geben Sie einen gültigen Prüfernamen ein!")
-            return
+        # ===== VALIDATION FIRST =====
+        validation_data = {
+            "inspector_name": inspector_name,
+            "waste_quantity": self.quantity,  # 100% Ausschuss bei Zurückweisung
+            "total_quantity": self.quantity,
+            "quality_notes": quality_notes,
+            "is_rejection": True,  # Zurückweisung erfordert ausführliche Begründung
+        }
 
-        if not quality_notes or len(quality_notes) < 10:
-            self.show_error(
-                "Bitte geben Sie eine ausführliche Begründung für die Zurückweisung an (mind. 10 Zeichen)!"
-            )
-            return
+        validation_result = validation_service.validate_visual_inspection(
+            validation_data
+        )
+
+        if not validation_result.is_valid:
+            st.error("❌ **Validierungsfehler:**")
+            st.error(validation_result.get_formatted_errors())
+            return  # Stop execution
 
         # Bestätigungsdialog
         st.warning("⚠️ **Achtung:** Der gesamte Artikel wird als Ausschuss markiert!")
@@ -376,29 +386,6 @@ class VisualInspectionPopup(InspectionPopup):
         with col2:
             if st.button("↩️ Zurück", use_container_width=True, key="cancel_reject"):
                 st.rerun()
-
-    def _validate_inspection_data(self, form_data: Dict[str, Any]) -> tuple[bool, str]:
-        """Validiert Inspektionsdaten."""
-        inspector_name = form_data.get("visual_inspector_name", "").strip()
-
-        if not inspector_name or len(inspector_name) < 2:
-            return (
-                False,
-                "❌ Bitte geben Sie einen gültigen Prüfernamen ein (mind. 2 Zeichen)!",
-            )
-
-        waste_quantity = form_data.get("visual_waste_quantity", 0)
-
-        if waste_quantity < 0:
-            return False, "❌ Ausschussmenge kann nicht negativ sein!"
-
-        if waste_quantity > self.quantity:
-            return (
-                False,
-                f"❌ Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({self.quantity}) sein!",
-            )
-
-        return True, ""
 
     def _generate_inspection_document(
         self,
