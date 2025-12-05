@@ -297,13 +297,13 @@ class BarcodeGenerator:
             # Load fonts
             try:
                 # Try to load fonts - Liberation Sans ist der Linux-Ersatz für Arial
-                # Optimierte Schriftgrößen: Artikel & Lager gleich groß, Lot ca. 60% kleiner
+                # Optimierte Schriftgrößen: Artikel & Lager 20% reduziert (152), Lot ca. 60% kleiner
                 try:
                     # Try Liberation Sans Bold (Linux standard)
                     bold_font_large = ImageFont.truetype(
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                        190,
-                    )  # Artikel & Lager
+                        152,
+                    )  # Artikel & Lager (190 - 20% = 152)
                     bold_font_medium = ImageFont.truetype(
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
                         70,
@@ -315,13 +315,13 @@ class BarcodeGenerator:
                 except:
                     # Fallback to Arial (Windows)
                     try:
-                        bold_font_large = ImageFont.truetype("arialbd.ttf", 190)
+                        bold_font_large = ImageFont.truetype("arialbd.ttf", 152)
                         bold_font_medium = ImageFont.truetype("arialbd.ttf", 70)
                         normal_font = ImageFont.truetype("arial.ttf", 55)
                     except:
                         # Final fallback to DejaVu
                         bold_font_large = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 190
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 152
                         )
                         bold_font_medium = ImageFont.truetype(
                             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70

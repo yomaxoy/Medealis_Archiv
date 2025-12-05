@@ -346,6 +346,7 @@ class DocumentCheckPopup(InspectionPopup):
             )  # Using slip as proxy for QR presence
 
             validation_data = {
+                "employee_name": employee_name,
                 "label_present": label_present,
                 "qr_code_present": qr_code_present,
             }
@@ -358,11 +359,6 @@ class DocumentCheckPopup(InspectionPopup):
                 st.error("❌ **Validierungsfehler:**")
                 st.error(validation_result.get_formatted_errors())
                 return  # Stop execution
-
-            # Validate employee name separately (not part of document validation)
-            if not employee_name or len(employee_name) < 2:
-                st.error("❌ Bitte geben Sie einen gültigen Mitarbeiternamen ein!")
-                return
 
             # Collect certificate information from session_state (CORRECT KEYS!)
             documents_found = {

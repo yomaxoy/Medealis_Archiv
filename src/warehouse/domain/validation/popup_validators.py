@@ -250,6 +250,7 @@ class DocumentCheckValidator:
 
         Args:
             data: {
+                employee_name: str,
                 label_present: bool,
                 qr_code_present: bool
             }
@@ -258,6 +259,24 @@ class DocumentCheckValidator:
             ValidationResult
         """
         result = ValidationResult()
+
+        # Mitarbeitername (Pflicht, min 2 Zeichen)
+        employee_name = data.get("employee_name")
+        result.merge(
+            FieldValidator.validate_required(
+                employee_name, "employee_name", "Mitarbeitername"
+            )
+        )
+        if employee_name:
+            result.merge(
+                FieldValidator.validate_string_length(
+                    employee_name,
+                    "employee_name",
+                    50,
+                    "Mitarbeitername",
+                    min_length=2,
+                )
+            )
 
         # Label muss aktiviert sein
         label_present = data.get("label_present", False)
