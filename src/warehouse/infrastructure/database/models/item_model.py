@@ -9,7 +9,16 @@ ItemModel: (article_number, batch_number, delivery_number) als Composite PK
 """
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Text, ForeignKey, Boolean, DateTime
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    Text,
+    ForeignKey,
+    Boolean,
+    DateTime,
+    LargeBinary,
+)
 from sqlalchemy.orm import relationship
 from warehouse.infrastructure.database.connection import Base
 
@@ -23,10 +32,12 @@ class ItemInfoModel(Base):
     """
 
     __tablename__ = "item_info"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     # === PRIMÄRSCHLÜSSEL ===
-    article_number = Column(String(7), primary_key=True)  # A0001, B0002, CT003, SI00154, etc.
+    article_number = Column(
+        String(7), primary_key=True
+    )  # A0001, B0002, CT003, SI00154, etc.
 
     # === AUDIT FIELDS ===
     created_at = Column(DateTime, default=datetime.now, nullable=False)
@@ -41,12 +52,19 @@ class ItemInfoModel(Base):
     storage_location = Column(Text, nullable=True)  # Lagernummer
 
     # === ZUSÄTZLICHE INFOS ===
-    manufacturer = Column(String(100), nullable=True)  # Implantathersteller für Docklocs Schema
+    manufacturer = Column(
+        String(100), nullable=True
+    )  # Implantathersteller für Docklocs Schema
     material_specification = Column(Text, nullable=True)  # Material-Spezifikation
     description = Column(Text, nullable=True)  # Zusätzliche Beschreibung
 
+    # === QR-CODE ===
+    qr_code_image = Column(LargeBinary, nullable=True)  # QR-Code Bild (Binary)
+    qr_code_filename = Column(String(255), nullable=True)  # Original Dateiname
+    qr_code_uploaded_at = Column(DateTime, nullable=True)  # Upload-Zeitstempel
+
     # === BEZIEHUNGEN ===
-    # Temporarily disabled due to SQLAlchemy registry conflicts  
+    # Temporarily disabled due to SQLAlchemy registry conflicts
     # items = relationship("ItemModel", back_populates="item_info", lazy="select")
 
     def __repr__(self):
@@ -62,7 +80,7 @@ class ItemModel(Base):
     """
 
     __tablename__ = "items"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     # === COMPOSITE PRIMARY KEY (wie in deinem Original) ===
     article_number = Column(
@@ -70,7 +88,7 @@ class ItemModel(Base):
     )  # Teil des Composite PK
     batch_number = Column(String(19), primary_key=True)  # Chargennummer (Teil des PK)
     delivery_number = Column(
-        String(10), ForeignKey("deliveries.delivery_number"), primary_key=True
+        String(50), ForeignKey("deliveries.delivery_number"), primary_key=True
     )  # Lieferscheinnummer (Teil des PK)
 
     # === AUDIT FIELDS ===

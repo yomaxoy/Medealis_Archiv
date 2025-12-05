@@ -111,16 +111,20 @@ class ItemService:
                     "notes": item.notes,
                     "barcode": item.barcode,
                     "storage_location": item.storage_location,
-            }
+                }
 
         except (ConnectionError, AttributeError) as e:
             logger.error("Infrastructure-Fehler beim Laden des Items: %s", e)
             # Fallback to database layer
-            return self.get_item_by_composite_key(article_number, batch_number, delivery_number)
+            return self.get_item_by_composite_key(
+                article_number, batch_number, delivery_number
+            )
         except Exception as e:
             logger.error("Unerwarteter Fehler beim Laden des Items: %s", e)
             # Fallback to database layer
-            return self.get_item_by_composite_key(article_number, batch_number, delivery_number)
+            return self.get_item_by_composite_key(
+                article_number, batch_number, delivery_number
+            )
 
     def get_items_by_delivery(self, delivery_number: str) -> List[Dict[str, Any]]:
         """Holt alle Items einer Lieferung."""
@@ -458,7 +462,10 @@ class ItemService:
             # Persistiere
             self.item_repo.save_domain(item)
 
-            logger.info("Dokumentenzusammenführung abgeschlossen: %s", item.get_unique_identifier())
+            logger.info(
+                "Dokumentenzusammenführung abgeschlossen: %s",
+                item.get_unique_identifier(),
+            )
             return True
 
         except (ItemNotFoundException, ItemNotEditableException, ValueError) as e:
@@ -654,34 +661,34 @@ class ItemService:
         batch_number: str,
         delivery_number: str,
         new_status: str,
-        employee: str = "System"
+        employee: str = "System",
     ) -> bool:
         """
         Allgemeine Methode für Status-Updates.
-        
+
         Args:
             article_number: Artikelnummer
-            batch_number: Chargennummer  
+            batch_number: Chargennummer
             delivery_number: Lieferscheinnummer
             new_status: Neuer Status
             employee: Durchführender Mitarbeiter
-            
+
         Returns:
             True wenn erfolgreich
         """
         try:
             article_vo = ArticleNumber(article_number)
             batch_vo = BatchNumber(batch_number)
-            
+
             item = self.item_repo.find_domain_by_composite_key(
                 article_vo, batch_vo, delivery_number
             )
-            
+
             if not item:
                 raise ItemNotFoundException(
                     article_number, batch_number, delivery_number
                 )
-            
+
             # Je nach Status den entsprechenden Workflow ausführen
             if new_status == "Daten geprüft" or new_status == "Daten bestätigt":
                 item.complete_data_check(employee)
@@ -691,6 +698,7 @@ class ItemService:
             elif new_status == "Sichtgeprüft":
                 # Erstelle ein Standard InspectionResult
                 from warehouse.domain.entities.item import InspectionResult
+
                 inspection = InspectionResult(
                     performed_at=datetime.now(),
                     performed_by=employee,
@@ -710,13 +718,17 @@ class ItemService:
             else:
                 logger.warning("Unbekannter Status für Update: %s", new_status)
                 return False
-            
+
             # Persistiere
             self.item_repo.save_domain(item)
-            
-            logger.info("Status aktualisiert: %s -> %s", item.get_unique_identifier(), new_status)
+
+            logger.info(
+                "Status aktualisiert: %s -> %s",
+                item.get_unique_identifier(),
+                new_status,
+            )
             return True
-            
+
         except (ItemNotFoundException, ItemNotEditableException, ValueError) as e:
             logger.error("Geschäftslogik-Fehler beim Status-Update: %s", e)
             raise
@@ -748,7 +760,9 @@ class ItemService:
 
             # Safety check
             if items_with_info is None:
-                logger.warning("find_all_with_info() returned None, returning empty list")
+                logger.warning(
+                    "find_all_with_info() returned None, returning empty list"
+                )
                 return []
 
             item_list = []
@@ -756,88 +770,117 @@ class ItemService:
             for item, item_info in items_with_info:
                 # Basic item data
                 item_dict = {
-                    'article_number': str(item.article_number),
-                    'batch_number': str(item.batch_number),
-                    'delivery_number': item.delivery_number,
+                    "article_number": str(item.article_number),
+                    "batch_number": str(item.batch_number),
+                    "delivery_number": item.delivery_number,
                     # === DREI MENGENTYPEN ===
-                    'quantity': item.delivered_quantity,  # Backward compatibility
-                    'delivered_quantity': item.delivered_quantity,
-                    'delivery_quantity': item.delivered_quantity,  # ADDED: For context_builder compatibility
-                    'delivery_slip_quantity': getattr(item, 'delivery_slip_quantity', None),
-                    'ordered_quantity': getattr(item, 'ordered_quantity', None),
-                    'order_quantity': getattr(item, 'ordered_quantity', None),  # ADDED: For context_builder compatibility
-                    'status': item.get_current_status(),  # NEU: gibt String zurück
-                    'employee_name': item.created_by,
-                    'order_number': getattr(item, 'order_number', None),
-                    'created_at': item.created_at.isoformat() if hasattr(item, 'created_at') and item.created_at else None
+                    "quantity": item.delivered_quantity,  # Backward compatibility
+                    "delivered_quantity": item.delivered_quantity,
+                    "delivery_quantity": item.delivered_quantity,  # ADDED: For context_builder compatibility
+                    "delivery_slip_quantity": getattr(
+                        item, "delivery_slip_quantity", None
+                    ),
+                    "ordered_quantity": getattr(item, "ordered_quantity", None),
+                    "order_quantity": getattr(
+                        item, "ordered_quantity", None
+                    ),  # ADDED: For context_builder compatibility
+                    "status": item.get_current_status(),  # NEU: gibt String zurück
+                    "employee_name": item.created_by,
+                    "order_number": getattr(item, "order_number", None),
+                    "created_at": item.created_at.isoformat()
+                    if hasattr(item, "created_at") and item.created_at
+                    else None,
                 }
 
                 # Add ItemInfo data (already loaded via JOIN - no extra query!)
                 if item_info:
-                    item_dict.update({
-                        'designation': item_info.get('designation', ''),
-                        'revision_number': item_info.get('revision_number'),
-                        'storage_location': item_info.get('storage_location', ''),
-                        'manufacturer': item_info.get('manufacturer', ''),
-                        # order_quantity wurde aus ItemInfo entfernt - nutze Item.ordered_quantity
-                    })
+                    item_dict.update(
+                        {
+                            "designation": item_info.get("designation", ""),
+                            "revision_number": item_info.get("revision_number"),
+                            "storage_location": item_info.get("storage_location", ""),
+                            "manufacturer": item_info.get("manufacturer", ""),
+                            # order_quantity wurde aus ItemInfo entfernt - nutze Item.ordered_quantity
+                        }
+                    )
                 else:
                     # Default values if no ItemInfo exists
-                    item_dict.update({
-                        'designation': '',
-                        'revision_number': None,
-                        'storage_location': '',
-                        'manufacturer': '',
-                    })
+                    item_dict.update(
+                        {
+                            "designation": "",
+                            "revision_number": None,
+                            "storage_location": "",
+                            "manufacturer": "",
+                        }
+                    )
 
                 # Add certificate data from domain entity
                 try:
                     # Convert domain certificates to dict format for UI
                     certificate_data = {}
-                    if hasattr(item, 'certificates') and item.certificates:
-                        from warehouse.domain.enums.certificate_type import CertificateType
+                    if hasattr(item, "certificates") and item.certificates:
+                        from warehouse.domain.enums.certificate_type import (
+                            CertificateType,
+                        )
+
                         # Map German domain enums to English UI keys
                         certificate_data = {
-                            'material_certificate': item.certificates.get(CertificateType.MATERIALZEUGNIS, False),
-                            'measurement_protocol': item.certificates.get(CertificateType.MESSPROTOKOLL, False),
-                            'coating_certificate': item.certificates.get(CertificateType.BESCHICHTUNGSZEUGNIS, False),
-                            'hardness_certificate': item.certificates.get(CertificateType.HAERTEZEUGNIS, False),
-                            'additional_certificates': item.certificates.get(CertificateType.WEITERE_ZEUGNISSE, False),
+                            "material_certificate": item.certificates.get(
+                                CertificateType.MATERIALZEUGNIS, False
+                            ),
+                            "measurement_protocol": item.certificates.get(
+                                CertificateType.MESSPROTOKOLL, False
+                            ),
+                            "coating_certificate": item.certificates.get(
+                                CertificateType.BESCHICHTUNGSZEUGNIS, False
+                            ),
+                            "hardness_certificate": item.certificates.get(
+                                CertificateType.HAERTEZEUGNIS, False
+                            ),
+                            "additional_certificates": item.certificates.get(
+                                CertificateType.WEITERE_ZEUGNISSE, False
+                            ),
                             # Physical document flags from certificate dictionary, not direct attributes
-                            'label_present': item.certificates.get(CertificateType.ETIKETT, False),
-                            'accompanying_document': item.certificates.get(CertificateType.BEGLEITSCHEIN, False)
+                            "label_present": item.certificates.get(
+                                CertificateType.ETIKETT, False
+                            ),
+                            "accompanying_document": item.certificates.get(
+                                CertificateType.BEGLEITSCHEIN, False
+                            ),
                         }
                     else:
                         # Default values if no certificates
                         certificate_data = {
-                            'material_certificate': False,
-                            'measurement_protocol': False,
-                            'coating_certificate': False,
-                            'hardness_certificate': False,
-                            'additional_certificates': False,
-                            'label_present': False,
-                            'accompanying_document': False
+                            "material_certificate": False,
+                            "measurement_protocol": False,
+                            "coating_certificate": False,
+                            "hardness_certificate": False,
+                            "additional_certificates": False,
+                            "label_present": False,
+                            "accompanying_document": False,
                         }
 
-                    item_dict['certificates'] = certificate_data
+                    item_dict["certificates"] = certificate_data
 
                 except Exception as e:
-                    logger.warning(f"Could not fetch certificates for {item.article_number}: {e}")
+                    logger.warning(
+                        f"Could not fetch certificates for {item.article_number}: {e}"
+                    )
                     # Default certificate values on error
-                    item_dict['certificates'] = {
-                        'material_certificate': False,
-                        'measurement_protocol': False,
-                        'coating_certificate': False,
-                        'hardness_certificate': False,
-                        'additional_certificates': False,
-                        'label_present': False,
-                        'accompanying_document': False
+                    item_dict["certificates"] = {
+                        "material_certificate": False,
+                        "measurement_protocol": False,
+                        "coating_certificate": False,
+                        "hardness_certificate": False,
+                        "additional_certificates": False,
+                        "label_present": False,
+                        "accompanying_document": False,
                     }
 
                 item_list.append(item_dict)
-            
+
             return item_list
-            
+
         except (ConnectionError, AttributeError) as e:
             logger.error("Infrastructure-Fehler beim Laden aller Items: %s", e)
             return []
@@ -882,14 +925,14 @@ class ItemService:
     ) -> dict:
         """
         Prüft die Auswirkungen einer Chargennummer-Änderung.
-        
+
         Args:
             current_article_number: Aktuelle Artikelnummer
-            current_batch_number: Aktuelle Chargennummer  
+            current_batch_number: Aktuelle Chargennummer
             delivery_number: Lieferscheinnummer
             new_batch_number: Neue Chargennummer
             new_article_number: Neue Artikelnummer (optional)
-            
+
         Returns:
             Dictionary mit Informationen über mögliche Konflikte:
             {
@@ -904,49 +947,53 @@ class ItemService:
             # Keine Änderung der Chargennummer
             if new_batch_number == current_batch_number:
                 return {
-                    'has_conflict': False,
-                    'conflict_type': 'none',
-                    'existing_item': None,
-                    'recommendation': 'No batch number change detected.',
-                    'can_merge': False,
+                    "has_conflict": False,
+                    "conflict_type": "none",
+                    "existing_item": None,
+                    "recommendation": "No batch number change detected.",
+                    "can_merge": False,
                 }
-            
+
             # Bestimme die zu prüfende Artikelnummer
-            check_article = new_article_number if new_article_number else current_article_number
-            
+            check_article = (
+                new_article_number if new_article_number else current_article_number
+            )
+
             # Prüfe, ob bereits ein Item mit der neuen Chargennummer existiert
-            existing_item = self.get_item(check_article, new_batch_number, delivery_number)
-            
+            existing_item = self.get_item(
+                check_article, new_batch_number, delivery_number
+            )
+
             if existing_item:
                 return {
-                    'has_conflict': True,
-                    'conflict_type': 'duplicate',
-                    'existing_item': existing_item,
-                    'recommendation': (
+                    "has_conflict": True,
+                    "conflict_type": "duplicate",
+                    "existing_item": existing_item,
+                    "recommendation": (
                         f"Ein Artikel mit Chargennummer '{new_batch_number}' existiert bereits "
                         f"für Artikel '{check_article}' in Lieferung '{delivery_number}'. "
                         f"Die Mengen können zusammengeführt werden, oder wählen Sie eine andere Chargennummer."
                     ),
-                    'can_merge': True,
+                    "can_merge": True,
                 }
-            
+
             # Keine Konflikte gefunden
             return {
-                'has_conflict': False,
-                'conflict_type': 'none',
-                'existing_item': None,
-                'recommendation': f"Chargennummer kann sicher auf '{new_batch_number}' geändert werden.",
-                'can_merge': False,
+                "has_conflict": False,
+                "conflict_type": "none",
+                "existing_item": None,
+                "recommendation": f"Chargennummer kann sicher auf '{new_batch_number}' geändert werden.",
+                "can_merge": False,
             }
-            
+
         except Exception as e:
             logger.error("Fehler bei Chargennummer-Konfliktprüfung: %s", e)
             return {
-                'has_conflict': True,
-                'conflict_type': 'error',
-                'existing_item': None,
-                'recommendation': f"Fehler bei der Konfliktprüfung: {e}",
-                'can_merge': False,
+                "has_conflict": True,
+                "conflict_type": "error",
+                "existing_item": None,
+                "recommendation": f"Fehler bei der Konfliktprüfung: {e}",
+                "can_merge": False,
             }
 
     def _serialize_inspection_result(
@@ -1028,38 +1075,42 @@ class ItemService:
             # Check for potential duplication when changing batch number
             if new_batch_number and new_batch_number != batch_number:
                 # Use the new article number if provided, otherwise the current one
-                check_article = new_article_number if new_article_number else article_number
-                
+                check_article = (
+                    new_article_number if new_article_number else article_number
+                )
+
                 # Check if an item with the new batch number already exists
                 existing_item = self.item_repo.find_domain_by_composite_key(
-                    ArticleNumber(check_article), 
-                    BatchNumber(new_batch_number), 
-                    delivery_number
+                    ArticleNumber(check_article),
+                    BatchNumber(new_batch_number),
+                    delivery_number,
                 )
-                
+
                 if existing_item:
                     # An item with the new batch number already exists
                     if new_quantity is not None:
                         # Merge quantities: add the new quantity to the existing item
-                        existing_item.delivered_quantity = (existing_item.delivered_quantity or 0) + new_quantity  # FIXED
-                        
+                        existing_item.delivered_quantity = (
+                            existing_item.delivered_quantity or 0
+                        ) + new_quantity  # FIXED
+
                         # Delete the original item to avoid duplication
                         self.item_repo.delete_domain(
                             article_vo, batch_vo, delivery_number
                         )
-                        
+
                         # Update the existing item with merged data
                         if employee_name:
                             existing_item.employee_name = employee_name
-                        
+
                         # Save the existing item with merged data
                         self.item_repo.save_domain(existing_item)
-                        
+
                         logger.info(
                             "Items merged: %s -> %s (quantity merged: %d)",
                             item.get_unique_identifier(),
                             existing_item.get_unique_identifier(),
-                            new_quantity
+                            new_quantity,
                         )
                         return True
                     else:
@@ -1077,7 +1128,7 @@ class ItemService:
             original_delivery = delivery_number
             batch_number_changed = False
             article_number_changed = False
-            
+
             if new_article_number:
                 item.article_number = ArticleNumber(new_article_number)
                 article_number_changed = True
@@ -1085,7 +1136,9 @@ class ItemService:
                 item.batch_number = BatchNumber(new_batch_number)
                 batch_number_changed = True
             if new_quantity:
-                item.delivered_quantity = new_quantity  # FIXED: quantity → delivered_quantity
+                item.delivered_quantity = (
+                    new_quantity  # FIXED: quantity → delivered_quantity
+                )
             if employee_name:
                 item.employee_name = employee_name
             if order_number is not None:
@@ -1098,28 +1151,46 @@ class ItemService:
             certificate_updates = []
             if measurement_protocol is not None:
                 item.certificates[CertificateType.MESSPROTOKOLL] = measurement_protocol
-                certificate_updates.append(f"measurement_protocol={measurement_protocol}")
+                certificate_updates.append(
+                    f"measurement_protocol={measurement_protocol}"
+                )
             if material_certificate is not None:
-                item.certificates[CertificateType.MATERIALZEUGNIS] = material_certificate
-                certificate_updates.append(f"material_certificate={material_certificate}")
+                item.certificates[
+                    CertificateType.MATERIALZEUGNIS
+                ] = material_certificate
+                certificate_updates.append(
+                    f"material_certificate={material_certificate}"
+                )
             if coating_certificate is not None:
-                item.certificates[CertificateType.BESCHICHTUNGSZEUGNIS] = coating_certificate
+                item.certificates[
+                    CertificateType.BESCHICHTUNGSZEUGNIS
+                ] = coating_certificate
                 certificate_updates.append(f"coating_certificate={coating_certificate}")
             if hardness_certificate is not None:
                 item.certificates[CertificateType.HAERTEZEUGNIS] = hardness_certificate
-                certificate_updates.append(f"hardness_certificate={hardness_certificate}")
+                certificate_updates.append(
+                    f"hardness_certificate={hardness_certificate}"
+                )
             if additional_certificates is not None:
-                item.certificates[CertificateType.WEITERE_ZEUGNISSE] = additional_certificates
-                certificate_updates.append(f"additional_certificates={additional_certificates}")
+                item.certificates[
+                    CertificateType.WEITERE_ZEUGNISSE
+                ] = additional_certificates
+                certificate_updates.append(
+                    f"additional_certificates={additional_certificates}"
+                )
             if label_present is not None:
                 item.certificates[CertificateType.ETIKETT] = label_present
                 certificate_updates.append(f"label_present={label_present}")
             if accompanying_document is not None:
                 item.certificates[CertificateType.BEGLEITSCHEIN] = accompanying_document
-                certificate_updates.append(f"accompanying_document={accompanying_document}")
+                certificate_updates.append(
+                    f"accompanying_document={accompanying_document}"
+                )
 
             if certificate_updates:
-                logger.info(f"DEBUG CERTIFICATES: Updating item {article_number}/{new_batch_number or batch_number} certificates: {', '.join(certificate_updates)}")
+                logger.info(
+                    f"DEBUG CERTIFICATES: Updating item {article_number}/{new_batch_number or batch_number} certificates: {', '.join(certificate_updates)}"
+                )
 
             # If batch number or article number changed, we need to delete the old item first to avoid duplicates
             if batch_number_changed or article_number_changed:
@@ -1128,11 +1199,19 @@ class ItemService:
                     original_article_vo, original_batch_vo, original_delivery
                 )
                 if delete_success:
-                    logger.info("Original item deleted (key changed): %s_%s_%s", 
-                               str(original_article_vo), str(original_batch_vo), original_delivery)
+                    logger.info(
+                        "Original item deleted (key changed): %s_%s_%s",
+                        str(original_article_vo),
+                        str(original_batch_vo),
+                        original_delivery,
+                    )
                 else:
-                    logger.warning("Could not delete original item: %s_%s_%s", 
-                                  str(original_article_vo), str(original_batch_vo), original_delivery)
+                    logger.warning(
+                        "Could not delete original item: %s_%s_%s",
+                        str(original_article_vo),
+                        str(original_batch_vo),
+                        original_delivery,
+                    )
 
             # Persistiere das Item (mit neuer Chargennummer falls geändert)
             self.item_repo.save_domain(item)
@@ -1140,41 +1219,63 @@ class ItemService:
             # FIXED: Update delivery_slip_quantity and ordered_quantity directly in database (not in Domain Entity)
             if delivery_slip_quantity is not None or ordered_quantity is not None:
                 from warehouse.infrastructure.database.connection import get_session
-                from warehouse.infrastructure.database.models.item_model import ItemModel
+                from warehouse.infrastructure.database.models.item_model import (
+                    ItemModel,
+                )
 
                 with get_session() as session:
                     # Find item in DB with NEW keys if changed
-                    db_article = new_article_number if new_article_number else article_number
+                    db_article = (
+                        new_article_number if new_article_number else article_number
+                    )
                     db_batch = new_batch_number if new_batch_number else batch_number
 
-                    db_item = session.query(ItemModel).filter_by(
-                        article_number=db_article,
-                        batch_number=db_batch,
-                        delivery_number=delivery_number
-                    ).first()
+                    db_item = (
+                        session.query(ItemModel)
+                        .filter_by(
+                            article_number=db_article,
+                            batch_number=db_batch,
+                            delivery_number=delivery_number,
+                        )
+                        .first()
+                    )
 
                     if db_item:
                         if delivery_slip_quantity is not None:
                             db_item.delivery_slip_quantity = delivery_slip_quantity
-                            logger.info(f"Updated delivery_slip_quantity to {delivery_slip_quantity} for {db_article}/{db_batch}")
+                            logger.info(
+                                f"Updated delivery_slip_quantity to {delivery_slip_quantity} for {db_article}/{db_batch}"
+                            )
                         if ordered_quantity is not None:
                             db_item.ordered_quantity = ordered_quantity
-                            logger.info(f"Updated ordered_quantity to {ordered_quantity} for {db_article}/{db_batch}")
+                            logger.info(
+                                f"Updated ordered_quantity to {ordered_quantity} for {db_article}/{db_batch}"
+                            )
                         session.commit()
 
             if batch_number_changed or article_number_changed:
                 changes = []
                 if article_number_changed:
-                    changes.append(f"article: {str(original_article_vo)} -> {item.article_number}")
+                    changes.append(
+                        f"article: {str(original_article_vo)} -> {item.article_number}"
+                    )
                 if batch_number_changed:
-                    changes.append(f"batch: {str(original_batch_vo)} -> {item.batch_number}")
-                logger.info("Item key changed (%s): %s_%s_%s -> %s", 
-                           ", ".join(changes),
-                           str(original_article_vo), str(original_batch_vo), original_delivery,
-                           item.get_unique_identifier())
+                    changes.append(
+                        f"batch: {str(original_batch_vo)} -> {item.batch_number}"
+                    )
+                logger.info(
+                    "Item key changed (%s): %s_%s_%s -> %s",
+                    ", ".join(changes),
+                    str(original_article_vo),
+                    str(original_batch_vo),
+                    original_delivery,
+                    item.get_unique_identifier(),
+                )
             else:
-                logger.info("Item %s erfolgreich aktualisiert", item.get_unique_identifier())
-            
+                logger.info(
+                    "Item %s erfolgreich aktualisiert", item.get_unique_identifier()
+                )
+
             return True
 
         except (ItemNotFoundException, ItemNotEditableException, ValueError) as e:
@@ -1226,17 +1327,26 @@ class ItemService:
             # Item speichern
             self.item_repo.save_domain(item)
 
-            logger.info("Item-Notizen erfolgreich aktualisiert: %s", item.get_unique_identifier())
+            logger.info(
+                "Item-Notizen erfolgreich aktualisiert: %s",
+                item.get_unique_identifier(),
+            )
             return True
 
         except (ItemNotFoundException, ItemNotEditableException, ValueError) as e:
-            logger.error("Geschäftslogik-Fehler beim Aktualisieren der Item-Notizen: %s", e)
+            logger.error(
+                "Geschäftslogik-Fehler beim Aktualisieren der Item-Notizen: %s", e
+            )
             raise
         except (ConnectionError, AttributeError) as e:
-            logger.error("Infrastructure-Fehler beim Aktualisieren der Item-Notizen: %s", e)
+            logger.error(
+                "Infrastructure-Fehler beim Aktualisieren der Item-Notizen: %s", e
+            )
             raise
         except Exception as e:
-            logger.error("Unerwarteter Fehler beim Aktualisieren der Item-Notizen: %s", e)
+            logger.error(
+                "Unerwarteter Fehler beim Aktualisieren der Item-Notizen: %s", e
+            )
             raise
 
     def delete_item(
@@ -1276,9 +1386,13 @@ class ItemService:
             )
 
             if success:
-                logger.info("Item %s erfolgreich gelöscht", item.get_unique_identifier())
+                logger.info(
+                    "Item %s erfolgreich gelöscht", item.get_unique_identifier()
+                )
             else:
-                logger.warning("Item %s konnte nicht gelöscht werden", item.get_unique_identifier())
+                logger.warning(
+                    "Item %s konnte nicht gelöscht werden", item.get_unique_identifier()
+                )
 
             return success
 
@@ -1301,11 +1415,11 @@ class ItemService:
         storage_location: str = "",
         manufacturer: str = "",
         material_specification: str = "",
-        description: str = ""
+        description: str = "",
     ) -> str:
         """
         Speichert oder aktualisiert ItemInfo (Artikel-Stammdaten).
-        
+
         Args:
             article_number: Artikelnummer
             designation: Bezeichnung
@@ -1315,7 +1429,7 @@ class ItemService:
             manufacturer: Hersteller
             material_specification: Materialspezifikation
             description: Beschreibung
-            
+
         Returns:
             article_number des gespeicherten ItemInfo
         """
@@ -1328,7 +1442,7 @@ class ItemService:
                 storage_location=storage_location,
                 manufacturer=manufacturer,
                 material_specification=material_specification,
-                description=description
+                description=description,
             )
         except (ConnectionError, AttributeError) as e:
             logger.error("Infrastructure-Fehler beim Speichern der ItemInfo: %s", e)
@@ -1347,12 +1461,12 @@ class ItemService:
         ordered_quantity: int = None,  # Bestellmenge (aus Bestellung)
         quantity: int = None,  # BACKWARD COMPATIBILITY - wird zu delivered_quantity
         order_number: str = "",
-        expiry_date = None,
+        expiry_date=None,
         storage_location: str = "",
         description: str = "",
         status: str = "received",
         employee_name: str = "",
-        supplier_id: str = ""
+        supplier_id: str = "",
     ) -> str:
         """
         Creates a new Item with the given parameters.
@@ -1380,7 +1494,10 @@ class ItemService:
         try:
             # Direct approach: Create ItemInfo and Item in single transaction
             from warehouse.infrastructure.database.connection import get_session
-            from warehouse.infrastructure.database.models.item_model import ItemInfoModel, ItemModel
+            from warehouse.infrastructure.database.models.item_model import (
+                ItemInfoModel,
+                ItemModel,
+            )
 
             logger.info(f"DEBUG create_item: description parameter = '{description}'")
 
@@ -1390,35 +1507,54 @@ class ItemService:
 
                 if not item_info:
                     # Create ItemInfo with provided description
-                    logger.info(f"DEBUG: Creating NEW ItemInfo with designation='{description or f'Artikel {article_number}'}'")
+                    logger.info(
+                        f"DEBUG: Creating NEW ItemInfo with designation='{description or f'Artikel {article_number}'}'"
+                    )
                     item_info = ItemInfoModel(
                         article_number=article_number,
                         designation=description or f"Artikel {article_number}",
-                        description=description or "Automatisch erstellt via Item Creation"
+                        description=description
+                        or "Automatisch erstellt via Item Creation",
                     )
                     session.add(item_info)
                     session.flush()  # Ensure ItemInfo is created before Item
+
+                    # Set workflow status for newly created ItemInfo
+                    self._set_iteminfo_complete_status(session, article_number)
                 else:
-                    logger.info(f"DEBUG: ItemInfo ALREADY EXISTS for {article_number}, designation='{item_info.designation}'")
+                    logger.info(
+                        f"DEBUG: ItemInfo ALREADY EXISTS for {article_number}, designation='{item_info.designation}'"
+                    )
                     # Update designation if we have a better value (non-empty description provided)
                     if description and description.strip():
                         # Only update if current designation is empty, generic, or "Claude Import"
                         current_designation = item_info.designation or ""
-                        if (not current_designation.strip() or
-                            current_designation.startswith("Artikel ") or
-                            current_designation == "Claude Import" or
-                            current_designation == "Automatisch erstellt via Item Creation"):
-                            logger.info(f"DEBUG: Updating ItemInfo designation from '{item_info.designation}' to '{description}'")
+                        if (
+                            not current_designation.strip()
+                            or current_designation.startswith("Artikel ")
+                            or current_designation == "Claude Import"
+                            or current_designation
+                            == "Automatisch erstellt via Item Creation"
+                        ):
+                            logger.info(
+                                f"DEBUG: Updating ItemInfo designation from '{item_info.designation}' to '{description}'"
+                            )
                             item_info.designation = description
                             item_info.description = description
                             session.flush()
+
+                            # Set workflow status for updated ItemInfo
+                            self._set_iteminfo_complete_status(session, article_number)
 
                 # Now create the Item
                 # Handle order_number: Check if order exists, create if not
                 final_order_number = None
                 if order_number and order_number.strip():
                     # Check if order exists in database
-                    from warehouse.infrastructure.database.models.order_model import OrderModel
+                    from warehouse.infrastructure.database.models.order_model import (
+                        OrderModel,
+                    )
+
                     existing_order = session.get(OrderModel, order_number.strip())
                     if existing_order:
                         final_order_number = order_number.strip()
@@ -1427,26 +1563,29 @@ class ItemService:
                         logger.info(f"Creating new order {order_number} automatically")
                         from datetime import date
 
-                        # Ensure AUTO_CREATED supplier exists
-                        from warehouse.infrastructure.database.models.supplier_model import SupplierModel
-                        auto_supplier = session.get(SupplierModel, "AUTO_CREATED")
+                        # Ensure AUTO_SUPP supplier exists (max 10 chars for supplier_id)
+                        from warehouse.infrastructure.database.models.supplier_model import (
+                            SupplierModel,
+                        )
+
+                        auto_supplier = session.get(SupplierModel, "AUTO_SUPP")
                         if not auto_supplier:
                             auto_supplier = SupplierModel(
-                                supplier_id="AUTO_CREATED",
+                                supplier_id="AUTO_SUPP",
                                 name="Auto-created Supplier",
                                 contact_person="System",
-                                notes="Automatically created supplier for orders from delivery imports"
+                                notes="Automatically created supplier for orders from delivery imports",
                             )
                             session.add(auto_supplier)
                             session.flush()
 
                         new_order = OrderModel(
                             order_number=order_number.strip(),
-                            supplier_id="AUTO_CREATED",  # Default supplier for auto-created orders
+                            supplier_id="AUTO_SUPP",  # Default supplier for auto-created orders (max 10 chars)
                             employee_name=employee_name or "System",
                             status="open",
                             order_date=date.today(),  # Set current date
-                            notes=f"Auto-created from delivery import on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                            notes=f"Auto-created from delivery import on {datetime.now().strftime('%Y-%m-%d %H:%M')}",
                         )
                         session.add(new_order)
                         session.flush()  # Ensure order is created before using it
@@ -1454,9 +1593,15 @@ class ItemService:
                         logger.info(f"Order {order_number} created successfully")
 
                 # === BACKWARD COMPATIBILITY: quantity → delivered_quantity ===
-                final_delivered_quantity = delivered_quantity if delivered_quantity is not None else quantity
+                final_delivered_quantity = (
+                    delivered_quantity if delivered_quantity is not None else quantity
+                )
                 if final_delivered_quantity is None:
-                    final_delivered_quantity = delivery_slip_quantity if delivery_slip_quantity is not None else 1
+                    final_delivered_quantity = (
+                        delivery_slip_quantity
+                        if delivery_slip_quantity is not None
+                        else 1
+                    )
 
                 item = ItemModel(
                     article_number=article_number,
@@ -1466,7 +1611,7 @@ class ItemService:
                     delivery_slip_quantity=delivery_slip_quantity,  # Lieferschein (OCR)
                     ordered_quantity=ordered_quantity,  # Bestellung (optional)
                     order_number=final_order_number,  # NULL instead of empty string
-                    employee=employee_name or "System"
+                    employee=employee_name or "System",
                 )
                 session.add(item)
                 session.flush()  # Ensure item is created
@@ -1474,8 +1619,15 @@ class ItemService:
                 # BACKWARD COMPAT: Fülle alte delivery_quantity Spalte auch (falls vorhanden)
                 try:
                     session.execute(
-                        text("UPDATE items SET delivery_quantity = :qty WHERE article_number = :art AND batch_number = :batch AND delivery_number = :del"),
-                        {"qty": final_delivered_quantity, "art": article_number, "batch": batch_number, "del": delivery_number}
+                        text(
+                            "UPDATE items SET delivery_quantity = :qty WHERE article_number = :art AND batch_number = :batch AND delivery_number = :del"
+                        ),
+                        {
+                            "qty": final_delivered_quantity,
+                            "art": article_number,
+                            "batch": batch_number,
+                            "del": delivery_number,
+                        },
                     )
                 except Exception:
                     pass  # Spalte existiert vielleicht nicht mehr
@@ -1514,30 +1666,43 @@ class ItemService:
         """
         try:
             from warehouse.infrastructure.database.connection import get_session
-            from warehouse.infrastructure.database.models.item_model import ItemModel, ItemInfoModel
-            from warehouse.infrastructure.database.models.delivery_model import DeliveryModel
+            from warehouse.infrastructure.database.models.item_model import (
+                ItemModel,
+                ItemInfoModel,
+            )
+            from warehouse.infrastructure.database.models.delivery_model import (
+                DeliveryModel,
+            )
 
             with get_session() as session:
                 # Query the ItemModel directly
-                item = session.query(ItemModel).filter_by(
-                    article_number=article_number,
-                    batch_number=batch_number,
-                    delivery_number=delivery_number
-                ).first()
+                item = (
+                    session.query(ItemModel)
+                    .filter_by(
+                        article_number=article_number,
+                        batch_number=batch_number,
+                        delivery_number=delivery_number,
+                    )
+                    .first()
+                )
 
                 if not item:
-                    logger.warning(f"DEBUG CERTIFICATES: Item not found in DB: {article_number}/{batch_number}/{delivery_number}")
+                    logger.warning(
+                        f"DEBUG CERTIFICATES: Item not found in DB: {article_number}/{batch_number}/{delivery_number}"
+                    )
                     return None
 
                 # Log raw database certificate values
-                logger.info(f"DEBUG CERTIFICATES: Raw DB values for {article_number}/{batch_number}: "
-                           f"measurement_protocol={item.measurement_protocol}, "
-                           f"material_certificate={item.material_certificate}, "
-                           f"coating_certificate={item.coating_certificate}, "
-                           f"hardness_certificate={item.hardness_certificate}, "
-                           f"additional_certificates={item.additional_certificates}, "
-                           f"label_present={item.label_present}, "
-                           f"accompanying_document={item.accompanying_document}")
+                logger.info(
+                    f"DEBUG CERTIFICATES: Raw DB values for {article_number}/{batch_number}: "
+                    f"measurement_protocol={item.measurement_protocol}, "
+                    f"material_certificate={item.material_certificate}, "
+                    f"coating_certificate={item.coating_certificate}, "
+                    f"hardness_certificate={item.hardness_certificate}, "
+                    f"additional_certificates={item.additional_certificates}, "
+                    f"label_present={item.label_present}, "
+                    f"accompanying_document={item.accompanying_document}"
+                )
 
                 # Get additional data from related tables
                 item_info = session.get(ItemInfoModel, article_number)
@@ -1545,41 +1710,92 @@ class ItemService:
 
                 # Return dictionary compatible with UI expectations
                 return {
-                    'article_number': item.article_number,
-                    'batch_number': item.batch_number,
-                    'delivery_number': item.delivery_number,
+                    "article_number": item.article_number,
+                    "batch_number": item.batch_number,
+                    "delivery_number": item.delivery_number,
                     # === DREI MENGENTYPEN ===
-                    'delivered_quantity': item.delivered_quantity,  # Tatsächlich geliefert
-                    'delivery_slip_quantity': item.delivery_slip_quantity,  # Lieferschein (OCR)
-                    'ordered_quantity': item.ordered_quantity,  # Bestellung
+                    "delivered_quantity": item.delivered_quantity,  # Tatsächlich geliefert
+                    "delivery_slip_quantity": item.delivery_slip_quantity,  # Lieferschein (OCR)
+                    "ordered_quantity": item.ordered_quantity,  # Bestellung
                     # === BACKWARD COMPATIBILITY ===
-                    'quantity': item.delivered_quantity,  # Fallback für alten Code
-                    'delivery_quantity': item.delivered_quantity,  # Fallback für alten Code
-                    'status': 'Artikel angelegt',  # Default status for newly created items
-                    'employee_name': item.employee or 'System',
-                    'order_number': item.order_number,
-                    'created_at': item.created_at.isoformat() if item.created_at else None,
-                    'designation': item_info.designation if item_info else f'Artikel {article_number}',
-                    'revision_number': item_info.revision_number if item_info else '',
-                    'storage_location': item_info.storage_location if item_info else '',
-                    'manufacturer': item_info.manufacturer if item_info else '',
-                    'supplier_name': delivery.supplier_name if delivery else '',
+                    "quantity": item.delivered_quantity,  # Fallback für alten Code
+                    "delivery_quantity": item.delivered_quantity,  # Fallback für alten Code
+                    "status": "Artikel angelegt",  # Default status for newly created items
+                    "employee_name": item.employee or "System",
+                    "order_number": item.order_number,
+                    "created_at": item.created_at.isoformat()
+                    if item.created_at
+                    else None,
+                    "designation": item_info.designation
+                    if item_info
+                    else f"Artikel {article_number}",
+                    "revision_number": item_info.revision_number if item_info else "",
+                    "storage_location": item_info.storage_location if item_info else "",
+                    "manufacturer": item_info.manufacturer if item_info else "",
+                    "supplier_name": delivery.supplier_name if delivery else "",
                     # Certificate data for template generation and popup pre-filling
-                    'certificates': {
-                        'measurement_protocol': item.measurement_protocol or False,
-                        'material_certificate': item.material_certificate or False,
-                        'coating_certificate': item.coating_certificate or False,
-                        'hardness_certificate': item.hardness_certificate or False,
-                        'additional_certificates': item.additional_certificates or False,
-                        'label_present': item.label_present or False,
-                        'accompanying_document': item.accompanying_document or False
-                    }
+                    "certificates": {
+                        "measurement_protocol": item.measurement_protocol or False,
+                        "material_certificate": item.material_certificate or False,
+                        "coating_certificate": item.coating_certificate or False,
+                        "hardness_certificate": item.hardness_certificate or False,
+                        "additional_certificates": item.additional_certificates
+                        or False,
+                        "label_present": item.label_present or False,
+                        "accompanying_document": item.accompanying_document or False,
+                    },
                 }
 
         except Exception as e:
             logger.error(f"Error retrieving item by composite key: {e}")
             return None
 
+    def _set_iteminfo_complete_status(self, session, article_number: str) -> None:
+        """
+        Setzt automatisch den Workflow-Status "Artikeldetails vollständig" für alle Items
+        mit dieser Artikelnummer.
+
+        Args:
+            session: Aktive SQLAlchemy Session
+            article_number: Artikelnummer
+        """
+        try:
+            from warehouse.infrastructure.database.models.item_workflow_steps_model import (
+                ItemWorkflowStepsModel,
+            )
+
+            # Finde alle Workflow-Einträge für diese Artikelnummer
+            workflow_entries = (
+                session.query(ItemWorkflowStepsModel)
+                .filter(ItemWorkflowStepsModel.article_number == article_number)
+                .all()
+            )
+
+            if not workflow_entries:
+                logger.debug(f"No workflow entries found for article {article_number}")
+                return
+
+            # Setze Status für alle gefundenen Einträge
+            current_user = (
+                "System"  # TODO: Könnte aus session_state kommen falls verfügbar
+            )
+            current_time = datetime.now()
+
+            for workflow in workflow_entries:
+                # Nur setzen wenn noch nicht gesetzt
+                if not workflow.iteminfo_complete_at:
+                    workflow.iteminfo_complete_by = current_user
+                    workflow.iteminfo_complete_at = current_time
+                    logger.info(
+                        f"Workflow status 'Artikeldetails vollständig' set for "
+                        f"{article_number}/{workflow.batch_number}/{workflow.delivery_number}"
+                    )
+
+            session.flush()
+
+        except Exception as e:
+            logger.error(f"Error setting iteminfo_complete status: {str(e)}")
+            logger.exception("Full traceback:")
 
 
 # Test-Funktion

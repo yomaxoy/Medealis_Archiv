@@ -20,7 +20,7 @@ class OrderModel(Base):
     """
 
     __tablename__ = "orders"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     # === PRIMÄRSCHLÜSSEL (Business Key) ===
     order_number = Column(String(10), primary_key=True)  # "ORD001", "B24001"
@@ -32,7 +32,7 @@ class OrderModel(Base):
     )
 
     # === BESTELLDATEN ===
-    supplier_id = Column(String(5), nullable=True, index=True)
+    supplier_id = Column(String(10), nullable=True, index=True)
     order_date = Column(Date, nullable=False, index=True)
     expected_delivery_date = Column(Date, nullable=True)
 
@@ -124,7 +124,7 @@ class OrderItemModel(Base):
     """
 
     __tablename__ = "order_items"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     # === PRIMÄRSCHLÜSSEL ===
     id = Column(Integer, primary_key=True, autoincrement=True)

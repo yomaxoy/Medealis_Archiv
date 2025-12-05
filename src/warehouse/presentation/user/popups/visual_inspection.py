@@ -16,6 +16,9 @@ from .components import (
     FormBuilder,
     render_quality_footer,
 )
+from warehouse.application.services.validation_service import validation_service
+from warehouse.application.services.audit_service import audit_service
+from warehouse.presentation.utils.user_context import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +40,14 @@ class VisualInspectionPopup(InspectionPopup):
             title="👁️ Sichtkontrolle durchführen",
             item_data=item_data,
             show_info_box=False,  # Info-Box deaktiviert für kompaktes Layout
-            info_text=None
+            info_text=None,
         )
 
     def render_header(self) -> None:
         """Rendert Artikel-Header mit Infos."""
         # Kompaktes CSS für das gesamte Popup
-        st.markdown("""
+        st.markdown(
+            """
         <style>
         /* Reduziere Abstände im Dialog */
         div[data-testid="stDialog"] section[data-testid="stVerticalBlock"] {
@@ -119,7 +123,9 @@ class VisualInspectionPopup(InspectionPopup):
             padding: 0.3rem !important;
         }
         </style>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
         render_article_header(
             article_number=self.article_number,
@@ -128,23 +134,35 @@ class VisualInspectionPopup(InspectionPopup):
             quantity=self.quantity,
             status=self.status,
             show_info_box=self.show_info_box,
-            info_text=self.info_text
+            info_text=self.info_text,
         )
 
     def render_body(self) -> Dict[str, Any]:
         """Rendert Formular für Sichtkontrolle."""
         form = FormBuilder(columns=2)
 
+        # ===== PRÜFERNAME GANZ OBEN (PFLICHTFELD) =====
+        form.add_section("👤 Prüfer", expanded=True, use_expander=False)
+
+        current_user = get_current_user()
+        form.add_text_input(
+            "Name des Prüfers: *",
+            key="visual_inspector_name",
+            value=current_user if current_user != "System" else "",
+            placeholder="Vollständiger Name des durchführenden Mitarbeiters",
+            help="Wird für die Nachvollziehbarkeit benötigt (Pflichtfeld)",
+        )
+
         # Sektion 1: Ausschusserfassung
         form.add_section("📊 Ausschuss erfassen", expanded=True, use_expander=False)
 
         form.add_number_input(
-            "Ausschussmenge:",
+            "Ausschussmenge: *",
             key="visual_waste_quantity",
             value=0,
             min_value=0,
             max_value=self.quantity if self.quantity else None,
-            help=f"Menge des nicht verwendbaren Materials (max. {self.quantity})"
+            help=f"Menge des nicht verwendbaren Materials (Pflichtfeld, max. {self.quantity})",
         )
 
         # Sektion 2: Qualitätsbewertung
@@ -154,27 +172,19 @@ class VisualInspectionPopup(InspectionPopup):
             "Bemerkungen zur Qualitätskontrolle:",
             key="visual_quality_notes",
             value="",
-            height=60,  # Reduziert von 100 auf 60
-            placeholder="Bemerkungen zur Inspektion...",
-            help="Beschreiben Sie eventuelle Mängel"
-        )
-
-        # Sektion 3: Prüfer
-        form.add_section("👤 Prüfer", expanded=True, use_expander=False)
-
-        form.add_text_input(
-            "Name des Prüfers:",
-            key="visual_inspector_name",
-            value=self.get_current_user(),
-            placeholder="Vollständiger Name des durchführenden Mitarbeiters",
-            help="Wird für die Nachvollziehbarkeit benötigt"
+            height=60,
+            placeholder="Optionale Bemerkungen zur Inspektion...",
+            help="Beschreiben Sie eventuelle Mängel (optional)",
         )
 
         # Render und hole Daten
         form_data = form.render()
 
+        # Pflichtfeld-Hinweis
+        st.caption("* Pflichtfelder")
+
         # Zeige Berechnungen
-        self._render_waste_calculations(form_data['visual_waste_quantity'])
+        self._render_waste_calculations(form_data["visual_waste_quantity"])
 
         return form_data
 
@@ -182,34 +192,30 @@ class VisualInspectionPopup(InspectionPopup):
         """Zeigt Berechnungen für Ausschuss an."""
         if waste_quantity > 0:
             effective_quantity = max(0, self.quantity - waste_quantity)
-            waste_percentage = (waste_quantity / self.quantity * 100) if self.quantity > 0 else 0
+            waste_percentage = (
+                (waste_quantity / self.quantity * 100) if self.quantity > 0 else 0
+            )
 
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric(
-                    "Gesamtmenge",
-                    f"{self.quantity}",
-                    delta=None
-                )
+                st.metric("Gesamtmenge", f"{self.quantity}", delta=None)
 
             with col2:
                 st.metric(
                     "Ausschuss",
                     f"{waste_quantity}",
                     delta=f"-{waste_percentage:.1f}%",
-                    delta_color="inverse"
+                    delta_color="inverse",
                 )
 
             with col3:
-                st.metric(
-                    "Verwendbar",
-                    f"{effective_quantity}",
-                    delta=None
-                )
+                st.metric("Verwendbar", f"{effective_quantity}", delta=None)
 
             if waste_percentage >= 50:
-                st.error(f"⚠️ **Hoher Ausschuss:** {waste_percentage:.1f}% - Bitte Lieferanten kontaktieren!")
+                st.error(
+                    f"⚠️ **Hoher Ausschuss:** {waste_percentage:.1f}% - Bitte Lieferanten kontaktieren!"
+                )
             elif waste_percentage >= 10:
                 st.warning(f"⚠️ **Erhöhter Ausschuss:** {waste_percentage:.1f}%")
 
@@ -218,7 +224,7 @@ class VisualInspectionPopup(InspectionPopup):
         return render_quality_footer(
             confirm_label="✅ Prüfung bestätigen",
             reject_label="🗑️ Artikel zurückweisen",
-            cancel_label="🚫 Abbrechen"
+            cancel_label="🚫 Abbrechen",
         )
 
     def handle_primary_action(self, form_data: Dict[str, Any]) -> None:
@@ -227,19 +233,30 @@ class VisualInspectionPopup(InspectionPopup):
 
     def handle_confirm_action(self, form_data: Dict[str, Any]) -> None:
         """Verarbeitet Prüfung bestätigen."""
-        # Validierung
-        is_valid, error_msg = self._validate_inspection_data(form_data)
-        if not is_valid:
-            self.show_error(error_msg)
-            return
+        inspector_name = form_data["visual_inspector_name"].strip()
+        waste_quantity = form_data["visual_waste_quantity"]
+        quality_notes = form_data["visual_quality_notes"].strip()
 
-        inspector_name = form_data['visual_inspector_name'].strip()
-        waste_quantity = form_data['visual_waste_quantity']
-        quality_notes = form_data['visual_quality_notes'].strip()
+        # ===== VALIDATION FIRST =====
+        validation_data = {
+            "inspector_name": inspector_name,
+            "waste_quantity": waste_quantity,
+        }
+
+        validation_result = validation_service.validate_visual_inspection(
+            validation_data
+        )
+
+        if not validation_result.is_valid:
+            st.error("❌ **Validierungsfehler:**")
+            st.error(validation_result.get_formatted_errors())
+            return  # Stop execution
 
         try:
             # Speichere in DB
-            from warehouse.application.services.entity_services.item_service import ItemService
+            from warehouse.application.services.entity_services.item_service import (
+                ItemService,
+            )
 
             item_service = ItemService()
             success = item_service.complete_visual_inspection(
@@ -249,7 +266,7 @@ class VisualInspectionPopup(InspectionPopup):
                 performed_by=inspector_name,
                 waste_quantity=waste_quantity,
                 quality_notes=quality_notes,
-                passed=True
+                passed=True,
             )
 
             if not success:
@@ -257,16 +274,25 @@ class VisualInspectionPopup(InspectionPopup):
                 return
 
             # Generiere Dokument
-            self._generate_inspection_document(waste_quantity, quality_notes, inspector_name)
+            self._generate_inspection_document(
+                waste_quantity, quality_notes, inspector_name
+            )
 
-            # Log Action
-            self.log_action('visual_inspection_confirmed', {
-                'waste_quantity': waste_quantity,
-                'inspector': inspector_name
-            })
+            # ===== AUDIT LOGGING =====
+            audit_service.log_visual_inspection(
+                user=inspector_name,
+                article_number=self.article_number,
+                batch_number=self.batch_number,
+                delivery_number=self.delivery_number,
+                waste_quantity=waste_quantity,
+                passed=True,  # Bei handle_confirm_action ist die Prüfung bestanden
+                notes=quality_notes if quality_notes else "Keine Mängel",
+            )
 
             # Erfolg
-            self.show_success("✅ Sichtkontrolle erfolgreich abgeschlossen!", with_balloons=True)
+            self.show_success(
+                "✅ Sichtkontrolle erfolgreich abgeschlossen!", with_balloons=True
+            )
             self.cleanup_session_state()
             st.rerun()
 
@@ -276,8 +302,8 @@ class VisualInspectionPopup(InspectionPopup):
 
     def handle_reject_action(self, form_data: Dict[str, Any]) -> None:
         """Verarbeitet Artikel zurückweisen (100% Ausschuss)."""
-        inspector_name = form_data['visual_inspector_name'].strip()
-        quality_notes = form_data['visual_quality_notes'].strip()
+        inspector_name = form_data["visual_inspector_name"].strip()
+        quality_notes = form_data["visual_quality_notes"].strip()
 
         # Validierung für Zurückweisung
         if not inspector_name or len(inspector_name) < 2:
@@ -285,7 +311,9 @@ class VisualInspectionPopup(InspectionPopup):
             return
 
         if not quality_notes or len(quality_notes) < 10:
-            self.show_error("Bitte geben Sie eine ausführliche Begründung für die Zurückweisung an (mind. 10 Zeichen)!")
+            self.show_error(
+                "Bitte geben Sie eine ausführliche Begründung für die Zurückweisung an (mind. 10 Zeichen)!"
+            )
             return
 
         # Bestätigungsdialog
@@ -294,9 +322,16 @@ class VisualInspectionPopup(InspectionPopup):
         col1, col2 = st.columns(2)
 
         with col1:
-            if st.button("🗑️ Ja, zurückweisen", type="primary", use_container_width=True, key="confirm_reject"):
+            if st.button(
+                "🗑️ Ja, zurückweisen",
+                type="primary",
+                use_container_width=True,
+                key="confirm_reject",
+            ):
                 try:
-                    from warehouse.application.services.entity_services.item_service import ItemService
+                    from warehouse.application.services.entity_services.item_service import (
+                        ItemService,
+                    )
 
                     item_service = ItemService()
                     success = item_service.mark_item_as_waste(
@@ -304,7 +339,7 @@ class VisualInspectionPopup(InspectionPopup):
                         batch_number=self.batch_number,
                         delivery_number=self.delivery_number,
                         reason=quality_notes,
-                        employee=inspector_name
+                        employee=inspector_name,
                     )
 
                     if not success:
@@ -316,14 +351,19 @@ class VisualInspectionPopup(InspectionPopup):
                         waste_quantity=self.quantity,  # 100% Ausschuss
                         quality_notes=quality_notes,
                         inspector_name=inspector_name,
-                        is_rejection=True
+                        is_rejection=True,
                     )
 
-                    # Log Action
-                    self.log_action('visual_inspection_rejected', {
-                        'reason': quality_notes,
-                        'inspector': inspector_name
-                    })
+                    # ===== AUDIT LOGGING =====
+                    audit_service.log_visual_inspection(
+                        user=inspector_name,
+                        article_number=self.article_number,
+                        batch_number=self.batch_number,
+                        delivery_number=self.delivery_number,
+                        waste_quantity=self.quantity,  # 100% Ausschuss bei Zurückweisung
+                        passed=False,  # Bei Zurückweisung ist die Prüfung nicht bestanden
+                        notes=f"ZURÜCKGEWIESEN: {quality_notes}",
+                    )
 
                     self.show_error("❌ Artikel wurde zurückgewiesen!")
                     self.cleanup_session_state()
@@ -339,18 +379,24 @@ class VisualInspectionPopup(InspectionPopup):
 
     def _validate_inspection_data(self, form_data: Dict[str, Any]) -> tuple[bool, str]:
         """Validiert Inspektionsdaten."""
-        inspector_name = form_data.get('visual_inspector_name', '').strip()
+        inspector_name = form_data.get("visual_inspector_name", "").strip()
 
         if not inspector_name or len(inspector_name) < 2:
-            return False, "❌ Bitte geben Sie einen gültigen Prüfernamen ein (mind. 2 Zeichen)!"
+            return (
+                False,
+                "❌ Bitte geben Sie einen gültigen Prüfernamen ein (mind. 2 Zeichen)!",
+            )
 
-        waste_quantity = form_data.get('visual_waste_quantity', 0)
+        waste_quantity = form_data.get("visual_waste_quantity", 0)
 
         if waste_quantity < 0:
             return False, "❌ Ausschussmenge kann nicht negativ sein!"
 
         if waste_quantity > self.quantity:
-            return False, f"❌ Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({self.quantity}) sein!"
+            return (
+                False,
+                f"❌ Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({self.quantity}) sein!",
+            )
 
         return True, ""
 
@@ -359,13 +405,13 @@ class VisualInspectionPopup(InspectionPopup):
         waste_quantity: int,
         quality_notes: str,
         inspector_name: str,
-        is_rejection: bool = False
+        is_rejection: bool = False,
     ) -> None:
         """Generiert Sichtkontrolle-Dokument."""
         try:
             from warehouse.application.services.document_generation import (
                 DocumentGenerationService,
-                DocumentType
+                DocumentType,
             )
 
             with st.spinner("📋 Erstelle Sichtkontrolle-Dokument..."):
@@ -385,13 +431,13 @@ class VisualInspectionPopup(InspectionPopup):
                     "ausschussquote": ausschussquote,
                     "name": inspector_name,
                     "qty": str(total_quantity),
-                    "date": datetime.now().strftime('%d.%m.%Y'),
-                    "time": datetime.now().strftime('%H:%M'),
-                    'waste_quantity': waste_quantity,
-                    'effective_quantity': max(0, total_quantity - waste_quantity),
-                    'quality_notes': quality_notes,
-                    'status': 'Zurückgewiesen' if is_rejection else 'Sichtgeprüft',
-                    'is_rejection': is_rejection
+                    "date": datetime.now().strftime("%d.%m.%Y"),
+                    "time": datetime.now().strftime("%H:%M"),
+                    "waste_quantity": waste_quantity,
+                    "effective_quantity": max(0, total_quantity - waste_quantity),
+                    "quality_notes": quality_notes,
+                    "status": "Zurückgewiesen" if is_rejection else "Sichtgeprüft",
+                    "is_rejection": is_rejection,
                 }
 
                 # Generiere Dokument
@@ -403,22 +449,26 @@ class VisualInspectionPopup(InspectionPopup):
                     supplier_name=self.supplier_name,
                     quantity=total_quantity,
                     employee_name=inspector_name,
-                    additional_data=additional_data
+                    additional_data=additional_data,
                 )
 
                 if result.success:
                     self.show_success("📋 Sichtkontrolle-Dokument erfolgreich erstellt!")
                     st.info(f"📄 DOCX: {result.document_path.name}")
 
-                    if hasattr(result, 'pdf_path') and result.pdf_path:
+                    if hasattr(result, "pdf_path") and result.pdf_path:
                         st.info(f"📄 PDF: {result.pdf_path.name}")
 
                     # Zeige Zertifikat-Zusammenfassung
                     if waste_quantity > 0:
-                        st.info(f"📊 Ausschuss dokumentiert: {waste_quantity} Stück ({ausschussquote})")
+                        st.info(
+                            f"📊 Ausschuss dokumentiert: {waste_quantity} Stück ({ausschussquote})"
+                        )
 
                 else:
-                    st.warning(f"⚠️ Dokumentenerstellung fehlgeschlagen: {result.error}")
+                    st.warning(
+                        f"⚠️ Dokumentenerstellung fehlgeschlagen: {result.error}"
+                    )
                     logger.error(f"Document generation failed: {result.error}")
 
         except Exception as e:
@@ -438,13 +488,13 @@ class VisualInspectionPopup(InspectionPopup):
             action = self.render_footer()
 
             # Custom Action Handler
-            if action == 'confirm':
+            if action == "confirm":
                 self.handle_confirm_action(form_data)
-            elif action == 'reject':
+            elif action == "reject":
                 self.handle_reject_action(form_data)
-            elif action == 'cancel':
+            elif action == "cancel":
                 self.cleanup_session_state()
-                st.session_state['popup_action'] = 'cancel'
+                st.session_state["popup_action"] = "cancel"
                 st.rerun()
 
         except Exception as e:
@@ -453,6 +503,7 @@ class VisualInspectionPopup(InspectionPopup):
 
 
 # ============== Public API ==============
+
 
 @st.dialog("👁️ Sichtkontrolle durchführen", width="large")
 def show_visual_inspection_popup(item_data: Dict[str, Any]):

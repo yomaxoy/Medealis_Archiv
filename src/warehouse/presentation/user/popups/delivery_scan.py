@@ -49,7 +49,7 @@ def show_delivery_scan_popup():
             ):
                 # ⚠️ NEU: Storage-Verfügbarkeits-Check VOR Dokumenten-Upload
                 from warehouse.presentation.user.popups.components.storage_warning_dialog import (
-                    check_and_show_storage_warning
+                    check_and_show_storage_warning,
                 )
 
                 # Zeige Warnung wenn Server nicht verfügbar
@@ -58,7 +58,9 @@ def show_delivery_scan_popup():
                 )
 
                 if not can_continue:
-                    st.error("❌ Dokumenten-Upload abgebrochen - keine Speicher-Option verfügbar")
+                    st.error(
+                        "❌ Dokumenten-Upload abgebrochen - keine Speicher-Option verfügbar"
+                    )
                 else:
                     process_uploaded_delivery_file(uploaded_pdf)
 
@@ -86,7 +88,9 @@ def show_system_status_check():
             st.error("❌ ANTHROPIC_API_KEY nicht gesetzt!")
             with st.expander("🔧 API Key konfigurieren"):
                 st.code('$env:ANTHROPIC_API_KEY="sk-ant-api03-ihr-echter-key"')
-                st.write("Setzen Sie den API-Key in Ihrer Umgebung und starten Sie die App neu.")
+                st.write(
+                    "Setzen Sie den API-Key in Ihrer Umgebung und starten Sie die App neu."
+                )
 
     with col2:
         # Check OCR availability
@@ -209,11 +213,14 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
 
     # DEBUG: Log what's in the items
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info(f"DEBUG: items_data count: {len(items_data)}")
     if items_data:
         logger.info(f"DEBUG: First item keys: {items_data[0].keys()}")
-        logger.info(f"DEBUG: First item description: {items_data[0].get('description', 'NOT FOUND')}")
+        logger.info(
+            f"DEBUG: First item description: {items_data[0].get('description', 'NOT FOUND')}"
+        )
 
     # Delivery information section - editable
     col1, col2 = st.columns(2)
@@ -241,13 +248,18 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
             # Try to parse German date format "DD.MM.YYYY"
             try:
                 from datetime import datetime
-                delivery_date_value = datetime.strptime(delivery_date_value, "%d.%m.%Y").date()
+
+                delivery_date_value = datetime.strptime(
+                    delivery_date_value, "%d.%m.%Y"
+                ).date()
             except (ValueError, TypeError):
                 # Fallback to today
                 from datetime import date
+
                 delivery_date_value = date.today()
         elif delivery_date_value is None:
             from datetime import date
+
             delivery_date_value = date.today()
 
         edited_delivery_date = st.date_input(
@@ -270,7 +282,7 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
     # Items table section - editable
     if items_data:
         # Header row
-        col1, col2, col3, col4, col5 = st.columns([3, 4, 2, 2, 1])
+        col1, col2, col3, col4, col5, col6 = st.columns([3, 4, 2, 2, 1, 1])
         with col1:
             st.write("**Artikelnummer**")
         with col2:
@@ -280,7 +292,9 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
         with col4:
             st.write("**Bestellnummer**")
         with col5:
-            st.write("")  # Remove column
+            st.write("")  # ItemInfo button
+        with col6:
+            st.write("")  # Remove button
 
         edited_items = []
         for i, item in enumerate(items_data):
@@ -288,7 +302,7 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
             if i in st.session_state.items_to_remove:
                 continue
 
-            col1, col2, col3, col4, col5 = st.columns([3, 4, 2, 2, 1])
+            col1, col2, col3, col4, col5, col6 = st.columns([3, 4, 2, 2, 1, 1])
             with col1:
                 edited_article = st.text_input(
                     "Artikelnummer",
@@ -321,39 +335,56 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
                 )
             with col5:
                 if st.button(
-                    "🗑️", key=f"user_popup_remove_{i}", help="Item entfernen"
+                    "📝", key=f"user_popup_iteminfo_{i}", help="ItemInfo bearbeiten"
                 ):
+                    # Speichere aktuellen Artikel für ItemInfo-Dialog
+                    st.session_state.edit_iteminfo_article = edited_article
+                    st.session_state.edit_iteminfo_item_data = {
+                        "article_number": edited_article,
+                        "description": item.get("description", ""),
+                        "manufacturer": delivery_data.get("supplier_name", ""),
+                    }
+                    st.session_state.show_iteminfo_edit_dialog = True
+                    st.rerun()
+            with col6:
+                if st.button("🗑️", key=f"user_popup_remove_{i}", help="Item entfernen"):
                     st.session_state.items_to_remove.add(i)
                     st.rerun()
 
             # Keep all original fields from Claude extraction (like description, storage_location, etc.)
             # but update with edited values
             edited_item = item.copy()  # Preserve all original fields
-            edited_item.update({
-                "article_number": edited_article,
-                "batch_number": edited_batch,
-                "quantity": edited_quantity,
-                "order_number": edited_order_number,
-            })
+            edited_item.update(
+                {
+                    "article_number": edited_article,
+                    "batch_number": edited_batch,
+                    "quantity": edited_quantity,
+                    "order_number": edited_order_number,
+                }
+            )
             edited_items.append(edited_item)
 
         # DEBUG: Log edited items
         logger.info(f"DEBUG: edited_items count: {len(edited_items)}")
         if edited_items:
             logger.info(f"DEBUG: First edited item keys: {edited_items[0].keys()}")
-            logger.info(f"DEBUG: First edited item description: {edited_items[0].get('description', 'NOT FOUND')}")
+            logger.info(
+                f"DEBUG: First edited item description: {edited_items[0].get('description', 'NOT FOUND')}"
+            )
 
         # Add new item button
         st.write("---")
         if st.button("➕ Neues Item hinzufügen", key="user_add_new_item"):
             # Add empty item to the list with description field
-            items_data.append({
-                "article_number": "",
-                "batch_number": "",
-                "quantity": 1,
-                "order_number": "",
-                "description": ""  # Empty description for manually added items
-            })
+            items_data.append(
+                {
+                    "article_number": "",
+                    "batch_number": "",
+                    "quantity": 1,
+                    "order_number": "",
+                    "description": "",  # Empty description for manually added items
+                }
+            )
             st.rerun()
 
         # Summary
@@ -366,12 +397,14 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
         st.warning("Keine Items gefunden")
         # Allow adding first item
         if st.button("➕ Erstes Item hinzufügen", key="user_add_first_item"):
-            items_data.append({
-                "article_number": "",
-                "batch_number": "",
-                "quantity": 1,
-                "order_number": ""
-            })
+            items_data.append(
+                {
+                    "article_number": "",
+                    "batch_number": "",
+                    "quantity": 1,
+                    "order_number": "",
+                }
+            )
             st.rerun()
 
     st.write("---")

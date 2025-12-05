@@ -7,12 +7,13 @@ Diese Tabelle trackt den Workflow-Fortschritt jedes Items.
 Jeder Schritt speichert: Wer hat ihn durchgeführt + Wann.
 
 Workflow-Reihenfolge:
-1. Daten prüfen
-2. Dokumente prüfen
-3. Vermessen
-4. Sichtkontrolle
-5. Dokumente zusammenführen
-6. Abschließen (completed) oder Ausschuss (rejected)
+1. Artikeldetails vollständig (ItemInfo erstellt)
+2. Daten prüfen
+3. Dokumente prüfen
+4. Vermessen
+5. Sichtkontrolle
+6. Dokumente zusammenführen
+7. Abschließen (completed) oder Ausschuss (rejected)
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKeyConstraint
@@ -40,23 +41,27 @@ class ItemWorkflowStepsModel(Base):
 
     # === WORKFLOW STEPS (in Reihenfolge) ===
 
-    # Step 1: Daten prüfen
+    # Step 1: Artikeldetails vollständig (ItemInfo erstellt)
+    iteminfo_complete_by = Column(String(100), nullable=True)
+    iteminfo_complete_at = Column(DateTime, nullable=True)
+
+    # Step 2: Daten prüfen
     data_checked_by = Column(String(100), nullable=True)
     data_checked_at = Column(DateTime, nullable=True)
 
-    # Step 2: Dokumente prüfen
+    # Step 3: Dokumente prüfen
     documents_checked_by = Column(String(100), nullable=True)
     documents_checked_at = Column(DateTime, nullable=True)
 
-    # Step 3: Vermessen
+    # Step 4: Vermessen
     measured_by = Column(String(100), nullable=True)
     measured_at = Column(DateTime, nullable=True)
 
-    # Step 4: Sichtkontrolle
+    # Step 5: Sichtkontrolle
     visually_inspected_by = Column(String(100), nullable=True)
     visually_inspected_at = Column(DateTime, nullable=True)
 
-    # Step 5: Dokumente zusammenführen
+    # Step 6: Dokumente zusammenführen
     documents_merged_by = Column(String(100), nullable=True)
     documents_merged_at = Column(DateTime, nullable=True)
 
@@ -73,15 +78,17 @@ class ItemWorkflowStepsModel(Base):
 
     # === AUDIT-TIMESTAMPS ===
     created_at = Column(DateTime, nullable=False, default=datetime.now)
-    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
 
     # === FOREIGN KEY CONSTRAINT ===
     __table_args__ = (
         ForeignKeyConstraint(
-            ['article_number', 'batch_number', 'delivery_number'],
-            ['items.article_number', 'items.batch_number', 'items.delivery_number'],
-            name='fk_workflow_steps_item',
-            ondelete='CASCADE'
+            ["article_number", "batch_number", "delivery_number"],
+            ["items.article_number", "items.batch_number", "items.delivery_number"],
+            name="fk_workflow_steps_item",
+            ondelete="CASCADE",
         ),
     )
 

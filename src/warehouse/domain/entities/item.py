@@ -96,6 +96,10 @@ class Item:
         self.priority_level = priority_level
 
         # === WORKFLOW STEPS (von DB geladen, initial alle None) ===
+        # Step 0: Artikeldetails vollständig (ItemInfo erstellt)
+        self.iteminfo_complete_by: Optional[str] = None
+        self.iteminfo_complete_at: Optional[datetime] = None
+
         # Step 1: Daten prüfen
         self.data_checked_by: Optional[str] = None
         self.data_checked_at: Optional[datetime] = None
@@ -183,6 +187,7 @@ class Item:
 
         # String-basierte Prüfung
         string_mapping = {
+            "Artikeldetails vollständig": self.iteminfo_complete_by,
             "Daten prüfen": self.data_checked_by,
             "Dokumente prüfen": self.documents_checked_by,
             "Vermessen": self.measured_by,
@@ -191,7 +196,7 @@ class Item:
         }
 
         # Prüfe ob step ein Enum ist
-        if hasattr(step, 'value'):
+        if hasattr(step, "value"):
             # ItemStatus Enum
             return step_mapping.get(step) is not None
         else:
@@ -233,8 +238,7 @@ class Item:
         if not self.inspection_result:
             # Erstelle InspectionResult falls nicht vorhanden
             self.inspection_result = InspectionResult(
-                performed_at=datetime.now(),
-                performed_by=employee
+                performed_at=datetime.now(), performed_by=employee
             )
 
         self.inspection_result.measurements.update(measurements)
@@ -278,7 +282,9 @@ class Item:
         # Prüfe ob alle Steps done
         missing_steps = self.get_missing_steps()
         if missing_steps:
-            raise ValueError(f"Folgende Schritte fehlen noch: {', '.join(missing_steps)}")
+            raise ValueError(
+                f"Folgende Schritte fehlen noch: {', '.join(missing_steps)}"
+            )
 
         self.completed_by = employee
         self.completed_at = datetime.now()
@@ -375,13 +381,15 @@ class Item:
             Prozentsatz (0-100)
         """
         total_steps = 5  # data, documents, measurement, visual, merge
-        completed_steps = sum([
-            bool(self.data_checked_by),
-            bool(self.documents_checked_by),
-            bool(self.measured_by),
-            bool(self.visually_inspected_by),
-            bool(self.documents_merged_by),
-        ])
+        completed_steps = sum(
+            [
+                bool(self.data_checked_by),
+                bool(self.documents_checked_by),
+                bool(self.measured_by),
+                bool(self.visually_inspected_by),
+                bool(self.documents_merged_by),
+            ]
+        )
 
         return (completed_steps / total_steps) * 100
 
@@ -405,38 +413,46 @@ class Item:
             Dictionary mit aktuellem Status und Step-Details
         """
         return {
-            'current_status': self.get_current_status(),
-            'completion_percentage': self.get_completion_percentage(),
-            'missing_steps': self.get_missing_steps(),
-            'is_final': self.is_final_status(),
-            'is_ready_for_completion': self.is_ready_for_completion(),
-            'steps': {
-                'data_checked': {
-                    'completed': bool(self.data_checked_by),
-                    'by': self.data_checked_by,
-                    'at': self.data_checked_at.isoformat() if self.data_checked_at else None
+            "current_status": self.get_current_status(),
+            "completion_percentage": self.get_completion_percentage(),
+            "missing_steps": self.get_missing_steps(),
+            "is_final": self.is_final_status(),
+            "is_ready_for_completion": self.is_ready_for_completion(),
+            "steps": {
+                "data_checked": {
+                    "completed": bool(self.data_checked_by),
+                    "by": self.data_checked_by,
+                    "at": self.data_checked_at.isoformat()
+                    if self.data_checked_at
+                    else None,
                 },
-                'documents_checked': {
-                    'completed': bool(self.documents_checked_by),
-                    'by': self.documents_checked_by,
-                    'at': self.documents_checked_at.isoformat() if self.documents_checked_at else None
+                "documents_checked": {
+                    "completed": bool(self.documents_checked_by),
+                    "by": self.documents_checked_by,
+                    "at": self.documents_checked_at.isoformat()
+                    if self.documents_checked_at
+                    else None,
                 },
-                'measured': {
-                    'completed': bool(self.measured_by),
-                    'by': self.measured_by,
-                    'at': self.measured_at.isoformat() if self.measured_at else None
+                "measured": {
+                    "completed": bool(self.measured_by),
+                    "by": self.measured_by,
+                    "at": self.measured_at.isoformat() if self.measured_at else None,
                 },
-                'visually_inspected': {
-                    'completed': bool(self.visually_inspected_by),
-                    'by': self.visually_inspected_by,
-                    'at': self.visually_inspected_at.isoformat() if self.visually_inspected_at else None
+                "visually_inspected": {
+                    "completed": bool(self.visually_inspected_by),
+                    "by": self.visually_inspected_by,
+                    "at": self.visually_inspected_at.isoformat()
+                    if self.visually_inspected_at
+                    else None,
                 },
-                'documents_merged': {
-                    'completed': bool(self.documents_merged_by),
-                    'by': self.documents_merged_by,
-                    'at': self.documents_merged_at.isoformat() if self.documents_merged_at else None
-                }
-            }
+                "documents_merged": {
+                    "completed": bool(self.documents_merged_by),
+                    "by": self.documents_merged_by,
+                    "at": self.documents_merged_at.isoformat()
+                    if self.documents_merged_at
+                    else None,
+                },
+            },
         }
 
     # === PRIORITY MANAGEMENT ===
@@ -557,14 +573,14 @@ class Item:
             waste = self.inspection_result.waste_quantity
 
         return {
-            'ordered': self.ordered_quantity,
-            'delivery_slip': self.delivery_slip_quantity,
-            'delivered': self.delivered_quantity,
-            'slip_discrepancy': self.get_slip_difference(),
-            'order_discrepancy': self.get_order_difference(),
-            'waste': waste,
-            'good_quantity': self.get_good_quantity(),
-            'waste_percentage': float(self.get_waste_percentage())
+            "ordered": self.ordered_quantity,
+            "delivery_slip": self.delivery_slip_quantity,
+            "delivered": self.delivered_quantity,
+            "slip_discrepancy": self.get_slip_difference(),
+            "order_discrepancy": self.get_order_difference(),
+            "waste": waste,
+            "good_quantity": self.get_good_quantity(),
+            "waste_percentage": float(self.get_waste_percentage()),
         }
 
     # === UTILITY METHODS ===
@@ -600,43 +616,41 @@ class Item:
         """
         return {
             # Identität
-            'article_number': str(self.article_number),
-            'batch_number': str(self.batch_number),
-            'delivery_number': self.delivery_number,
-            'supplier_id': self.supplier_id,
-            'order_number': self.order_number,
-            'unique_identifier': self.get_unique_identifier(),
-
+            "article_number": str(self.article_number),
+            "batch_number": str(self.batch_number),
+            "delivery_number": self.delivery_number,
+            "supplier_id": self.supplier_id,
+            "order_number": self.order_number,
+            "unique_identifier": self.get_unique_identifier(),
             # Mengen
-            'delivered_quantity': self.delivered_quantity,
-            'delivery_slip_quantity': self.delivery_slip_quantity,
-            'ordered_quantity': self.ordered_quantity,
-            'good_quantity': self.get_good_quantity(),
-
+            "delivered_quantity": self.delivered_quantity,
+            "delivery_slip_quantity": self.delivery_slip_quantity,
+            "ordered_quantity": self.ordered_quantity,
+            "good_quantity": self.get_good_quantity(),
             # Status & Workflow
-            'current_status': self.get_current_status(),
-            'completion_percentage': self.get_completion_percentage(),
-            'missing_steps': self.get_missing_steps(),
-            'is_final': self.is_final_status(),
-
+            "current_status": self.get_current_status(),
+            "completion_percentage": self.get_completion_percentage(),
+            "missing_steps": self.get_missing_steps(),
+            "is_final": self.is_final_status(),
             # Workflow Steps
-            'workflow': self.get_workflow_summary(),
-
+            "workflow": self.get_workflow_summary(),
             # Zertifikate
-            'certificates': {cert.value: present for cert, present in self.certificates.items()},
-            'missing_certificates': [cert.value for cert in self.get_missing_certificates()],
-
+            "certificates": {
+                cert.value: present for cert, present in self.certificates.items()
+            },
+            "missing_certificates": [
+                cert.value for cert in self.get_missing_certificates()
+            ],
             # Prüfung
-            'inspection_result': self._serialize_inspection_result(),
-
+            "inspection_result": self._serialize_inspection_result(),
             # Metadaten
-            'priority_level': self.priority_level.value,
-            'created_by': self.created_by,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'notes': self.notes,
-            'barcode': self.generate_barcode_content(),
-            'storage_location': self.storage_location
+            "priority_level": self.priority_level.value,
+            "created_by": self.created_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "notes": self.notes,
+            "barcode": self.generate_barcode_content(),
+            "storage_location": self.storage_location,
         }
 
     def _serialize_inspection_result(self) -> Optional[Dict[str, Any]]:
@@ -645,13 +659,13 @@ class Item:
             return None
 
         return {
-            'performed_at': self.inspection_result.performed_at.isoformat(),
-            'performed_by': self.inspection_result.performed_by,
-            'waste_quantity': self.inspection_result.waste_quantity,
-            'waste_reason': self.inspection_result.waste_reason,
-            'quality_notes': self.inspection_result.quality_notes,
-            'measurements': self.inspection_result.measurements,
-            'passed': self.inspection_result.passed
+            "performed_at": self.inspection_result.performed_at.isoformat(),
+            "performed_by": self.inspection_result.performed_by,
+            "waste_quantity": self.inspection_result.waste_quantity,
+            "waste_reason": self.inspection_result.waste_reason,
+            "quality_notes": self.inspection_result.quality_notes,
+            "measurements": self.inspection_result.measurements,
+            "passed": self.inspection_result.passed,
         }
 
     def __str__(self) -> str:

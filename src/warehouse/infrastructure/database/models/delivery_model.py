@@ -23,12 +23,12 @@ class DeliveryModel(BaseModel):
     """
 
     __tablename__ = "deliveries"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     # === KERN-IDENTIFIKATOREN ===
     delivery_number = Column(String(50), nullable=False, unique=True, index=True)
     supplier_id = Column(
-        String(5), ForeignKey("suppliers.supplier_id"), nullable=False, index=True
+        String(10), ForeignKey("suppliers.supplier_id"), nullable=False, index=True
     )
     delivery_date = Column(Date, nullable=False, index=True)
 
@@ -44,7 +44,7 @@ class DeliveryModel(BaseModel):
     # === METADATEN ===
     notes = Column(Text, nullable=True)
 
-    # === BEZIEHUNGEN === 
+    # === BEZIEHUNGEN ===
     # Temporarily disabled due to SQLAlchemy registry conflicts
     # items = relationship("ItemModel", back_populates="delivery", lazy="select")
     # supplier = relationship("SupplierModel", back_populates="deliveries", lazy="select")

@@ -18,7 +18,9 @@ from warehouse.domain.value_objects.batch_number import BatchNumber
 from warehouse.domain.repositories.item_repository import ItemRepository, ItemId
 from warehouse.infrastructure.database.connection import get_session
 from warehouse.infrastructure.database.models.item_model import ItemModel, ItemInfoModel
-from warehouse.infrastructure.database.models.item_workflow_steps_model import ItemWorkflowStepsModel
+from warehouse.infrastructure.database.models.item_workflow_steps_model import (
+    ItemWorkflowStepsModel,
+)
 from warehouse.infrastructure.database.mappers.item_mapper import ItemMapper
 
 logger = logging.getLogger(__name__)
@@ -149,7 +151,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             # Konvertiere zu Domain Entities
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 items.append(self._mapper.to_domain(item_model, workflow_model))
 
@@ -177,7 +183,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
                 # Konvertiere zu Domain Entities
                 items = []
                 for item_model in item_models:
-                    key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                    key = (
+                        item_model.article_number,
+                        item_model.batch_number,
+                        item_model.delivery_number,
+                    )
                     workflow_model = workflow_dict.get(key)
                     items.append(self._mapper.to_domain(item_model, workflow_model))
 
@@ -197,12 +207,9 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         try:
             with get_session() as session:
                 # Query mit LEFT JOIN für ItemInfo
-                query = (
-                    session.query(ItemModel, ItemInfoModel)
-                    .outerjoin(
-                        ItemInfoModel,
-                        ItemModel.article_number == ItemInfoModel.article_number
-                    )
+                query = session.query(ItemModel, ItemInfoModel).outerjoin(
+                    ItemInfoModel,
+                    ItemModel.article_number == ItemInfoModel.article_number,
                 )
 
                 results = query.all()
@@ -220,11 +227,17 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
                 # Konvertiere zu Domain mit Info
                 items_with_info = []
                 for item_model, info_model in results:
-                    key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                    key = (
+                        item_model.article_number,
+                        item_model.batch_number,
+                        item_model.delivery_number,
+                    )
                     workflow_model = workflow_dict.get(key)
 
                     item = self._mapper.to_domain(item_model, workflow_model)
-                    info_dict = self._item_info_to_dict(info_model) if info_model else None
+                    info_dict = (
+                        self._item_info_to_dict(info_model) if info_model else None
+                    )
 
                     items_with_info.append((item, info_dict))
 
@@ -258,9 +271,12 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         delivery_number: str,
     ) -> bool:
         """Prüft ob Item existiert."""
-        return self.find_domain_by_composite_key(
-            article_number, batch_number, delivery_number
-        ) is not None
+        return (
+            self.find_domain_by_composite_key(
+                article_number, batch_number, delivery_number
+            )
+            is not None
+        )
 
     # === ITEM INFO OPERATIONS ===
 
@@ -341,10 +357,20 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
     ) -> Optional[dict]:
         """Legacy-Methode - gibt Dictionary zurück."""
         try:
-            article_num = ArticleNumber(article_number) if isinstance(article_number, str) else article_number
-            batch_num = BatchNumber(batch_number) if isinstance(batch_number, str) else batch_number
+            article_num = (
+                ArticleNumber(article_number)
+                if isinstance(article_number, str)
+                else article_number
+            )
+            batch_num = (
+                BatchNumber(batch_number)
+                if isinstance(batch_number, str)
+                else batch_number
+            )
 
-            item = self.find_domain_by_composite_key(article_num, batch_num, delivery_number)
+            item = self.find_domain_by_composite_key(
+                article_num, batch_num, delivery_number
+            )
 
             if item:
                 return item.to_dict()
@@ -430,7 +456,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 items.append(self._mapper.to_domain(item_model, workflow_model))
 
@@ -459,8 +489,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         item_info = session.get(ItemInfoModel, article_number)
         if not item_info:
             item_info = ItemInfoModel(
-                article_number=article_number,
-                designation=f"Artikel {article_number}"
+                article_number=article_number, designation=f"Artikel {article_number}"
             )
             session.add(item_info)
             session.flush()
@@ -486,8 +515,13 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
         target.updated_at = datetime.now()
 
-    def _copy_workflow_fields(self, source: ItemWorkflowStepsModel, target: ItemWorkflowStepsModel) -> None:
+    def _copy_workflow_fields(
+        self, source: ItemWorkflowStepsModel, target: ItemWorkflowStepsModel
+    ) -> None:
         """Kopiert Felder von source zu target WorkflowStepsModel."""
+        target.iteminfo_complete_by = source.iteminfo_complete_by
+        target.iteminfo_complete_at = source.iteminfo_complete_at
+
         target.data_checked_by = source.data_checked_by
         target.data_checked_at = source.data_checked_at
 
@@ -520,7 +554,9 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
     def find_domain_by_status(self, status) -> List[Item]:
         """TODO: Implement - Status ist jetzt String nicht ItemStatus"""
-        return self.find_by_status(status.value if hasattr(status, 'value') else str(status))
+        return self.find_by_status(
+            status.value if hasattr(status, "value") else str(status)
+        )
 
     def find_domain_by_order_number(self, order_number: str) -> List[Item]:
         """TODO: Implement"""
@@ -535,9 +571,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
             workflow_models = (
                 session.query(ItemWorkflowStepsModel)
-                .filter(ItemWorkflowStepsModel.article_number.in_(
-                    [m.article_number for m in item_models]
-                ))
+                .filter(
+                    ItemWorkflowStepsModel.article_number.in_(
+                        [m.article_number for m in item_models]
+                    )
+                )
                 .all()
             )
             workflow_dict = {
@@ -547,7 +585,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 items.append(self._mapper.to_domain(item_model, workflow_model))
             return items
@@ -559,14 +601,20 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
                 session.query(ItemModel)
                 .filter(
                     ItemModel.article_number == str(article_number),
-                    ItemModel.batch_number == str(batch_number)
+                    ItemModel.batch_number == str(batch_number),
                 )
                 .first()
             )
             if not item_model:
                 return None
-            workflow_model = session.get(ItemWorkflowStepsModel,
-                (item_model.article_number, item_model.batch_number, item_model.delivery_number))
+            workflow_model = session.get(
+                ItemWorkflowStepsModel,
+                (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                ),
+            )
             return self._mapper.to_domain(item_model, workflow_model)
 
     def find_by_unique_identifier(self, unique_id: str) -> Optional[Item]:
@@ -592,8 +640,9 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
     def find_items_needing_attention(self) -> List[Item]:
         """TODO: Implement"""
         all_items = self.find_domain_all()
-        return [item for item in all_items
-                if not item.completed_by and not item.rejected_by]
+        return [
+            item for item in all_items if not item.completed_by and not item.rejected_by
+        ]
 
     def find_by_completed_step(self, step) -> List[Item]:
         """TODO: Implement step-based queries"""
@@ -624,9 +673,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         """TODO: Implement"""
         with get_session() as session:
             item_models = (
-                session.query(ItemModel)
-                .filter(ItemModel.waste_quantity > 0)
-                .all()
+                session.query(ItemModel).filter(ItemModel.waste_quantity > 0).all()
             )
             workflow_models = session.query(ItemWorkflowStepsModel).all()
             workflow_dict = {
@@ -635,7 +682,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             }
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 items.append(self._mapper.to_domain(item_model, workflow_model))
             return items
@@ -644,14 +695,15 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         """TODO: Implement"""
         raise NotImplementedError("Quality status queries not yet implemented")
 
-    def find_created_between(self, start_date: datetime, end_date: datetime) -> List[Item]:
+    def find_created_between(
+        self, start_date: datetime, end_date: datetime
+    ) -> List[Item]:
         """TODO: Implement"""
         with get_session() as session:
             item_models = (
                 session.query(ItemModel)
                 .filter(
-                    ItemModel.created_at >= start_date,
-                    ItemModel.created_at <= end_date
+                    ItemModel.created_at >= start_date, ItemModel.created_at <= end_date
                 )
                 .all()
             )
@@ -662,7 +714,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             }
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 items.append(self._mapper.to_domain(item_model, workflow_model))
             return items
@@ -682,7 +738,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             }
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 items.append(self._mapper.to_domain(item_model, workflow_model))
             return items
@@ -697,12 +757,12 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             workflow_models = (
                 session.query(ItemWorkflowStepsModel)
                 .filter(
-                    (ItemWorkflowStepsModel.data_checked_by == employee_name) |
-                    (ItemWorkflowStepsModel.documents_checked_by == employee_name) |
-                    (ItemWorkflowStepsModel.measured_by == employee_name) |
-                    (ItemWorkflowStepsModel.visually_inspected_by == employee_name) |
-                    (ItemWorkflowStepsModel.documents_merged_by == employee_name) |
-                    (ItemWorkflowStepsModel.completed_by == employee_name)
+                    (ItemWorkflowStepsModel.data_checked_by == employee_name)
+                    | (ItemWorkflowStepsModel.documents_checked_by == employee_name)
+                    | (ItemWorkflowStepsModel.measured_by == employee_name)
+                    | (ItemWorkflowStepsModel.visually_inspected_by == employee_name)
+                    | (ItemWorkflowStepsModel.documents_merged_by == employee_name)
+                    | (ItemWorkflowStepsModel.completed_by == employee_name)
                 )
                 .all()
             )
@@ -717,9 +777,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
             item_models = (
                 session.query(ItemModel)
-                .filter(
-                    ItemModel.article_number.in_([k[0] for k in composite_keys])
-                )
+                .filter(ItemModel.article_number.in_([k[0] for k in composite_keys]))
                 .all()
             )
 
@@ -730,7 +788,11 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
 
             items = []
             for item_model in item_models:
-                key = (item_model.article_number, item_model.batch_number, item_model.delivery_number)
+                key = (
+                    item_model.article_number,
+                    item_model.batch_number,
+                    item_model.delivery_number,
+                )
                 workflow_model = workflow_dict.get(key)
                 if workflow_model:
                     items.append(self._mapper.to_domain(item_model, workflow_model))
@@ -760,7 +822,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             "total": total,
             "completed": completed,
             "rejected": rejected,
-            "in_progress": in_progress
+            "in_progress": in_progress,
         }
 
     def get_waste_statistics(self) -> dict:
@@ -771,7 +833,9 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         """TODO: Implement"""
         raise NotImplementedError("Employee workload not yet implemented")
 
-    def search_items(self, search_term: str, search_fields: Optional[List[str]] = None) -> List[Item]:
+    def search_items(
+        self, search_term: str, search_fields: Optional[List[str]] = None
+    ) -> List[Item]:
         """TODO: Implement full-text search"""
         raise NotImplementedError("Full-text search not yet implemented")
 
@@ -784,10 +848,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         raise NotImplementedError("Criteria search not yet implemented")
 
     def update_item_info_order_quantity(
-        self,
-        article_number: str,
-        order_quantity: int,
-        order_number: str
+        self, article_number: str, order_quantity: int, order_number: str
     ) -> bool:
         """
         Aktualisiert die Bestellmenge in der ItemInfo Tabelle.
@@ -805,7 +866,9 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         """
         try:
             with get_session() as session:
-                from warehouse.infrastructure.database.models.item_model import ItemInfoModel
+                from warehouse.infrastructure.database.models.item_model import (
+                    ItemInfoModel,
+                )
 
                 # Finde oder erstelle ItemInfo
                 item_info = session.get(ItemInfoModel, article_number)
@@ -814,7 +877,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
                     # Erstelle neue ItemInfo wenn nicht vorhanden
                     item_info = ItemInfoModel(
                         article_number=article_number,
-                        designation=f"Artikel {article_number}"  # Placeholder
+                        designation=f"Artikel {article_number}",  # Placeholder
                     )
                     session.add(item_info)
 

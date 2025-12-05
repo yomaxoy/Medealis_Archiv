@@ -10,6 +10,10 @@ from datetime import datetime
 from pathlib import Path
 import logging
 
+from warehouse.application.services.validation_service import validation_service
+from warehouse.application.services.audit_service import audit_service
+from warehouse.presentation.utils.user_context import get_current_user
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +39,9 @@ def show_document_merge_popup(item_data: Dict[str, Any]) -> None:
     folder_path = None
     try:
         from warehouse.application.services import determine_manufacturer
-        from warehouse.application.services.service_registry import get_document_storage_service
+        from warehouse.application.services.service_registry import (
+            get_document_storage_service,
+        )
 
         # Bestimme Hersteller für Pfad
         manufacturer = determine_manufacturer(item_data.get("article_number", ""))
@@ -43,7 +49,10 @@ def show_document_merge_popup(item_data: Dict[str, Any]) -> None:
         # Hole Supplier-Name aus Delivery-Daten
         supplier_name = "Primec"  # Fallback
         try:
-            from warehouse.application.services.service_registry import get_data_integration_service
+            from warehouse.application.services.service_registry import (
+                get_data_integration_service,
+            )
+
             data_integration_service = get_data_integration_service()
 
             delivery_data = data_integration_service.get_complete_delivery_data(
@@ -144,8 +153,12 @@ def show_document_merge_popup(item_data: Dict[str, Any]) -> None:
 
     # Show info if files were excluded
     if excluded_merge_files:
-        st.info(f"ℹ️ {len(excluded_merge_files)} Dokument(e) automatisch ausgeschlossen: {', '.join([f.name for f in excluded_merge_files])}")
-        st.caption("💡 Begleitschein und Wareneingang werden nicht in zusammengeführte Dokumente einbezogen")
+        st.info(
+            f"ℹ️ {len(excluded_merge_files)} Dokument(e) automatisch ausgeschlossen: {', '.join([f.name for f in excluded_merge_files])}"
+        )
+        st.caption(
+            "💡 Begleitschein und Wareneingang werden nicht in zusammengeführte Dokumente einbezogen"
+        )
 
     if all_merge_files:
         st.write("### 🔗 Dokumente zusammenführen")
@@ -210,17 +223,54 @@ def show_document_merge_popup(item_data: Dict[str, Any]) -> None:
                     use_container_width=True,
                     type="primary",
                 ):
-                    _execute_merge(
-                        selected_files,
-                        folder_path,
-                        output_filename,
-                        include_cover,
-                        cover_title if include_cover else None,
-                        item_data,
+                    # ===== VALIDATION FIRST =====
+                    validation_data = {
+                        "pdb_available": bool(
+                            scanned_docs["document_categories"]["pdb"]
+                        ),
+                        "measurement_protocol_available": bool(
+                            scanned_docs["document_categories"]["vermessung"]
+                        ),
+                        "visual_inspection_available": bool(
+                            scanned_docs["document_categories"]["sichtkontrolle"]
+                        ),
+                        "order_document_available": bool(
+                            scanned_docs["document_categories"]["bestellung"]
+                        ),
+                        "delivery_slip_available": bool(
+                            scanned_docs["document_categories"]["lieferschein"]
+                        ),
+                        "accompanying_documents_available": bool(
+                            scanned_docs["document_categories"]["begleitpapiere"]
+                        ),
+                    }
+
+                    validation_result = validation_service.validate_document_merge(
+                        validation_data
                     )
 
+                    if not validation_result.is_valid:
+                        st.error("❌ **Validierungsfehler:**")
+                        st.error(validation_result.get_formatted_errors())
+                        st.warning(
+                            "💡 **Hinweis:** Alle erforderlichen Dokumente müssen vorhanden sein, bevor Sie die Dokumente zusammenführen können."
+                        )
+                    else:
+                        # Validation passed - proceed with merge
+                        _execute_merge(
+                            selected_files,
+                            folder_path,
+                            output_filename,
+                            include_cover,
+                            cover_title if include_cover else None,
+                            item_data,
+                            scanned_docs,
+                        )
+
             with col_close:
-                if st.button("❌ Schließen", key="merge_close_btn2", use_container_width=True):
+                if st.button(
+                    "❌ Schließen", key="merge_close_btn2", use_container_width=True
+                ):
                     st.rerun()
 
         else:
@@ -258,7 +308,10 @@ def show_document_merge_popup(item_data: Dict[str, Any]) -> None:
 # HELPER FUNCTIONS (copied from Admin merge_check_popup.py)
 # ============================================================================
 
-def _create_scan_result_from_documents(documents: List[Path], item_data: Dict[str, Any]) -> Dict[str, Any]:
+
+def _create_scan_result_from_documents(
+    documents: List[Path], item_data: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Create scan result from already-loaded documents.
 
@@ -341,7 +394,9 @@ def _categorize_files(files: List[Path], scan_result: Dict[str, Any]) -> Dict[st
     return scan_result
 
 
-def _show_document_status_matrix(scanned_docs: Dict[str, Any], item_data: Dict[str, Any] = None):
+def _show_document_status_matrix(
+    scanned_docs: Dict[str, Any], item_data: Dict[str, Any] = None
+):
     """Display document status matrix with source information."""
     if not scanned_docs["folder_exists"]:
         st.error("❌ Keine Dokumente gefunden (weder SharePoint noch lokal)")
@@ -392,7 +447,9 @@ def _show_document_status_matrix(scanned_docs: Dict[str, Any], item_data: Dict[s
         st.write(", ".join([f.name for f in unknown_files]))
 
 
-def _get_all_merge_files_from_storage(item_data: Dict[str, Any], article_folder_path: Path) -> List[Path]:
+def _get_all_merge_files_from_storage(
+    item_data: Dict[str, Any], article_folder_path: Path
+) -> List[Path]:
     """
     Sammelt alle verfügbaren PDF-Dateien für den Merge aus Storage (SharePoint → Lokal).
 
@@ -404,10 +461,15 @@ def _get_all_merge_files_from_storage(item_data: Dict[str, Any], article_folder_
         Liste aller verfügbaren PDF-Dateien, sortiert nach Dokumenttyp
     """
     try:
-        logger.info(f"[USER MERGE] Collecting merge files using DocumentStorageService (SharePoint → Local)")
+        logger.info(
+            f"[USER MERGE] Collecting merge files using DocumentStorageService (SharePoint → Local)"
+        )
 
         # Hole DocumentStorageService
-        from warehouse.application.services.service_registry import get_document_storage_service
+        from warehouse.application.services.service_registry import (
+            get_document_storage_service,
+        )
+
         storage_service = get_document_storage_service()
 
         if not storage_service:
@@ -419,7 +481,7 @@ def _get_all_merge_files_from_storage(item_data: Dict[str, Any], article_folder_
             batch_number=item_data.get("batch_number", ""),
             delivery_number=item_data.get("delivery_number", ""),
             article_number=item_data.get("article_number", ""),
-            supplier_name=item_data.get("supplier_name", "")
+            supplier_name=item_data.get("supplier_name", ""),
         )
 
         if not all_files:
@@ -429,7 +491,9 @@ def _get_all_merge_files_from_storage(item_data: Dict[str, Any], article_folder_
         # Sortiere nach Dokumenttyp
         sorted_files = _sort_files_by_document_type(all_files)
 
-        logger.info(f"[USER MERGE] Total files collected from storage: {len(sorted_files)}")
+        logger.info(
+            f"[USER MERGE] Total files collected from storage: {len(sorted_files)}"
+        )
         logger.info(f"[USER MERGE] Files: {[f.name for f in sorted_files]}")
 
         return sorted_files
@@ -466,12 +530,17 @@ def _execute_merge(
     output_filename: str,
     include_cover: bool,
     cover_title: Optional[str],
-    item_data: Dict[str, Any]
+    item_data: Dict[str, Any],
+    scanned_docs: Dict[str, Any] = None,
 ):
     """Execute PDF merge operation and save to article folder."""
     try:
-        from warehouse.application.services.entity_services.item_service import ItemService
-        from warehouse.application.services.document_operations.pdf_merge_service import pdf_merge_service
+        from warehouse.application.services.entity_services.item_service import (
+            ItemService,
+        )
+        from warehouse.application.services.document_operations.pdf_merge_service import (
+            pdf_merge_service,
+        )
 
         st.info(f"🔗 Führe {len(selected_files)} Dokumente zusammen...")
 
@@ -482,10 +551,10 @@ def _execute_merge(
             output_path=output_path,
             include_cover=include_cover,
             cover_title=cover_title,
-            article_number=item_data.get('article_number', ''),
-            batch_number=item_data.get('batch_number', ''),
-            delivery_number=item_data.get('delivery_number', ''),
-            supplier_name=item_data.get('supplier_name', '')
+            article_number=item_data.get("article_number", ""),
+            batch_number=item_data.get("batch_number", ""),
+            delivery_number=item_data.get("delivery_number", ""),
+            supplier_name=item_data.get("supplier_name", ""),
         )
 
         if success:
@@ -499,20 +568,46 @@ def _execute_merge(
                 batch_number = item_data.get("batch_number")
                 delivery_number = item_data.get("delivery_number")
 
+                # Get current user
+                current_user = get_current_user()
+
                 # Mark workflow step as completed
                 workflow_success = item_service.complete_documents_merge(
                     article_number=article_number,
                     batch_number=batch_number,
                     delivery_number=delivery_number,
-                    employee=st.session_state.get('current_user', 'System')
+                    employee=current_user,
                 )
 
                 if workflow_success:
                     st.success("✅ Workflow-Schritt abgeschlossen")
                     logger.info(f"Workflow step completed for merge: {output_filename}")
+
+                    # ===== AUDIT LOGGING =====
+                    # Build document list for notes
+                    doc_list = [f.name for f in selected_files]
+                    notes_text = f"Zusammengeführt: {len(selected_files)} Dokumente. Datei: {output_filename}"
+
+                    audit_service.log_action(
+                        action="DOCUMENTS_MERGED",
+                        user=current_user,
+                        entity_type="Item",
+                        entity_id=f"{article_number}#{batch_number}#{delivery_number}",
+                        data={
+                            "Artikel": article_number,
+                            "Charge": batch_number,
+                            "Lieferung": delivery_number,
+                            "Dateiname": output_filename,
+                            "Anzahl Dokumente": len(selected_files),
+                        },
+                        notes=notes_text,
+                    )
+
                 else:
                     st.warning("⚠️ Workflow-Update fehlgeschlagen")
-                    logger.warning(f"Workflow update failed for merge: {output_filename}")
+                    logger.warning(
+                        f"Workflow update failed for merge: {output_filename}"
+                    )
 
             except Exception as notes_error:
                 logger.error(f"Error updating notes: {notes_error}")
@@ -526,5 +621,6 @@ def _execute_merge(
     except Exception as e:
         logger.error(f"Error executing merge: {e}")
         import traceback
+
         logger.error(f"Traceback: {traceback.format_exc()}")
         st.error(f"❌ Fehler beim Zusammenführen: {e}")

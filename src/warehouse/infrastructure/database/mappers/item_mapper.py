@@ -17,7 +17,9 @@ from warehouse.domain.value_objects.batch_number import BatchNumber
 from warehouse.domain.enums.priority_level import PriorityLevel
 from warehouse.domain.enums.certificate_type import CertificateType
 from warehouse.infrastructure.database.models.item_model import ItemModel
-from warehouse.infrastructure.database.models.item_workflow_steps_model import ItemWorkflowStepsModel
+from warehouse.infrastructure.database.models.item_workflow_steps_model import (
+    ItemWorkflowStepsModel,
+)
 from .base_mapper import BaseMapper
 
 
@@ -30,7 +32,11 @@ class ItemMapper(BaseMapper):
     2. ItemWorkflowStepsModel - Workflow/Status
     """
 
-    def to_domain(self, item_model: ItemModel, workflow_model: Optional[ItemWorkflowStepsModel] = None) -> Item:
+    def to_domain(
+        self,
+        item_model: ItemModel,
+        workflow_model: Optional[ItemWorkflowStepsModel] = None,
+    ) -> Item:
         """
         Konvertiert Database Models zu Item Domain Entity.
 
@@ -47,7 +53,7 @@ class ItemMapper(BaseMapper):
 
         # Supplier ID ermitteln
         supplier_id = "UNKNOWN"
-        if hasattr(item_model, 'delivery') and item_model.delivery:
+        if hasattr(item_model, "delivery") and item_model.delivery:
             supplier_id = item_model.delivery.supplier_id
 
         # Priority Level
@@ -70,6 +76,9 @@ class ItemMapper(BaseMapper):
 
         # Workflow Steps übertragen (falls vorhanden)
         if workflow_model:
+            item.iteminfo_complete_by = workflow_model.iteminfo_complete_by
+            item.iteminfo_complete_at = workflow_model.iteminfo_complete_at
+
             item.data_checked_by = workflow_model.data_checked_by
             item.data_checked_at = workflow_model.data_checked_at
 
@@ -93,11 +102,21 @@ class ItemMapper(BaseMapper):
             item.rejection_reason = workflow_model.rejection_reason
 
         # Zertifikate übertragen
-        item.certificates[CertificateType.MATERIALZEUGNIS] = item_model.material_certificate or False
-        item.certificates[CertificateType.MESSPROTOKOLL] = item_model.measurement_protocol or False
-        item.certificates[CertificateType.BESCHICHTUNGSZEUGNIS] = item_model.coating_certificate or False
-        item.certificates[CertificateType.HAERTEZEUGNIS] = item_model.hardness_certificate or False
-        item.certificates[CertificateType.WEITERE_ZEUGNISSE] = item_model.additional_certificates or False
+        item.certificates[CertificateType.MATERIALZEUGNIS] = (
+            item_model.material_certificate or False
+        )
+        item.certificates[CertificateType.MESSPROTOKOLL] = (
+            item_model.measurement_protocol or False
+        )
+        item.certificates[CertificateType.BESCHICHTUNGSZEUGNIS] = (
+            item_model.coating_certificate or False
+        )
+        item.certificates[CertificateType.HAERTEZEUGNIS] = (
+            item_model.hardness_certificate or False
+        )
+        item.certificates[CertificateType.WEITERE_ZEUGNISSE] = (
+            item_model.additional_certificates or False
+        )
 
         # Inspection Result rekonstruieren (falls Sichtkontrolle done)
         if item.visually_inspected_by and item.visually_inspected_at:
@@ -105,7 +124,7 @@ class ItemMapper(BaseMapper):
                 performed_at=item.visually_inspected_at,
                 performed_by=item.visually_inspected_by,
                 waste_quantity=item_model.waste_quantity or 0,
-                passed=(item.rejected_by is None)  # Passed wenn nicht rejected
+                passed=(item.rejected_by is None),  # Passed wenn nicht rejected
             )
 
         # Metadaten
@@ -139,13 +158,27 @@ class ItemMapper(BaseMapper):
         )
 
         # Zertifikate
-        item_model.material_certificate = entity.certificates.get(CertificateType.MATERIALZEUGNIS, False)
-        item_model.measurement_protocol = entity.certificates.get(CertificateType.MESSPROTOKOLL, False)
-        item_model.coating_certificate = entity.certificates.get(CertificateType.BESCHICHTUNGSZEUGNIS, False)
-        item_model.hardness_certificate = entity.certificates.get(CertificateType.HAERTEZEUGNIS, False)
-        item_model.additional_certificates = entity.certificates.get(CertificateType.WEITERE_ZEUGNISSE, False)
-        item_model.label_present = entity.certificates.get(CertificateType.ETIKETT, False)
-        item_model.accompanying_document = entity.certificates.get(CertificateType.BEGLEITSCHEIN, False)
+        item_model.material_certificate = entity.certificates.get(
+            CertificateType.MATERIALZEUGNIS, False
+        )
+        item_model.measurement_protocol = entity.certificates.get(
+            CertificateType.MESSPROTOKOLL, False
+        )
+        item_model.coating_certificate = entity.certificates.get(
+            CertificateType.BESCHICHTUNGSZEUGNIS, False
+        )
+        item_model.hardness_certificate = entity.certificates.get(
+            CertificateType.HAERTEZEUGNIS, False
+        )
+        item_model.additional_certificates = entity.certificates.get(
+            CertificateType.WEITERE_ZEUGNISSE, False
+        )
+        item_model.label_present = entity.certificates.get(
+            CertificateType.ETIKETT, False
+        )
+        item_model.accompanying_document = entity.certificates.get(
+            CertificateType.BEGLEITSCHEIN, False
+        )
 
         # Waste Quantity (aus InspectionResult)
         if entity.inspection_result:
@@ -158,25 +191,20 @@ class ItemMapper(BaseMapper):
             article_number=str(entity.article_number),
             batch_number=str(entity.batch_number),
             delivery_number=entity.delivery_number,
-
+            iteminfo_complete_by=entity.iteminfo_complete_by,
+            iteminfo_complete_at=entity.iteminfo_complete_at,
             data_checked_by=entity.data_checked_by,
             data_checked_at=entity.data_checked_at,
-
             documents_checked_by=entity.documents_checked_by,
             documents_checked_at=entity.documents_checked_at,
-
             measured_by=entity.measured_by,
             measured_at=entity.measured_at,
-
             visually_inspected_by=entity.visually_inspected_by,
             visually_inspected_at=entity.visually_inspected_at,
-
             documents_merged_by=entity.documents_merged_by,
             documents_merged_at=entity.documents_merged_at,
-
             completed_by=entity.completed_by,
             completed_at=entity.completed_at,
-
             rejected_by=entity.rejected_by,
             rejected_at=entity.rejected_at,
             rejection_reason=entity.rejection_reason,
@@ -197,7 +225,7 @@ class ItemMapper(BaseMapper):
         self,
         item_model: ItemModel,
         workflow_model: ItemWorkflowStepsModel,
-        entity: Item
+        entity: Item,
     ) -> None:
         """
         Aktualisiert bestehende Models mit Daten aus Entity.
@@ -215,13 +243,27 @@ class ItemMapper(BaseMapper):
         item_model.order_number = entity.order_number
 
         # Zertifikate
-        item_model.material_certificate = entity.certificates.get(CertificateType.MATERIALZEUGNIS, False)
-        item_model.measurement_protocol = entity.certificates.get(CertificateType.MESSPROTOKOLL, False)
-        item_model.coating_certificate = entity.certificates.get(CertificateType.BESCHICHTUNGSZEUGNIS, False)
-        item_model.hardness_certificate = entity.certificates.get(CertificateType.HAERTEZEUGNIS, False)
-        item_model.additional_certificates = entity.certificates.get(CertificateType.WEITERE_ZEUGNISSE, False)
-        item_model.label_present = entity.certificates.get(CertificateType.ETIKETT, False)
-        item_model.accompanying_document = entity.certificates.get(CertificateType.BEGLEITSCHEIN, False)
+        item_model.material_certificate = entity.certificates.get(
+            CertificateType.MATERIALZEUGNIS, False
+        )
+        item_model.measurement_protocol = entity.certificates.get(
+            CertificateType.MESSPROTOKOLL, False
+        )
+        item_model.coating_certificate = entity.certificates.get(
+            CertificateType.BESCHICHTUNGSZEUGNIS, False
+        )
+        item_model.hardness_certificate = entity.certificates.get(
+            CertificateType.HAERTEZEUGNIS, False
+        )
+        item_model.additional_certificates = entity.certificates.get(
+            CertificateType.WEITERE_ZEUGNISSE, False
+        )
+        item_model.label_present = entity.certificates.get(
+            CertificateType.ETIKETT, False
+        )
+        item_model.accompanying_document = entity.certificates.get(
+            CertificateType.BEGLEITSCHEIN, False
+        )
 
         # Waste Quantity
         if entity.inspection_result:
@@ -232,6 +274,9 @@ class ItemMapper(BaseMapper):
         item_model.updated_at = datetime.now()
 
         # Update WorkflowStepsModel
+        workflow_model.iteminfo_complete_by = entity.iteminfo_complete_by
+        workflow_model.iteminfo_complete_at = entity.iteminfo_complete_at
+
         workflow_model.data_checked_by = entity.data_checked_by
         workflow_model.data_checked_at = entity.data_checked_at
 

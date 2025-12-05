@@ -20,10 +20,10 @@ class SupplierModel(Base):
     """
 
     __tablename__ = "suppliers"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     # === PRIMÄRSCHLÜSSEL (Business Key) ===
-    supplier_id = Column(String(5), primary_key=True)  # "BEGO", "CAMLOG", "DENTSPLY"
+    supplier_id = Column(String(10), primary_key=True)  # "BEGO", "CAMLOG", "DENTSPLY"
 
     # === AUDIT FIELDS ===
     created_at = Column(DateTime, default=datetime.now, nullable=False)

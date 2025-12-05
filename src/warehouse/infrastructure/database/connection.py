@@ -3,11 +3,12 @@
 """
 SQLAlchemy Database Connection für das Warehouse Management System.
 Folgt der vorgegebenen Clean Architecture Struktur.
-ERWEITERT um Foreign Key Constraints für SQLite.
+MIGRIERT: Unterstützt PostgreSQL und SQLite
 """
 
+import os
 from pathlib import Path
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 from contextlib import contextmanager
@@ -20,12 +21,15 @@ _engine = None
 _session_factory = None
 
 
-def initialize_database(database_path: str = None) -> None:
+def initialize_database(database_url: str = None) -> None:
     """
     Initialisiert die Database Engine und Session Factory.
 
+    Unterstützt PostgreSQL (primär) und SQLite (fallback).
+
     Args:
-        database_path: Optionaler Pfad zur Database-Datei
+        database_url: Optionale Database URL (z.B. postgresql://user:pass@host/db)
+                     Falls None, wird aus Environment Variable DATABASE_URL gelesen
     """
     global _engine, _session_factory
 
@@ -33,69 +37,87 @@ def initialize_database(database_path: str = None) -> None:
     if _engine is not None and _session_factory is not None:
         return
 
-    if database_path is None:
-        # Standard-Pfad aus config
-        try:
-            from config.settings import settings
-            # WICHTIG: Cache leeren, falls settings vorher importiert wurde
-            settings.DATABASE_DIR = None
-            settings.DATABASE_PATH = None
-            # ensure_directories() aufrufen, wenn .env garantiert geladen ist
-            settings.ensure_directories()
-            database_path = settings.get_database_path()
-        except ImportError:
-            # Fallback wenn config nicht verfügbar
-            db_dir = Path.home() / ".medealis"
-            db_dir.mkdir(parents=True, exist_ok=True)
-            database_path = db_dir / "warehouse_new.db"
+    # Hole Database URL
+    if database_url is None:
+        # Primär: Environment Variable DATABASE_URL
+        database_url = os.getenv("DATABASE_URL")
 
-    # SQLite Connection String
-    database_url = f"sqlite:///{database_path}"
+        if database_url is None:
+            # Fallback: SQLite aus config
+            try:
+                from config.settings import settings
 
-    # Engine erstellen
-    _engine = create_engine(
-        database_url,
-        echo=False,  # Setze auf True für SQL Debug-Output
-        pool_pre_ping=True,  # Überprüft Connection vor Verwendung
-        poolclass=None,  # Disable connection pooling for SQLite
+                settings.DATABASE_DIR = None
+                settings.DATABASE_PATH = None
+                settings.ensure_directories()
+                database_path = settings.get_database_path()
+                database_url = f"sqlite:///{database_path}"
+                print("⚠️  Fallback: Verwende SQLite-Datenbank")
+            except ImportError:
+                # Letzter Fallback
+                db_dir = Path.home() / ".medealis"
+                db_dir.mkdir(parents=True, exist_ok=True)
+                database_path = db_dir / "warehouse_new.db"
+                database_url = f"sqlite:///{database_path}"
+                print(
+                    "⚠️  Fallback: Verwende SQLite-Datenbank (config nicht verfügbar)"
+                )
+
+    # Erkenne Datenbank-Typ
+    is_postgresql = database_url.startswith("postgresql://") or database_url.startswith(
+        "postgres://"
     )
+    is_sqlite = database_url.startswith("sqlite:///")
 
-    # WICHTIG: Foreign Key Constraints und WAL-Mode für SQLite aktivieren
-    @event.listens_for(_engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        """
-        Aktiviert Foreign Key Constraints und optimierte Einstellungen für SQLite.
+    # Engine Configuration basierend auf DB-Typ
+    if is_postgresql:
+        # PostgreSQL: Connection Pooling aktiviert
+        _engine = create_engine(
+            database_url,
+            echo=False,  # Setze auf True für SQL Debug-Output
+            pool_pre_ping=True,  # Health Check vor Connection-Nutzung
+            pool_size=10,  # Connection Pool Size
+            max_overflow=20,  # Max zusätzliche Connections
+            pool_recycle=3600,  # Recycle Connections nach 1h
+            connect_args={
+                "connect_timeout": 10,  # 10s Timeout
+                "options": "-c timezone=Europe/Berlin",  # Timezone setzen
+            },
+        )
+        print(f"✅ PostgreSQL initialisiert")
+        print(f"   Connection Pool: 10 (max overflow: 20)")
 
-        WICHTIG: Verwendet DELETE journal_mode statt WAL für Netzwerk-Kompatibilität.
-        WAL (Write-Ahead Logging) funktioniert nicht zuverlässig über SMB/CIFS-Shares.
-        """
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+    elif is_sqlite:
+        # SQLite: Kein Pooling (nicht sinnvoll für SQLite)
+        _engine = create_engine(
+            database_url,
+            echo=False,
+            pool_pre_ping=True,
+            poolclass=None,  # Disable connection pooling
+        )
 
-        # Prüfe ob Datenbank auf Netzwerk-Pfad liegt
-        import os
-        db_path = str(database_path)
-        is_network = db_path.startswith('\\\\') or (len(db_path) > 1 and db_path[1] == ':' and os.path.exists(f"\\\\?\\UNC\\{db_path[2:]}"))
+        # SQLite PRAGMAs aktivieren (nur für SQLite)
+        from sqlalchemy import event
 
-        if is_network:
-            # DELETE-Mode für Netzwerk-Datenbanken (kompatibel mit SMB/CIFS)
-            cursor.execute("PRAGMA journal_mode=DELETE")
-            print("Database auf Netzwerk erkannt - verwende DELETE journal mode")
-        else:
-            # WAL-Mode für lokale Datenbanken (bessere Performance)
+        @event.listens_for(_engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            """Aktiviert SQLite-spezifische Optimierungen."""
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA journal_mode=WAL")
-            print("Lokale Database erkannt - verwende WAL journal mode")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA cache_size=-64000")
+            cursor.close()
 
-        cursor.execute("PRAGMA synchronous=NORMAL")  # Balance zwischen Sicherheit und Performance
-        cursor.execute("PRAGMA busy_timeout=10000")  # 10 Sekunden Timeout bei Locks (wichtig für Netzwerk)
-        cursor.execute("PRAGMA cache_size=-64000")  # 64MB Cache
-        cursor.close()
+        print(f"✅ SQLite initialisiert: {database_url}")
+
+    else:
+        raise ValueError(f"Unsupported database URL: {database_url}")
 
     # Session Factory
     _session_factory = sessionmaker(bind=_engine)
 
-    print(f"Database initialisiert: {database_path}")
-    print("Foreign Key Constraints aktiviert")
+    print("✅ Database Session Factory erstellt")
 
 
 @contextmanager
@@ -157,13 +179,17 @@ def test_connection() -> bool:
             # Teste Connection
             result = session.execute(text("SELECT 1")).scalar()
 
-            # Teste Foreign Key Constraints
-            fk_result = session.execute(text("PRAGMA foreign_keys")).scalar()
-            print(f"Foreign Keys Status: {fk_result}")
+            if result == 1:
+                print("✅ Database Connection Test erfolgreich")
+                return True
+            else:
+                print(
+                    "❌ Database Connection Test fehlgeschlagen: Unerwartetes Ergebnis"
+                )
+                return False
 
-            return result == 1
     except SQLAlchemyError as e:
-        print(f"Database Connection Test fehlgeschlagen: {e}")
+        print(f"❌ Database Connection Test fehlgeschlagen: {e}")
         return False
 
 

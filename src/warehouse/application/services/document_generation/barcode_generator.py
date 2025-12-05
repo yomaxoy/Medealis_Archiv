@@ -128,7 +128,9 @@ class BarcodeGenerator:
                 filename = f"{filename_prefix}_{clean_value}_{timestamp}.png"
                 output_path = temp_dir / filename
 
-                logger.warning(f"BarcodeGenerator using fallback temp path - DocumentGenerationService should provide correct path: {output_path}")
+                logger.warning(
+                    f"BarcodeGenerator using fallback temp path - DocumentGenerationService should provide correct path: {output_path}"
+                )
 
             # Generate barcode
             if self.barcode_available:
@@ -294,12 +296,41 @@ class BarcodeGenerator:
 
             # Load fonts
             try:
-                # Try to load a bold font for article and storage numbers
-                bold_font_large = ImageFont.truetype("arial.ttf", 96)
-                bold_font_medium = ImageFont.truetype("arial.ttf", 36)
-                normal_font = ImageFont.truetype("arial.ttf", 28)
+                # Try to load fonts - Liberation Sans ist der Linux-Ersatz für Arial
+                # Optimierte Schriftgrößen: Artikel & Lager gleich groß, Lot ca. 60% kleiner
+                try:
+                    # Try Liberation Sans Bold (Linux standard)
+                    bold_font_large = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                        190,
+                    )  # Artikel & Lager
+                    bold_font_medium = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                        70,
+                    )  # Header-Text
+                    normal_font = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        55,
+                    )  # Charge-Text (60% von 90)
+                except:
+                    # Fallback to Arial (Windows)
+                    try:
+                        bold_font_large = ImageFont.truetype("arialbd.ttf", 190)
+                        bold_font_medium = ImageFont.truetype("arialbd.ttf", 70)
+                        normal_font = ImageFont.truetype("arial.ttf", 55)
+                    except:
+                        # Final fallback to DejaVu
+                        bold_font_large = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 190
+                        )
+                        bold_font_medium = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70
+                        )
+                        normal_font = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 55
+                        )
             except:
-                # Fallback to default fonts
+                # Ultimate fallback to default fonts
                 try:
                     bold_font_large = ImageFont.load_default()
                     bold_font_medium = ImageFont.load_default()
@@ -388,11 +419,15 @@ class BarcodeGenerator:
 
                     # Optimale Größe für rechte obere Ecke berechnen
                     available_width = qr_section_width - 20
-                    available_height = upper_half_height - 60  # Platz für Header + Margin
+                    available_height = (
+                        upper_half_height - 60
+                    )  # Platz für Header + Margin
                     qr_size = min(available_width, available_height, 200)  # Max 200px
 
                     # QR-Code auf optimale Größe skalieren
-                    qr_resized = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+                    qr_resized = qr_img.resize(
+                        (qr_size, qr_size), Image.Resampling.LANCZOS
+                    )
 
                     # Position: Rechts oben, zentriert in der Sektion
                     qr_x = qr_section_x + (available_width - qr_size) // 2
@@ -410,7 +445,10 @@ class BarcodeGenerator:
             # Add a subtle separator line
             separator_y = padding_top + upper_half_height - 10
             draw.line(
-                [(padding_left, separator_y), (label_width - padding_right, separator_y)],
+                [
+                    (padding_left, separator_y),
+                    (label_width - padding_right, separator_y),
+                ],
                 fill="lightgray",
                 width=2,
             )
@@ -665,15 +703,21 @@ class BarcodeGenerator:
                 search_paths.append(("Server", server_qr_path))
                 logger.info(f"QR-Code Suche: Server-Pfad verfügbar: {server_qr_path}")
             else:
-                logger.warning(f"QR-Code Suche: Server-Pfad nicht verfügbar: {server_qr_path}")
+                logger.warning(
+                    f"QR-Code Suche: Server-Pfad nicht verfügbar: {server_qr_path}"
+                )
 
             # FALLBACK: Lokaler Pfad
             local_qr_path = path_resolver.local_qr_code_path
             if local_qr_path.exists():
                 search_paths.append(("Lokal", local_qr_path))
-                logger.info(f"QR-Code Suche: Lokaler Fallback-Pfad verfügbar: {local_qr_path}")
+                logger.info(
+                    f"QR-Code Suche: Lokaler Fallback-Pfad verfügbar: {local_qr_path}"
+                )
             else:
-                logger.warning(f"QR-Code Suche: Lokaler Pfad nicht verfügbar: {local_qr_path}")
+                logger.warning(
+                    f"QR-Code Suche: Lokaler Pfad nicht verfügbar: {local_qr_path}"
+                )
 
             # Prüfe ob überhaupt ein Pfad verfügbar ist
             if not search_paths:
@@ -682,7 +726,9 @@ class BarcodeGenerator:
 
             # Durchsuche Pfade in Prioritätsreihenfolge
             for source_name, qr_base_path in search_paths:
-                logger.info(f"QR-Code Suche: Durchsuche {source_name}-Pfad: {qr_base_path}")
+                logger.info(
+                    f"QR-Code Suche: Durchsuche {source_name}-Pfad: {qr_base_path}"
+                )
 
                 # Suche nach Datei die mit Artikelnummer beginnt
                 for qr_file in qr_base_path.glob(f"{article_number}*.png"):
@@ -692,18 +738,25 @@ class BarcodeGenerator:
                 # Fallback: Exakte Suche
                 exact_match = qr_base_path / f"{article_number}.png"
                 if exact_match.exists():
-                    logger.info(f"✅ QR-Code gefunden (exakt, {source_name}): {exact_match}")
+                    logger.info(
+                        f"✅ QR-Code gefunden (exakt, {source_name}): {exact_match}"
+                    )
                     return exact_match
 
-                logger.debug(f"Kein QR-Code in {source_name}-Pfad gefunden für: {article_number}")
+                logger.debug(
+                    f"Kein QR-Code in {source_name}-Pfad gefunden für: {article_number}"
+                )
 
             # Kein QR-Code in allen Pfaden gefunden
-            logger.info(f"❌ Kein QR-Code gefunden für Artikel: {article_number} (durchsuchte Pfade: {len(search_paths)})")
+            logger.info(
+                f"❌ Kein QR-Code gefunden für Artikel: {article_number} (durchsuchte Pfade: {len(search_paths)})"
+            )
             return None
 
         except Exception as e:
             logger.error(f"Fehler bei QR-Code Suche: {e}")
             import traceback
+
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 

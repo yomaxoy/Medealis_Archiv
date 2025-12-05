@@ -1,33 +1,63 @@
 # =============================================================================
 # Medealis Warehouse Management System - Docker Compose
 # =============================================================================
-# Startet beide Streamlit-Apps (Admin + User) in separaten Containern
+# Startet PostgreSQL + beide Streamlit-Apps (Admin + User)
+# MIGRIERT: PostgreSQL statt SQLite
 # =============================================================================
 
 version: '3.8'
 
 services:
+  # PostgreSQL Database (NEU)
+  postgres:
+    image: postgres:15-alpine
+    container_name: medealis_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medealis}
+      POSTGRES_USER: ${POSTGRES_USER:-medealis_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medealis_user} -d ${POSTGRES_DB:-medealis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medealis-network
+
   # Admin-App (Port 8501)
   medealis-admin:
     build: .
     container_name: medealis_admin
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8501:8501"
     volumes:
-      # Datenbank-Verzeichnis (wird auf Server gemountet)
-      - ${DATABASE_PATH:-./database}:/app/database
       # Template-Verzeichnis (read-only)
       - ./resources/templates:/app/resources/templates:ro
       # User-Daten-Verzeichnis (Dokumente, Wareneingang)
       - ${USER_DATA_DIR:-./user_data}:/root/Medealis/Wareneingang
       # Logs
       - ./data/logs:/app/data/logs
-      # Datenbank-Fallback (lokale SQLite)
-      - ./data/medealis_db:/root/.medealis
     environment:
-      # Server-Storage aktivieren
-      - USE_SERVER_STORAGE=true
-      # API Keys (über .env Datei)
+      # PostgreSQL Connection (NEU)
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-medealis_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medealis}
+      # SharePoint Storage (statt Server-Storage)
+      - USE_SERVER_STORAGE=false
+      - USE_SHAREPOINT=${USE_SHAREPOINT:-false}
+      # SharePoint Credentials
+      - SHAREPOINT_SITE_URL=${SHAREPOINT_SITE_URL}
+      - SHAREPOINT_CLIENT_ID=${SHAREPOINT_CLIENT_ID}
+      - SHAREPOINT_CLIENT_SECRET=${SHAREPOINT_CLIENT_SECRET}
+      - SHAREPOINT_TENANT_ID=${SHAREPOINT_TENANT_ID}
+      # AI API Keys
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       # Umgebung
@@ -44,23 +74,32 @@ services:
   medealis-user:
     build: .
     container_name: medealis_user
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8502:8502"
     volumes:
-      # Gleiche Datenbank wie Admin-App
-      - ${DATABASE_PATH:-./database}:/app/database
       # Template-Verzeichnis (read-only)
       - ./resources/templates:/app/resources/templates:ro
       # User-Daten-Verzeichnis (Dokumente, Wareneingang)
       - ${USER_DATA_DIR:-./user_data}:/root/Medealis/Wareneingang
       # Logs
       - ./data/logs:/app/data/logs
-      # Datenbank-Fallback (lokale SQLite)
-      - ./data/medealis_db:/root/.medealis
     environment:
-      - USE_SERVER_STORAGE=true
+      # PostgreSQL Connection (NEU) - gleiche DB wie Admin
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-medealis_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medealis}
+      # SharePoint Storage
+      - USE_SERVER_STORAGE=false
+      - USE_SHAREPOINT=${USE_SHAREPOINT:-false}
+      - SHAREPOINT_SITE_URL=${SHAREPOINT_SITE_URL}
+      - SHAREPOINT_CLIENT_ID=${SHAREPOINT_CLIENT_ID}
+      - SHAREPOINT_CLIENT_SECRET=${SHAREPOINT_CLIENT_SECRET}
+      - SHAREPOINT_TENANT_ID=${SHAREPOINT_TENANT_ID}
+      # AI API Keys
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Umgebung
       - ENVIRONMENT=production
       - DEBUG=false
     env_file:
@@ -73,3 +112,11 @@ services:
 networks:
   medealis-network:
     driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: C:/Users/kkrue/.medealis/postgres_data
