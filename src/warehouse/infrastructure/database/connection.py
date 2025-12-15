@@ -52,7 +52,7 @@ def initialize_database(database_url: str = None) -> None:
                 settings.ensure_directories()
                 database_path = settings.get_database_path()
                 database_url = f"sqlite:///{database_path}"
-                print("⚠️  Fallback: Verwende SQLite-Datenbank")
+                print("WARNING: Fallback - Using SQLite database")
             except ImportError:
                 # Letzter Fallback
                 db_dir = Path.home() / ".medealis"
@@ -60,7 +60,7 @@ def initialize_database(database_url: str = None) -> None:
                 database_path = db_dir / "warehouse_new.db"
                 database_url = f"sqlite:///{database_path}"
                 print(
-                    "⚠️  Fallback: Verwende SQLite-Datenbank (config nicht verfügbar)"
+                    "WARNING: Fallback - Using SQLite database (config not available)"
                 )
 
     # Erkenne Datenbank-Typ
@@ -84,8 +84,8 @@ def initialize_database(database_url: str = None) -> None:
                 "options": "-c timezone=Europe/Berlin",  # Timezone setzen
             },
         )
-        print(f"✅ PostgreSQL initialisiert")
-        print(f"   Connection Pool: 10 (max overflow: 20)")
+        print("PostgreSQL initialized")
+        print("   Connection Pool: 10 (max overflow: 20)")
 
     elif is_sqlite:
         # SQLite: Kein Pooling (nicht sinnvoll für SQLite)
@@ -109,7 +109,7 @@ def initialize_database(database_url: str = None) -> None:
             cursor.execute("PRAGMA cache_size=-64000")
             cursor.close()
 
-        print(f"✅ SQLite initialisiert: {database_url}")
+        print(f"SQLite initialized: {database_url}")
 
     else:
         raise ValueError(f"Unsupported database URL: {database_url}")
@@ -117,7 +117,7 @@ def initialize_database(database_url: str = None) -> None:
     # Session Factory
     _session_factory = sessionmaker(bind=_engine)
 
-    print("✅ Database Session Factory erstellt")
+    print("Database Session Factory created")
 
 
 @contextmanager
@@ -180,16 +180,14 @@ def test_connection() -> bool:
             result = session.execute(text("SELECT 1")).scalar()
 
             if result == 1:
-                print("✅ Database Connection Test erfolgreich")
+                print("Database Connection Test successful")
                 return True
             else:
-                print(
-                    "❌ Database Connection Test fehlgeschlagen: Unerwartetes Ergebnis"
-                )
+                print("Database Connection Test failed: Unexpected result")
                 return False
 
     except SQLAlchemyError as e:
-        print(f"❌ Database Connection Test fehlgeschlagen: {e}")
+        print(f"Database Connection Test failed: {e}")
         return False
 
 
