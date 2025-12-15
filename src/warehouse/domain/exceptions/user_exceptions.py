@@ -1,9 +1,9 @@
 # src/warehouse/domain/exceptions/user_exceptions.py
 
-from warehouse.domain.exceptions.base_exceptions import DomainException
+from warehouse.domain.exceptions.base_exceptions import BaseDomainException
 
 
-class UserException(DomainException):
+class UserException(BaseDomainException):
     """Basis-Exception für User-bezogene Fehler."""
 
     pass

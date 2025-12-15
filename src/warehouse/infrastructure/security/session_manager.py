@@ -10,11 +10,24 @@ class SessionManager:
     Einfache Session-Verwaltung für die Anwendung.
 
     Verwendet In-Memory-Storage für Sessions (für Desktop-Anwendung ausreichend).
+    Singleton-Pattern um Sessions über Streamlit-Reruns hinweg zu erhalten.
     """
 
+    _instance: Optional["SessionManager"] = None
+    _initialized: bool = False
+
+    def __new__(cls, session_timeout_minutes: int = 480):
+        """Singleton: Gibt immer dieselbe Instanz zurück."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self, session_timeout_minutes: int = 480):  # 8 Stunden Default
-        self._sessions: dict[str, dict] = {}
-        self._session_timeout = timedelta(minutes=session_timeout_minutes)
+        # Nur einmal initialisieren
+        if not SessionManager._initialized:
+            self._sessions: dict[str, dict] = {}
+            self._session_timeout = timedelta(minutes=session_timeout_minutes)
+            SessionManager._initialized = True
 
     def create_session(self, user_id: str, username: str, role: str) -> str:
         """

@@ -1,10 +1,9 @@
 # src/warehouse/infrastructure/database/models/user_model.py
 
 from sqlalchemy import Column, String, Boolean, DateTime
-from sqlalchemy.orm import declarative_base
 from datetime import datetime
 
-Base = declarative_base()
+from warehouse.infrastructure.database.connection import Base
 
 
 class UserModel(Base):
