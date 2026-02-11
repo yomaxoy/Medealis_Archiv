@@ -185,9 +185,10 @@ def render_admin_sidebar():
         "🔍 Wareneingangskontrolle": "Inspection",
     }
 
-    # Benutzerverwaltung nur für Admins
+    # Benutzerverwaltung und Logs nur für Admins
     if user.get("role") == "admin":
         pages["👥 Benutzer"] = "Users"
+        pages["📜 Protokoll"] = "AuditLog"
 
     selected_page = st.sidebar.radio("Navigation:", list(pages.keys()))
     st.session_state.current_page = pages[selected_page]
@@ -260,6 +261,8 @@ def render_admin_main_content():
             render_inspection_page()
         elif page == "Users":
             render_users_page()
+        elif page == "AuditLog":
+            render_audit_log_page()
         else:
             st.error(f"Unknown page: {page}")
 
@@ -393,6 +396,24 @@ def render_users_page():
         logger.error(f"Error in user management: {e}")
         st.title("👥 Benutzer")
         st.error(f"Fehler in Benutzerverwaltung: {e}")
+
+
+def render_audit_log_page():
+    """Render audit log page."""
+    try:
+        from warehouse.presentation.admin.views.audit_log_view import (
+            show_audit_log_view,
+        )
+
+        show_audit_log_view()
+    except ImportError as e:
+        logger.error(f"Could not import audit log view: {e}")
+        st.title("📜 Protokoll")
+        st.error("Aktivitätsprotokoll nicht verfügbar")
+    except Exception as e:
+        logger.error(f"Error in audit log: {e}")
+        st.title("📜 Protokoll")
+        st.error(f"Fehler im Aktivitätsprotokoll: {e}")
 
 
 def handle_popup_actions():

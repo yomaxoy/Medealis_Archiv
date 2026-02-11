@@ -257,6 +257,44 @@ class AuditRepository:
             logger.error(f"Failed to get logs by date range: {e}")
             return []
 
+    def search_logs(self, search_term: str, limit: int = 200) -> List[AuditLogModel]:
+        """
+        Durchsucht Logs nach Freitext in log_line, user, action, entity_id.
+
+        Args:
+            search_term: Suchbegriff
+            limit: Maximale Treffer
+
+        Returns:
+            Liste passender AuditLogModel
+        """
+        try:
+            from sqlalchemy import or_
+            pattern = f"%{search_term}%"
+            with get_session() as session:
+                logs = (
+                    session.query(AuditLogModel)
+                    .filter(
+                        or_(
+                            AuditLogModel.log_line.ilike(pattern),
+                            AuditLogModel.user.ilike(pattern),
+                            AuditLogModel.action.ilike(pattern),
+                            AuditLogModel.entity_id.ilike(pattern),
+                        )
+                    )
+                    .order_by(desc(AuditLogModel.timestamp))
+                    .limit(limit)
+                    .all()
+                )
+
+                for log in logs:
+                    session.expunge(log)
+
+                return logs
+        except Exception as e:
+            logger.error(f"Failed to search logs: {e}")
+            return []
+
 
 # Global instance (Singleton pattern)
 audit_repository = AuditRepository()

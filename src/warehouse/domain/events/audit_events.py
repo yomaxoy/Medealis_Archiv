@@ -49,6 +49,14 @@ class AuditAction(Enum):
     DOCUMENT_GENERATED = "Dokument generiert"
     DOCUMENT_MERGED = "Dokumente zusammengeführt"
 
+    # Benutzerverwaltung
+    USER_CREATED = "Benutzer erstellt"
+    USER_ROLE_CHANGED = "Benutzerrolle geändert"
+    USER_PASSWORD_RESET = "Passwort zurückgesetzt"
+    USER_ACTIVATED = "Benutzer aktiviert"
+    USER_DEACTIVATED = "Benutzer deaktiviert"
+    USER_PASSWORD_CHANGED = "Passwort geändert"
+
     # System
     LOGIN = "Benutzer angemeldet"
     LOGOUT = "Benutzer abgemeldet"

@@ -11,8 +11,14 @@ from warehouse.infrastructure.database.repositories.user_repository_impl import 
     UserRepositoryImpl,
 )
 from warehouse.domain.enums.user_role import UserRole
+from warehouse.application.services.audit_service import audit_service
 
 logger = logging.getLogger(__name__)
+
+
+def _actor_name(current_user: dict) -> str:
+    """Gibt den Anzeigenamen des aktuellen Admins zurück."""
+    return current_user.get("full_name") or current_user.get("username", "?")
 
 
 def _get_user_service() -> UserService:
@@ -167,7 +173,14 @@ def _show_role_edit(user, user_service: UserService, current_user: dict):
         st.write("")  # Spacing
         if st.button("Speichern", key=f"save_role_{user_id}", type="primary"):
             try:
+                old_role_name = user.role.display_name
                 user_service.update_user_role(user_id, new_role, current_user["user_id"])
+                audit_service.log_user_role_changed(
+                    actor=_actor_name(current_user),
+                    username=str(user.username),
+                    old_role=old_role_name,
+                    new_role=new_role.display_name,
+                )
                 st.session_state[f"edit_role_{user_id}"] = False
                 st.success(f"Rolle geändert: {new_role.display_name}")
                 st.rerun()
@@ -202,6 +215,10 @@ def _show_password_reset(user, user_service: UserService, current_user: dict):
                     user_service.reset_password(
                         user_id, new_pw, current_user["user_id"]
                     )
+                    audit_service.log_user_password_reset(
+                        actor=_actor_name(current_user),
+                        username=str(user.username),
+                    )
                     st.session_state[f"reset_pw_{user_id}"] = False
                     st.success(
                         f"Passwort zurückgesetzt. "
@@ -228,6 +245,10 @@ def _show_deactivate_confirm(user, user_service: UserService, current_user: dict
         if st.button("Ja, deaktivieren", key=f"do_deactivate_{user_id}", type="primary"):
             try:
                 user_service.deactivate_user(user_id, current_user["user_id"])
+                audit_service.log_user_deactivated(
+                    actor=_actor_name(current_user),
+                    username=username,
+                )
                 st.session_state[f"confirm_deactivate_{user_id}"] = False
                 st.success(f"Benutzer {username} deaktiviert.")
                 st.rerun()
@@ -242,7 +263,11 @@ def _show_deactivate_confirm(user, user_service: UserService, current_user: dict
 def _activate_user(user_service: UserService, user_id: str, current_user: dict):
     """Aktiviert einen Benutzer."""
     try:
-        user_service.activate_user(user_id, current_user["user_id"])
+        activated = user_service.activate_user(user_id, current_user["user_id"])
+        audit_service.log_user_activated(
+            actor=_actor_name(current_user),
+            username=str(activated.username),
+        )
         st.success("Benutzer aktiviert.")
         st.rerun()
     except Exception as e:
@@ -315,6 +340,11 @@ def _show_create_user_form(user_service: UserService, current_user: dict):
                     role=role,
                     full_name=full_name or None,
                     created_by=current_user.get("user_id"),
+                )
+                audit_service.log_user_created(
+                    actor=_actor_name(current_user),
+                    username=username,
+                    role=role.display_name,
                 )
                 st.success(f"Benutzer **{username}** erfolgreich angelegt!")
                 logger.info(f"User created by admin: {username} ({role.display_name})")

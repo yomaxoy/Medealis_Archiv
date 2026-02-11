@@ -415,6 +415,111 @@ class AuditService:
             notes=notes,
         )
 
+    # === LOGIN/LOGOUT AKTIONEN ===
+
+    def log_login(self, user: str, notes: Optional[str] = None) -> bool:
+        """Loggt erfolgreichen Login."""
+        return self.log_action(
+            action=AuditAction.LOGIN,
+            user=user,
+            entity_type="User",
+            entity_id=user,
+            data={"Benutzer": user},
+            notes=notes,
+        )
+
+    def log_logout(self, user: str, notes: Optional[str] = None) -> bool:
+        """Loggt Logout."""
+        return self.log_action(
+            action=AuditAction.LOGOUT,
+            user=user,
+            entity_type="User",
+            entity_id=user,
+            data={"Benutzer": user},
+            notes=notes,
+        )
+
+    # === BENUTZERVERWALTUNG AKTIONEN ===
+
+    def log_user_created(
+        self, actor: str, username: str, role: str, notes: Optional[str] = None
+    ) -> bool:
+        """Loggt Benutzer-Erstellung (keine sensiblen Daten)."""
+        return self.log_action(
+            action=AuditAction.USER_CREATED,
+            user=actor,
+            entity_type="User",
+            entity_id=username,
+            data={"Benutzer": username, "Rolle": role},
+            notes=notes,
+        )
+
+    def log_user_role_changed(
+        self, actor: str, username: str, old_role: str, new_role: str,
+        notes: Optional[str] = None,
+    ) -> bool:
+        """Loggt Rollenänderung."""
+        return self.log_action(
+            action=AuditAction.USER_ROLE_CHANGED,
+            user=actor,
+            entity_type="User",
+            entity_id=username,
+            data={"Benutzer": username, "Alte Rolle": old_role, "Neue Rolle": new_role},
+            notes=notes,
+        )
+
+    def log_user_password_reset(
+        self, actor: str, username: str, notes: Optional[str] = None
+    ) -> bool:
+        """Loggt Passwort-Reset (NICHT das Passwort selbst!)."""
+        return self.log_action(
+            action=AuditAction.USER_PASSWORD_RESET,
+            user=actor,
+            entity_type="User",
+            entity_id=username,
+            data={"Benutzer": username},
+            notes=notes,
+        )
+
+    def log_user_password_changed(
+        self, user: str, notes: Optional[str] = None
+    ) -> bool:
+        """Loggt Passwort-Änderung durch den User selbst (NICHT das Passwort!)."""
+        return self.log_action(
+            action=AuditAction.USER_PASSWORD_CHANGED,
+            user=user,
+            entity_type="User",
+            entity_id=user,
+            data={"Benutzer": user},
+            notes=notes,
+        )
+
+    def log_user_activated(
+        self, actor: str, username: str, notes: Optional[str] = None
+    ) -> bool:
+        """Loggt Benutzer-Aktivierung."""
+        return self.log_action(
+            action=AuditAction.USER_ACTIVATED,
+            user=actor,
+            entity_type="User",
+            entity_id=username,
+            data={"Benutzer": username},
+            notes=notes,
+        )
+
+    def log_user_deactivated(
+        self, actor: str, username: str, notes: Optional[str] = None
+    ) -> bool:
+        """Loggt Benutzer-Deaktivierung."""
+        return self.log_action(
+            action=AuditAction.USER_DEACTIVATED,
+            user=actor,
+            entity_type="User",
+            entity_id=username,
+            data={"Benutzer": username},
+            notes=notes,
+        )
+
     # === QUERY METHODS (delegiert an Repository) ===
 
     def get_recent_logs(self, limit: int = 100):
@@ -428,6 +533,10 @@ class AuditService:
     def get_entity_history(self, entity_type: str, entity_id: str):
         """Lädt vollständige Historie für eine Entity."""
         return self.repository.get_logs_by_entity(entity_type, entity_id)
+
+    def search_logs(self, search_term: str, limit: int = 200):
+        """Durchsucht Logs nach Freitext."""
+        return self.repository.search_logs(search_term, limit)
 
 
 # Global instance (Singleton pattern)

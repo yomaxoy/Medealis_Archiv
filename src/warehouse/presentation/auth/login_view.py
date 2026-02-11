@@ -100,6 +100,14 @@ class LoginView:
                     self._complete_login(user)
                     st.success(f"Willkommen, {user.full_name or user.username}!")
                     logger.info(f"User login successful: {username}")
+
+                    # Audit-Trail: Login loggen
+                    try:
+                        from warehouse.application.services.audit_service import audit_service
+                        audit_service.log_login(user=str(user.username))
+                    except Exception:
+                        pass  # Audit-Fehler darf Login nicht blockieren
+
                     st.rerun()
                     return True
 
@@ -174,6 +182,13 @@ class LoginView:
 
                     st.success("Passwort erfolgreich geändert! Bitte melden Sie sich erneut an.")
                     logger.info(f"Forced password change completed for: {username}")
+
+                    # Audit-Trail: Passwortwechsel loggen (NICHT das Passwort!)
+                    try:
+                        from warehouse.application.services.audit_service import audit_service
+                        audit_service.log_user_password_changed(user=username)
+                    except Exception:
+                        pass
                     st.rerun()
                     return False
 
@@ -223,6 +238,14 @@ class LoginView:
 
     def logout(self):
         """Loggt den aktuellen User aus."""
+        # Audit-Trail: Logout loggen (vor Session-Clear!)
+        username = st.session_state.get("current_user", {}).get("username", "?")
+        try:
+            from warehouse.application.services.audit_service import audit_service
+            audit_service.log_logout(user=username)
+        except Exception:
+            pass  # Audit-Fehler darf Logout nicht blockieren
+
         if "auth_token" in st.session_state:
             self._session_manager.invalidate_session(st.session_state.auth_token)
 
@@ -233,7 +256,7 @@ class LoginView:
 
         self._clear_force_change_state()
 
-        logger.info("User logged out")
+        logger.info(f"User logged out: {username}")
         st.rerun()
 
 
