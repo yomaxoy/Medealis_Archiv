@@ -63,6 +63,7 @@ def initialize_system() -> bool:
         if not is_initialized():
             initialize_database()
             create_tables()
+            _ensure_default_admin()
 
         return True
 
@@ -71,6 +72,39 @@ def initialize_system() -> bool:
         logger = logging.getLogger(__name__)
         logger.error(f"System initialization failed: {e}")
         return False
+
+
+def _ensure_default_admin():
+    """Erstellt Default-Admin falls kein User existiert."""
+    try:
+        import uuid
+        from warehouse.infrastructure.database.connection import get_session
+        from warehouse.infrastructure.database.models.user_model import UserModel
+        from warehouse.infrastructure.security.password_hasher import PasswordHasher
+
+        with get_session() as session:
+            user_count = session.query(UserModel).count()
+            if user_count == 0:
+                hasher = PasswordHasher()
+                admin = UserModel(
+                    user_id=str(uuid.uuid4()),
+                    username="admin",
+                    email="admin@medealis.local",
+                    password_hash=hasher.hash_password("Admin123!"),
+                    role="admin",
+                    is_active=True,
+                    must_change_password=True,
+                    full_name="System Administrator",
+                )
+                session.add(admin)
+                session.commit()
+                import logging
+                logging.getLogger(__name__).info(
+                    "Default-Admin erstellt (admin / Admin123!)"
+                )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Default-Admin konnte nicht erstellt werden: {e}")
 
 
 __all__ = [

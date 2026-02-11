@@ -185,6 +185,10 @@ def render_admin_sidebar():
         "🔍 Wareneingangskontrolle": "Inspection",
     }
 
+    # Benutzerverwaltung nur für Admins
+    if user.get("role") == "admin":
+        pages["👥 Benutzer"] = "Users"
+
     selected_page = st.sidebar.radio("Navigation:", list(pages.keys()))
     st.session_state.current_page = pages[selected_page]
 
@@ -254,6 +258,8 @@ def render_admin_main_content():
             render_orders_page()
         elif page == "Inspection":
             render_inspection_page()
+        elif page == "Users":
+            render_users_page()
         else:
             st.error(f"Unknown page: {page}")
 
@@ -369,6 +375,24 @@ def render_inspection_page():
         logger.error(f"Error in inspection page: {e}")
         st.title("🔍 Wareneingangskontrolle")
         st.error(f"Fehler in Wareneingangskontrolle: {e}")
+
+
+def render_users_page():
+    """Render user management page."""
+    try:
+        from warehouse.presentation.admin.views.user_management_view import (
+            show_user_management_view,
+        )
+
+        show_user_management_view()
+    except ImportError as e:
+        logger.error(f"Could not import user management view: {e}")
+        st.title("👥 Benutzer")
+        st.error("Benutzerverwaltung nicht verfügbar")
+    except Exception as e:
+        logger.error(f"Error in user management: {e}")
+        st.title("👥 Benutzer")
+        st.error(f"Fehler in Benutzerverwaltung: {e}")
 
 
 def handle_popup_actions():
