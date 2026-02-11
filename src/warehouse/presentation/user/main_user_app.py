@@ -134,6 +134,14 @@ def main():
             st.session_state.system_initialized = True
             logger.info("User system initialized successfully")
 
+        # Authentication Gate
+        from warehouse.presentation.auth.login_view import LoginView, is_authenticated
+
+        if not is_authenticated():
+            login_view = LoginView()
+            login_view.show()
+            return
+
         # Render user interface
         render_user_interface()
 
@@ -141,7 +149,7 @@ def main():
         logger.error(f"User app error: {e}")
         st.error(f"Anwendungsfehler: {e}")
 
-        if st.button("🔄 Neu starten"):
+        if st.button("Neu starten"):
             # Clear cache and restart
             st.cache_resource.clear()
             if "system_initialized" in st.session_state:

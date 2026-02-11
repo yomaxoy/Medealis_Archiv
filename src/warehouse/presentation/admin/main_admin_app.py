@@ -49,6 +49,14 @@ def main():
             initialize_admin_system()
             st.session_state.system_initialized = True
 
+        # Authentication Gate
+        from warehouse.presentation.auth.login_view import LoginView, is_authenticated
+
+        if not is_authenticated():
+            login_view = LoginView()
+            login_view.show()
+            return
+
         # Render admin interface
         render_admin_interface()
 
@@ -56,7 +64,7 @@ def main():
         logger.error(f"Admin app error: {e}")
         st.error(f"Anwendungsfehler: {e}")
 
-        if st.button("🔄 Neu starten"):
+        if st.button("Neu starten"):
             st.rerun()
 
 
@@ -156,7 +164,16 @@ def render_admin_interface():
 
 def render_admin_sidebar():
     """Render admin sidebar navigation."""
-    st.sidebar.title("🏭 Warehouse Admin")
+    st.sidebar.title("Warehouse Admin")
+
+    # User info & Logout
+    from warehouse.presentation.auth.login_view import LoginView
+    user = st.session_state.get("current_user", {})
+    st.sidebar.markdown(f"**{user.get('full_name') or user.get('username', '?')}** ({user.get('role', '?')})")
+    if st.sidebar.button("Abmelden", use_container_width=True):
+        LoginView().logout()
+
+    st.sidebar.write("---")
 
     # Navigation menu
     pages = {

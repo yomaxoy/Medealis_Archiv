@@ -51,6 +51,9 @@ docs/_build/
 .coverage
 htmlcov/
 
+# Test scripts (local testing only)
+test_auth.py
+
 # Environment variables
 .env
 

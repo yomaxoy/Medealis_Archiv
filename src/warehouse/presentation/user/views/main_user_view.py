@@ -33,20 +33,27 @@ def show_main_user_view():
     Show simplified main user view with left menu and item table.
     Focus: Easy to use, clean interface without verbose status messages.
     """
-    # Title and Scan button in header
-    col1, col2 = st.columns([4, 1])
+    # Title, Scan button and Logout in header
+    col1, col2, col3 = st.columns([4, 1, 1])
     with col1:
-        st.title("📦 Wareneingangskontrolle")
+        st.title("Wareneingangskontrolle")
     with col2:
         st.write("")  # Spacing
         if st.button(
-            "📄 Lieferschein scannen",
+            "Lieferschein scannen",
             type="primary",
             use_container_width=True,
             key="scan_button_header",
         ):
             st.session_state.show_scan_popup = True
             st.rerun()
+    with col3:
+        st.write("")  # Spacing
+        user = st.session_state.get("current_user", {})
+        st.caption(f"{user.get('full_name') or user.get('username', '')}")
+        if st.button("Abmelden", use_container_width=True, key="logout_header"):
+            from warehouse.presentation.auth.login_view import LoginView
+            LoginView().logout()
 
     # Check system initialization
     if not st.session_state.get("system_initialized"):
