@@ -341,8 +341,13 @@ class InspectionPopup(ABC):
     # ========== Utility Methods ==========
 
     def get_current_user(self) -> str:
-        """Gibt den aktuellen User aus Session-State zurück."""
-        return st.session_state.get('current_user', 'System')
+        """Gibt den aktuellen Username aus Session-State zurück."""
+        user = st.session_state.get('current_user')
+        if user is None:
+            return 'System'
+        if isinstance(user, dict):
+            return user.get('username', 'System')
+        return str(user)
 
     def log_action(self, action: str, details: Optional[Dict[str, Any]] = None) -> None:
         """

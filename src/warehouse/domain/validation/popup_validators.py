@@ -420,8 +420,8 @@ class VisualInspectionValidator:
         ):
             if waste_quantity > total_quantity:
                 result.add_error(
-                    f"Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({total_quantity}) sein",
                     "waste_quantity",
+                    f"Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({total_quantity}) sein",
                 )
 
         # Bei Zurückweisung: Qualitätsnotizen sind Pflicht (mind. 10 Zeichen)
@@ -431,8 +431,8 @@ class VisualInspectionValidator:
         if is_rejection:
             if not quality_notes or len(quality_notes.strip()) < 10:
                 result.add_error(
-                    "Bei Zurückweisung ist eine ausführliche Begründung erforderlich (mind. 10 Zeichen)",
                     "quality_notes",
+                    "Bei Zurückweisung ist eine ausführliche Begründung erforderlich (mind. 10 Zeichen)",
                 )
 
         return result

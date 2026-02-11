@@ -12,7 +12,7 @@ import logging
 
 from warehouse.application.services.validation_service import validation_service
 from warehouse.application.services.audit_service import audit_service
-from warehouse.presentation.utils.user_context import get_current_user
+from warehouse.presentation.utils.user_context import get_current_username
 
 logger = logging.getLogger(__name__)
 
@@ -569,7 +569,7 @@ def _execute_merge(
                 delivery_number = item_data.get("delivery_number")
 
                 # Get current user
-                current_user = get_current_user()
+                current_user = get_current_username()
 
                 # Mark workflow step as completed
                 workflow_success = item_service.complete_documents_merge(

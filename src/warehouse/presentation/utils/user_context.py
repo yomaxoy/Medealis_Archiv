@@ -2,42 +2,62 @@
 User Context Helper.
 
 Zentraler Helper für User-Kontext aus Streamlit Session State.
-Wird später mit Authentication-System integriert.
+Integriert mit dem Authentication-System (login_view.py).
 """
 
 import streamlit as st
+from typing import Optional
 
 
-def get_current_user() -> str:
+def get_current_user() -> Optional[dict]:
     """
     Holt aktuellen Benutzer aus Session State.
 
-    TODO: Später mit Authentication-System integrieren.
-    Aktuell Fallback auf "System" wenn kein User gesetzt.
+    Wenn das Auth-System aktiv ist, gibt dies ein Dictionary zurück:
+        {"user_id": ..., "username": ..., "email": ..., "role": ..., "full_name": ...}
+
+    Falls kein User eingeloggt ist, wird None zurückgegeben.
 
     Returns:
-        Username oder "System" als Fallback
+        User-Dict oder None
     """
-    return st.session_state.get("current_user", "System")
+    return st.session_state.get("current_user")
 
 
-def set_current_user(username: str) -> None:
+def get_current_username() -> str:
+    """
+    Gibt den Benutzernamen des aktuell eingeloggten Users zurück.
+
+    Fallback auf "System" wenn kein User eingeloggt ist.
+
+    Returns:
+        Username als String
+    """
+    user = st.session_state.get("current_user")
+    if user is None:
+        return "System"
+    if isinstance(user, dict):
+        return user.get("username", "System")
+    return str(user)
+
+
+def set_current_user(user_data: dict) -> None:
     """
     Setzt aktuellen Benutzer in Session State.
 
-    TODO: Wird vom Authentication-System aufgerufen.
+    Wird vom Authentication-System (LoginView) aufgerufen.
 
     Args:
-        username: Benutzername
+        user_data: Dictionary mit user_id, username, email, role, full_name
     """
-    st.session_state.current_user = username
+    st.session_state.current_user = user_data
 
 
 def clear_current_user() -> None:
     """
     Löscht aktuellen Benutzer aus Session State (Logout).
 
-    TODO: Wird vom Authentication-System beim Logout aufgerufen.
+    Wird vom Authentication-System beim Logout aufgerufen.
     """
     if "current_user" in st.session_state:
         del st.session_state.current_user

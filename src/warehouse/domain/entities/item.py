@@ -308,6 +308,7 @@ class Item:
         Berechnet aktuellen Status = Erster nicht-erfüllter Schritt.
 
         Workflow-Reihenfolge (fest):
+        0. Artikeldetails vollständig
         1. Daten prüfen
         2. Dokumente prüfen
         3. Vermessen
@@ -325,6 +326,9 @@ class Item:
             return "Ausschuss"
 
         # Workflow-Reihenfolge (fest definiert)
+        if not self.iteminfo_complete_by:
+            return "Artikeldetails vollständig"
+
         if not self.data_checked_by:
             return "Daten prüfen"
 
@@ -360,6 +364,8 @@ class Item:
         """
         missing = []
 
+        if not self.iteminfo_complete_by:
+            missing.append("Artikeldetails")
         if not self.data_checked_by:
             missing.append("Datenprüfung")
         if not self.documents_checked_by:
@@ -380,9 +386,10 @@ class Item:
         Returns:
             Prozentsatz (0-100)
         """
-        total_steps = 5  # data, documents, measurement, visual, merge
+        total_steps = 6  # iteminfo, data, documents, measurement, visual, merge
         completed_steps = sum(
             [
+                bool(self.iteminfo_complete_by),
                 bool(self.data_checked_by),
                 bool(self.documents_checked_by),
                 bool(self.measured_by),
@@ -419,6 +426,13 @@ class Item:
             "is_final": self.is_final_status(),
             "is_ready_for_completion": self.is_ready_for_completion(),
             "steps": {
+                "iteminfo_complete": {
+                    "completed": bool(self.iteminfo_complete_by),
+                    "by": self.iteminfo_complete_by,
+                    "at": self.iteminfo_complete_at.isoformat()
+                    if self.iteminfo_complete_at
+                    else None,
+                },
                 "data_checked": {
                     "completed": bool(self.data_checked_by),
                     "by": self.data_checked_by,

@@ -45,15 +45,17 @@ class FieldValidator:
         field_name: str,
         max_length: int,
         field_label: Optional[str] = None,
+        min_length: Optional[int] = None,
     ) -> ValidationResult:
         """
-        Validiert die maximale Länge eines Strings.
+        Validiert die Länge eines Strings.
 
         Args:
             value: String zu validieren
             field_name: Technischer Feldname
             max_length: Maximale Länge
             field_label: Anzeigename (optional)
+            min_length: Minimale Länge (optional)
 
         Returns:
             ValidationResult
@@ -62,6 +64,13 @@ class FieldValidator:
 
         if value is None:
             return ValidationResult.success()  # Nur Länge prüfen, nicht required
+
+        if min_length is not None and len(value) < min_length:
+            return ValidationResult.failure(
+                field_name,
+                f"{label} muss mindestens {min_length} Zeichen lang sein (aktuell: {len(value)})",
+                "TOO_SHORT",
+            )
 
         if len(value) > max_length:
             return ValidationResult.failure(

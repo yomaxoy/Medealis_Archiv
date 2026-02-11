@@ -4,10 +4,16 @@ SQLAlchemy Model für Audit Log.
 Speichert alle Benutzeraktionen und Statusänderungen für vollständige Nachvollziehbarkeit.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, Index
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, DateTime, Text, Index, JSON
 from datetime import datetime
 from warehouse.infrastructure.database.connection import Base
+
+# JSONB für PostgreSQL, JSON als Fallback für SQLite
+try:
+    from sqlalchemy.dialects.postgresql import JSONB
+    _json_column_type = JSONB
+except ImportError:
+    _json_column_type = JSON
 
 
 class AuditLogModel(Base):
@@ -37,7 +43,7 @@ class AuditLogModel(Base):
     action = Column(String(100), nullable=False, index=True)
     entity_type = Column(String(50), nullable=False, index=True)
     entity_id = Column(String(200), nullable=False, index=True)
-    data = Column(JSONB, nullable=True)  # PostgreSQL JSONB für strukturierte Queries
+    data = Column(_json_column_type, nullable=True)  # JSONB bei PostgreSQL, JSON bei SQLite
     notes = Column(Text, nullable=True)
     log_line = Column(Text, nullable=False)  # Formatierte Zeile für Textdatei
 

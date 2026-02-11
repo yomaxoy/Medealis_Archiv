@@ -16,7 +16,6 @@ from warehouse.presentation.user.popups.components import (
 from warehouse.domain.enums.certificate_type import CertificateType
 from warehouse.application.services.validation_service import validation_service
 from warehouse.application.services.audit_service import audit_service
-from warehouse.presentation.utils.user_context import get_current_user
 
 
 class DocumentCheckPopup(InspectionPopup):

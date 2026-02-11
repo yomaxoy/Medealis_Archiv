@@ -15,7 +15,7 @@ from warehouse.presentation.user.popups.components import (
 )
 from warehouse.application.services.validation_service import validation_service
 from warehouse.application.services.audit_service import audit_service
-from warehouse.presentation.utils.user_context import get_current_user
+from warehouse.presentation.utils.user_context import get_current_username
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +168,7 @@ class DataConfirmationPopup(InspectionPopup):
         # ===== MITARBEITERNAME GANZ OBEN (PFLICHTFELD) =====
         form.add_section("👤 Mitarbeiter", expanded=True, use_expander=False)
 
-        current_user = get_current_user()
+        current_user = get_current_username()
         form.add_text_input(
             "Mitarbeitername: *",
             key="data_employee_name",

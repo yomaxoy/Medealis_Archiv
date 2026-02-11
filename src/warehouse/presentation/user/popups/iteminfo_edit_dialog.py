@@ -13,7 +13,7 @@ from PIL import Image
 
 from warehouse.application.services.audit_service import audit_service
 from warehouse.application.services.validation_service import validation_service
-from warehouse.presentation.utils.user_context import get_current_user
+from warehouse.presentation.utils.user_context import get_current_username
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +251,7 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
                     st.success(f"✅ ItemInfo für Artikel {article_number} gespeichert!")
 
                     # AUDIT LOGGING
-                    current_user = get_current_user()
+                    current_user = get_current_username()
 
                     if is_update:
                         audit_service.log_iteminfo_updated(
