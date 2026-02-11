@@ -54,6 +54,7 @@ def create_users_table():
                 password_hash VARCHAR(255) NOT NULL,
                 role VARCHAR(20) NOT NULL,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
                 full_name VARCHAR(255),
                 last_login TIMESTAMP,
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -145,11 +146,11 @@ def create_default_admin():
         insert_query = """
             INSERT INTO users (
                 user_id, username, email, password_hash,
-                role, is_active, full_name
+                role, is_active, must_change_password, full_name
             )
             VALUES (
                 :user_id, :username, :email, :password_hash,
-                :role, TRUE, :full_name
+                :role, TRUE, TRUE, :full_name
             )
         """
         session.execute(

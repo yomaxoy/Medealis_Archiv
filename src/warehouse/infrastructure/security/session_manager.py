@@ -11,6 +11,15 @@ class SessionManager:
 
     Verwendet In-Memory-Storage für Sessions (für Desktop-Anwendung ausreichend).
     Singleton-Pattern um Sessions über Streamlit-Reruns hinweg zu erhalten.
+
+    BEKANNTE LIMITIERUNG:
+        Sessions werden im Prozess-Speicher gehalten. Bei Container-Restart,
+        Prozess-Neustart oder Server-Redeployment gehen alle Sessions verloren
+        und alle Benutzer werden automatisch ausgeloggt.
+
+        Für Multi-Container- oder Hochverfügbarkeits-Setups muss die
+        Session-Verwaltung auf eine externe Lösung umgestellt werden
+        (z.B. PostgreSQL-Tabelle oder Redis). Siehe Roadmap Phase 3.
     """
 
     _instance: Optional["SessionManager"] = None

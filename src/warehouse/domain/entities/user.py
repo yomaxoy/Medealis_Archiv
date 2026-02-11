@@ -23,6 +23,7 @@ class User:
     password_hash: str
     role: UserRole
     is_active: bool = True
+    must_change_password: bool = False
     full_name: Optional[str] = None
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -99,6 +100,7 @@ class User:
             "password_hash": self.password_hash,
             "role": self.role.value,
             "is_active": self.is_active,
+            "must_change_password": self.must_change_password,
             "full_name": self.full_name,
             "last_login": self.last_login.isoformat() if self.last_login else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -116,6 +118,7 @@ class User:
             password_hash=data["password_hash"],
             role=UserRole(data["role"]),
             is_active=data.get("is_active", True),
+            must_change_password=data.get("must_change_password", False),
             full_name=data.get("full_name"),
             last_login=datetime.fromisoformat(data["last_login"])
             if data.get("last_login")

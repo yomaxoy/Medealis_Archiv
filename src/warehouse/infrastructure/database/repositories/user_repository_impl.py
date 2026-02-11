@@ -39,6 +39,7 @@ class UserRepositoryImpl(UserRepository):
                     existing.password_hash = user.password_hash
                     existing.role = user.role.value
                     existing.is_active = user.is_active
+                    existing.must_change_password = user.must_change_password
                     existing.full_name = user.full_name
                     existing.last_login = user.last_login
                     existing.updated_at = datetime.now()
@@ -52,6 +53,7 @@ class UserRepositoryImpl(UserRepository):
                         password_hash=user.password_hash,
                         role=user.role.value,
                         is_active=user.is_active,
+                        must_change_password=user.must_change_password,
                         full_name=user.full_name,
                         last_login=user.last_login,
                         created_at=user.created_at or datetime.now(),
@@ -209,6 +211,7 @@ class UserRepositoryImpl(UserRepository):
             password_hash=model.password_hash,
             role=UserRole(model.role),
             is_active=model.is_active,
+            must_change_password=model.must_change_password,
             full_name=model.full_name,
             last_login=model.last_login,
             created_at=model.created_at,

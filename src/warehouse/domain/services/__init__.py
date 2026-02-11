@@ -7,8 +7,6 @@ einzelnen Entity gehört oder mehrere Entities koordiniert.
 
 Modules:
     inspection_service: Prüfungslogik für Artikel
-    certificate_service: Zertifikatsverwaltung
-    audit_service: Audit Trail und Compliance
 
 Architecture:
     Domain Services arbeiten mit Entities und Value Objects,
@@ -16,15 +14,8 @@ Architecture:
     Geschäftsregeln und Multi-Entity-Operationen.
 """
 
-# Placeholder für zukünftige Domain Services
 from .inspection_service import InspectionService
-
-# from .certificate_service import CertificateService
-
-# from .audit_service import AuditService
 
 __all__ = [
     "InspectionService",
-    #   "CertificateService",
-    #   "AuditService",
 ]

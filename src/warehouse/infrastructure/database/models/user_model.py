@@ -17,6 +17,7 @@ class UserModel(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)
     full_name = Column(String(255), nullable=True)
     last_login = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now, nullable=False)

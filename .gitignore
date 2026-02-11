@@ -42,6 +42,7 @@ dist/
 temp/
 tmp/
 *.tmp
+*.tmp.*
 
 # Documentation builds
 docs/_build/
@@ -59,5 +60,11 @@ poppler.zip
 
 # Old project documents (archived in docs/archive/)
 Plan.docx
-Purpose and Scope.docxuser_data/
+Purpose and Scope.docx
+
+# User data and runtime data (not in repo)
+user_data/
 data/
+
+# Streamlit secrets (contains credentials)
+.streamlit/secrets.toml

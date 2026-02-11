@@ -254,9 +254,40 @@ class UserService:
 
         # Hash und speichere neues Passwort
         user.password_hash = self._password_hasher.hash_password(new_password)
+        user.must_change_password = False
         self._user_repository.save(user)
 
         logger.info(f"Passwort geändert für User: {user.username}")
+
+    def force_change_password(self, user_id: str, new_password: str) -> None:
+        """
+        Erzwungener Passwortwechsel (ohne altes Passwort).
+
+        Wird beim ersten Login mit Default-Passwort verwendet.
+
+        Args:
+            user_id: User ID
+            new_password: Neues Passwort
+
+        Raises:
+            UserNotFoundError: Wenn User nicht existiert
+            ValueError: Bei ungültigem neuen Passwort
+        """
+        user = self.get_user_by_id(user_id)
+
+        # Validiere neues Passwort
+        is_valid, error_msg = self._password_hasher.validate_password_strength(
+            new_password
+        )
+        if not is_valid:
+            raise ValueError(error_msg)
+
+        # Hash und speichere
+        user.password_hash = self._password_hasher.hash_password(new_password)
+        user.must_change_password = False
+        self._user_repository.save(user)
+
+        logger.info(f"Erzwungener Passwortwechsel für User: {user.username}")
 
     def reset_password(
         self, user_id: str, new_password: str, actor_user_id: str
@@ -285,8 +316,9 @@ class UserService:
         if not is_valid:
             raise ValueError(error_msg)
 
-        # Hash und speichere
+        # Hash und speichere — User muss beim nächsten Login Passwort ändern
         user.password_hash = self._password_hasher.hash_password(new_password)
+        user.must_change_password = True
         self._user_repository.save(user)
 
         logger.info(
