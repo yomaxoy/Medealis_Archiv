@@ -12,6 +12,8 @@ from .item_workflow_steps_model import ItemWorkflowStepsModel
 from .delivery_model import DeliveryModel
 from .supplier_model import SupplierModel
 from .order_model import OrderModel, OrderItemModel
+from .user_model import UserModel
+from .audit_log_model import AuditLogModel
 
 # Diese Imports registrieren die Models bei SQLAlchemy Base
 __all__ = [
@@ -23,4 +25,6 @@ __all__ = [
     "SupplierModel",
     "OrderModel",
     "OrderItemModel",
+    "UserModel",
+    "AuditLogModel",
 ]

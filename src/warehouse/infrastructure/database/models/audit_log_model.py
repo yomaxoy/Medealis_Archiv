@@ -8,13 +8,6 @@ from sqlalchemy import Column, Integer, String, DateTime, Text, Index, JSON
 from datetime import datetime
 from warehouse.infrastructure.database.connection import Base
 
-# JSONB für PostgreSQL, JSON als Fallback für SQLite
-try:
-    from sqlalchemy.dialects.postgresql import JSONB
-    _json_column_type = JSONB
-except ImportError:
-    _json_column_type = JSON
-
 
 class AuditLogModel(Base):
     """
@@ -43,7 +36,7 @@ class AuditLogModel(Base):
     action = Column(String(100), nullable=False, index=True)
     entity_type = Column(String(50), nullable=False, index=True)
     entity_id = Column(String(200), nullable=False, index=True)
-    data = Column(_json_column_type, nullable=True)  # JSONB bei PostgreSQL, JSON bei SQLite
+    data = Column(JSON, nullable=True)
     notes = Column(Text, nullable=True)
     log_line = Column(Text, nullable=False)  # Formatierte Zeile für Textdatei
 
