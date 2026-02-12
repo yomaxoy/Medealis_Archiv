@@ -1,9 +1,2 @@
 {
-  "mcpServers": {
-    "qms-database": {
-      "command": "python",
-      "args": ["-m", "server"],
-      "cwd": "mcp-servers/qms_database"
-    }
-  }
 }

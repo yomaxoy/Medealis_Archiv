@@ -17,7 +17,9 @@
       "Bash(export:*)",
       "Bash(curl:*)",
       "Read(//c/Users/kkrue/.medealis/postgres_data/**)",
-      "Bash(docker logs:*)"
+      "Bash(docker logs:*)",
+      "Bash(git push:*)",
+      "mcp__qms-database__query_database"
     ],
     "deny": [],
     "ask": []

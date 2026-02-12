@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "qms-database": {
+      "type": "stdio",
+      "command": "C:/Users/KlausKrüger/Desktop/neu_Medealis_Archiv/.venv/Scripts/python.exe",
+      "args": [
+        "C:/Users/KlausKrüger/Desktop/neu_Medealis_Archiv/mcp-servers/qms_database/server.py"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

@@ -1,16 +1,21 @@
 """
 Medealis QMS Database MCP Server.
 
-Bietet Read-Only Zugriff auf die Warehouse-Datenbank fuer Claude Code.
-7 Tools fuer Lieferanten, Inspektionen, Statistiken und freie Queries.
+Bietet Read-Only Zugriff auf die Warehouse-Datenbank
+fuer Claude Code. Implementiert 7 Tools via MCP (Model
+Context Protocol) ueber stdio-Transport.
 
-Sicherheit:
-- Nur SELECT-Queries erlaubt
-- SQLite Read-Only Modus
-- Tabellen-Whitelist
-- SQL-Keyword-Blacklist
+Sicherheitskonzept:
+- Nur SELECT-Queries erlaubt (Keyword-Blacklist)
+- SQLite Read-Only Modus via URI
+- Tabellen-Whitelist (nur freigegebene Tabellen)
 - Ergebnis-Limit (max 1000 Zeilen)
-- Audit-Logging aller Aufrufe
+- Audit-Logging aller Aufrufe in separater DB
+
+Dateien:
+- server.py  - MCP-Server und Tool-Implementierungen
+- config.py  - Datenbank-Pfade, Whitelist, Limits
+- audit.py   - Audit-Logging in separate SQLite-DB
 """
 
 import sqlite3
@@ -18,7 +23,6 @@ import time
 import re
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -28,15 +32,53 @@ from mcp.types import Tool, TextContent
 from config import MCPDatabaseConfig
 from audit import MCPAuditLogger
 
-logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+# Logging in Datei (nicht stderr, das stoert MCP stdio)
+_log_file = Path(__file__).parent.parent.parent / "data" / "mcp_server.log"
+_log_file.parent.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    filename=str(_log_file),
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
-# Konfiguration laden
+# Konfiguration und Audit-Logger initialisieren
 config = MCPDatabaseConfig.from_environment()
 audit = MCPAuditLogger(config.audit_db_path)
 
-# MCP Server erstellen
+# MCP Server-Instanz
 app = Server("qms-database")
+
+
+# -- Tool-Beschreibungen (separat fuer Lesbarkeit) ------
+
+_DESC_LIST_TABLES = (
+    "Listet alle Tabellen der Warehouse-Datenbank" " mit ihren Spalten auf."
+)
+_DESC_DB_STATS = "Gibt die Anzahl der Eintraege pro Tabelle zurueck."
+_DESC_SUPPLIER = (
+    "Gibt Lieferanten-Stammdaten inkl." " zugehoeriger Lieferungen zurueck."
+)
+_DESC_INSPECTION = (
+    "Gibt Wareneingangspruefungs-Daten" " (Workflow-Steps + Items) zurueck."
+)
+_DESC_QUERY = (
+    "Fuehrt eine validierte Read-Only SQL-Query"
+    " gegen die Datenbank aus. Nur SELECT erlaubt."
+)
+_DESC_CAPAS = (
+    "Gibt offene CAPA-Vorgaenge zurueck." " (Tabelle noch nicht implementiert)"
+)
+_DESC_DOCUMENTS = (
+    "Gibt QM-Dokumente mit ablaufendem Review"
+    " zurueck. (Tabelle noch nicht implementiert)"
+)
+
+_MSG_NOT_IMPLEMENTED = (
+    "Noch nicht implementiert. Wird in einer"
+    " zukuenftigen Phase als separate"
+    " QMS-Datenbank erstellt."
+)
 
 
 # ============================================================
@@ -45,73 +87,102 @@ app = Server("qms-database")
 
 
 def get_readonly_connection() -> sqlite3.Connection:
-    """Oeffnet eine Read-Only SQLite-Verbindung."""
+    """Oeffnet eine Read-Only SQLite-Verbindung.
+
+    Versucht zuerst URI-Modus (?mode=ro), faellt auf
+    normalen Modus zurueck falls nicht unterstuetzt.
+    """
     if not config.database_path:
         raise RuntimeError(
             "Kein Datenbank-Pfad konfiguriert. "
-            "Setze MEDEALIS_DB_PATH oder pruefe data/medealis_db/warehouse_new.db"
+            "Setze MEDEALIS_DB_PATH oder pruefe "
+            "data/medealis_db/warehouse_new.db"
         )
 
     db_path = Path(config.database_path)
     if not db_path.exists():
-        raise FileNotFoundError(f"Datenbank nicht gefunden: {config.database_path}")
+        raise FileNotFoundError(f"Datenbank nicht gefunden: {db_path}")
 
-    # Read-Only Modus via URI
     try:
         db_uri = f"file:{config.database_path}?mode=ro"
-        conn = sqlite3.connect(db_uri, uri=True, timeout=config.query_timeout_seconds)
-    except sqlite3.OperationalError:
-        # Fallback: Normaler Modus (falls URI nicht unterstuetzt)
         conn = sqlite3.connect(
-            config.database_path, timeout=config.query_timeout_seconds
+            db_uri,
+            uri=True,
+            timeout=config.query_timeout_seconds,
         )
-        logger.warning("Read-Only URI-Modus nicht verfuegbar, verwende normalen Modus")
+    except sqlite3.OperationalError:
+        # Fallback falls URI nicht unterstuetzt
+        conn = sqlite3.connect(
+            config.database_path,
+            timeout=config.query_timeout_seconds,
+        )
+        logger.warning("Read-Only URI nicht verfuegbar, " "verwende normalen Modus")
 
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def validate_sql(sql: str) -> tuple:
-    """
-    Validiert eine SQL-Query.
+def validate_sql(sql: str) -> tuple[bool, str]:
+    """Validiert eine SQL-Query gegen Sicherheitsregeln.
+
+    Prueft:
+    - Muss mit SELECT oder WITH beginnen
+    - Keine verbotenen Keywords (INSERT, DROP, etc.)
+    - Maximal ein Statement (Semikolon-Check)
 
     Returns:
-        (is_valid: bool, error_message: str)
+        (is_valid, error_message)
     """
     cleaned = sql.strip()
     upper = cleaned.upper()
 
-    # Muss mit SELECT oder WITH beginnen
     if not (upper.startswith("SELECT") or upper.startswith("WITH")):
         return False, "Nur SELECT-Queries sind erlaubt"
 
-    # Verbotene Keywords pruefen
     for keyword in config.forbidden_keywords:
-        # Word-Boundary Matching um False-Positives zu vermeiden
         pattern = rf"\b{keyword}\b"
         if re.search(pattern, upper):
             return False, f"Verbotenes Keyword: {keyword}"
 
-    # Semikolon-Check (nur eine Query erlaubt)
-    # Entferne Strings und Comments bevor wir auf ; pruefen
-    sql_no_strings = re.sub(r"'[^']*'", "", cleaned)
-    sql_no_strings = re.sub(r'"[^"]*"', "", sql_no_strings)
-    if sql_no_strings.count(";") > 1:
+    # Semikolon-Check: Strings entfernen, dann zaehlen
+    no_strings = re.sub(r"'[^']*'", "", cleaned)
+    no_strings = re.sub(r'"[^"]*"', "", no_strings)
+    if no_strings.count(";") > 1:
         return False, "Nur eine einzelne Query erlaubt"
 
     return True, "OK"
 
 
-def rows_to_dicts(cursor: sqlite3.Cursor, rows: list) -> list:
-    """Konvertiert SQLite Rows in Dicts."""
+def rows_to_dicts(cursor: sqlite3.Cursor, rows: list) -> list[dict]:
+    """Konvertiert SQLite Rows in Dictionaries."""
     if not cursor.description:
         return []
     columns = [desc[0] for desc in cursor.description]
     return [dict(zip(columns, row)) for row in rows]
 
 
+def _json_response(data) -> list[TextContent]:
+    """Erzeugt eine JSON-TextContent-Antwort."""
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                data,
+                indent=2,
+                default=str,
+                ensure_ascii=False,
+            ),
+        )
+    ]
+
+
+def _error_response(message: str) -> list[TextContent]:
+    """Erzeugt eine Fehler-Antwort."""
+    return [TextContent(type="text", text=message)]
+
+
 # ============================================================
-# MCP Tools
+# MCP Tool-Registrierung
 # ============================================================
 
 
@@ -121,29 +192,31 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="list_available_tables",
-            description=(
-                "Listet alle Tabellen der" " Warehouse-Datenbank mit ihren Spalten auf."
-            ),
-            inputSchema={"type": "object", "properties": {}, "required": []},
+            description=_DESC_LIST_TABLES,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
         ),
         Tool(
             name="get_database_statistics",
-            description="Gibt die Anzahl der Eintraege pro Tabelle zurueck.",
-            inputSchema={"type": "object", "properties": {}, "required": []},
+            description=_DESC_DB_STATS,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
         ),
         Tool(
             name="get_supplier_data",
-            description=(
-                "Gibt Lieferanten-Stammdaten inkl." " zugehoeriger Lieferungen zurueck."
-            ),
+            description=_DESC_SUPPLIER,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "supplier_id": {
                         "type": "string",
-                        "description": (
-                            "Lieferanten-ID" " (z.B. 'BEGO', 'CAMLOG', 'PRIMEC')"
-                        ),
+                        "description": ("Lieferanten-ID" " (z.B. 'BEGO', 'PRIMEC')"),
                     }
                 },
                 "required": ["supplier_id"],
@@ -151,23 +224,21 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_inspection_data",
-            description=(
-                "Gibt Wareneingangspruefungs-Daten" " (Workflow-Steps + Items) zurueck."
-            ),
+            description=_DESC_INSPECTION,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "article_number": {
                         "type": "string",
-                        "description": "Artikelnummer (optional, z.B. 'CT0003')",
+                        "description": ("Artikelnummer" " (optional, z.B. 'CT0003')"),
                     },
                     "delivery_number": {
                         "type": "string",
-                        "description": "Lieferscheinnummer (optional)",
+                        "description": ("Lieferscheinnummer (optional)"),
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximale Anzahl Ergebnisse (default: 50)",
+                        "description": ("Max. Ergebnisse (default: 50)"),
                         "default": 50,
                     },
                 },
@@ -176,18 +247,17 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="query_database",
-            description=(
-                "Fuehrt eine validierte Read-Only SQL-Query"
-                " gegen die Datenbank aus."
-                " Nur SELECT erlaubt."
-            ),
+            description=_DESC_QUERY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "sql": {"type": "string", "description": "SQL SELECT-Query"},
+                    "sql": {
+                        "type": "string",
+                        "description": "SQL SELECT-Query",
+                    },
                     "timeout": {
                         "type": "integer",
-                        "description": "Timeout in Sekunden (default: 30)",
+                        "description": ("Timeout in Sekunden (default: 30)"),
                         "default": 30,
                     },
                 },
@@ -196,17 +266,18 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_open_capas",
-            description=(
-                "Gibt offene CAPA-Vorgaenge zurueck."
-                " (Tabelle noch nicht implementiert)"
-            ),
+            description=_DESC_CAPAS,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "priority": {
                         "type": "string",
-                        "description": "Filter nach Prioritaet (optional)",
-                        "enum": ["hoch", "mittel", "niedrig"],
+                        "description": ("Filter nach Prioritaet"),
+                        "enum": [
+                            "hoch",
+                            "mittel",
+                            "niedrig",
+                        ],
                     }
                 },
                 "required": [],
@@ -214,17 +285,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_expiring_documents",
-            description=(
-                "Gibt QM-Dokumente mit ablaufendem Review"
-                " zurueck. (Tabelle noch nicht"
-                " implementiert)"
-            ),
+            description=_DESC_DOCUMENTS,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "days": {
                         "type": "integer",
-                        "description": "Tage bis Ablauf (default: 30)",
+                        "description": ("Tage bis Ablauf (default: 30)"),
                         "default": 30,
                     }
                 },
@@ -234,36 +301,36 @@ async def list_tools() -> list[Tool]:
     ]
 
 
+# ============================================================
+# Tool-Dispatch
+# ============================================================
+
+# Mapping: Tool-Name -> Handler-Funktion
+_TOOL_HANDLERS = {}
+
+
+def _register(name: str):
+    """Decorator zum Registrieren eines Tool-Handlers."""
+
+    def wrapper(func):
+        _TOOL_HANDLERS[name] = func
+        return func
+
+    return wrapper
+
+
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Dispatch fuer MCP-Tool-Aufrufe."""
+    """Zentraler Dispatch fuer alle MCP-Tool-Aufrufe."""
+    handler = _TOOL_HANDLERS.get(name)
+    if not handler:
+        return _error_response(f"Unbekanntes Tool: {name}")
+
     try:
-        if name == "list_available_tables":
-            return await tool_list_available_tables()
-        elif name == "get_database_statistics":
-            return await tool_get_database_statistics()
-        elif name == "get_supplier_data":
-            return await tool_get_supplier_data(arguments.get("supplier_id", ""))
-        elif name == "get_inspection_data":
-            return await tool_get_inspection_data(
-                article_number=arguments.get("article_number"),
-                delivery_number=arguments.get("delivery_number"),
-                limit=arguments.get("limit", 50),
-            )
-        elif name == "query_database":
-            return await tool_query_database(
-                sql=arguments.get("sql", ""),
-                timeout=arguments.get("timeout", 30),
-            )
-        elif name == "get_open_capas":
-            return await tool_get_open_capas(arguments.get("priority"))
-        elif name == "get_expiring_documents":
-            return await tool_get_expiring_documents(arguments.get("days", 30))
-        else:
-            return [TextContent(type="text", text=f"Unbekanntes Tool: {name}")]
+        return await handler(**arguments)
     except Exception as e:
         audit.log_invocation(name, params=arguments, error=str(e))
-        return [TextContent(type="text", text=f"Fehler: {e}")]
+        return _error_response(f"Fehler: {e}")
 
 
 # ============================================================
@@ -271,6 +338,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 # ============================================================
 
 
+@_register("list_available_tables")
 async def tool_list_available_tables() -> list[TextContent]:
     """Listet alle Tabellen mit Spalteninformationen."""
     start = time.time()
@@ -283,22 +351,22 @@ async def tool_list_available_tables() -> list[TextContent]:
                 " AND name NOT LIKE 'sqlite_%'"
                 " ORDER BY name"
             )
-            tables = [row[0] for row in cursor.fetchall()]
+            tables = [
+                row[0] for row in cursor.fetchall() if row[0] in config.allowed_tables
+            ]
 
             result = {}
             for table in tables:
-                if table in config.allowed_tables:
-                    cursor = conn.execute(f"PRAGMA table_info([{table}])")
-                    columns = [
-                        {
-                            "name": row[1],
-                            "type": row[2],
-                            "nullable": not row[3],
-                            "primary_key": bool(row[5]),
-                        }
-                        for row in cursor.fetchall()
-                    ]
-                    result[table] = columns
+                cursor = conn.execute(f"PRAGMA table_info([{table}])")
+                result[table] = [
+                    {
+                        "name": row[1],
+                        "type": row[2],
+                        "nullable": not row[3],
+                        "primary_key": bool(row[5]),
+                    }
+                    for row in cursor.fetchall()
+                ]
 
             duration = (time.time() - start) * 1000
             audit.log_invocation(
@@ -306,23 +374,21 @@ async def tool_list_available_tables() -> list[TextContent]:
                 result_summary=f"{len(result)} Tabellen",
                 duration_ms=duration,
             )
-
-            return [
-                TextContent(
-                    type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
-                )
-            ]
+            return _json_response(result)
         finally:
             conn.close()
 
     except Exception as e:
         duration = (time.time() - start) * 1000
         audit.log_invocation(
-            "list_available_tables", error=str(e), duration_ms=duration
+            "list_available_tables",
+            error=str(e),
+            duration_ms=duration,
         )
-        return [TextContent(type="text", text=f"Fehler: {e}")]
+        return _error_response(f"Fehler: {e}")
 
 
+@_register("get_database_statistics")
 async def tool_get_database_statistics() -> list[TextContent]:
     """Gibt Eintragsanzahl pro Tabelle zurueck."""
     start = time.time()
@@ -333,53 +399,60 @@ async def tool_get_database_statistics() -> list[TextContent]:
             for table in config.allowed_tables:
                 try:
                     cursor = conn.execute(f"SELECT COUNT(*) FROM [{table}]")
-                    count = cursor.fetchone()[0]
-                    result[table] = count
+                    result[table] = cursor.fetchone()[0]
                 except sqlite3.OperationalError:
                     result[table] = "Tabelle nicht vorhanden"
 
             duration = (time.time() - start) * 1000
             audit.log_invocation(
                 "get_database_statistics",
-                result_summary=f"{len(result)} Tabellen abgefragt",
+                result_summary=(f"{len(result)} Tabellen abgefragt"),
                 duration_ms=duration,
             )
-
-            return [
-                TextContent(
-                    type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
-                )
-            ]
+            return _json_response(result)
         finally:
             conn.close()
 
     except Exception as e:
         duration = (time.time() - start) * 1000
         audit.log_invocation(
-            "get_database_statistics", error=str(e), duration_ms=duration
+            "get_database_statistics",
+            error=str(e),
+            duration_ms=duration,
         )
-        return [TextContent(type="text", text=f"Fehler: {e}")]
+        return _error_response(f"Fehler: {e}")
 
 
-async def tool_get_supplier_data(supplier_id: str) -> list[TextContent]:
-    """Gibt Lieferanten-Daten inkl. Lieferungen zurueck."""
+@_register("get_supplier_data")
+async def tool_get_supplier_data(supplier_id: str = "", **kwargs) -> list[TextContent]:
+    """Gibt Lieferanten-Daten inkl. Lieferungen zurueck.
+
+    Sucht zuerst exakt nach supplier_id, dann per
+    Teiltext-Suche in ID und Name.
+    """
     start = time.time()
     params = {"supplier_id": supplier_id}
 
     try:
         conn = get_readonly_connection()
         try:
-            # Lieferanten-Stammdaten
+            # Exakte Suche
             cursor = conn.execute(
-                "SELECT * FROM suppliers WHERE supplier_id = ?", (supplier_id,)
+                "SELECT * FROM suppliers" " WHERE supplier_id = ?",
+                (supplier_id,),
             )
             supplier_row = cursor.fetchone()
 
+            # Fallback: Teilsuche
             if not supplier_row:
-                # Versuche Teilsuche
                 cursor = conn.execute(
-                    "SELECT * FROM suppliers WHERE supplier_id LIKE ? OR name LIKE ?",
-                    (f"%{supplier_id}%", f"%{supplier_id}%"),
+                    "SELECT * FROM suppliers"
+                    " WHERE supplier_id LIKE ?"
+                    " OR name LIKE ?",
+                    (
+                        f"%{supplier_id}%",
+                        f"%{supplier_id}%",
+                    ),
                 )
                 supplier_row = cursor.fetchone()
 
@@ -387,27 +460,19 @@ async def tool_get_supplier_data(supplier_id: str) -> list[TextContent]:
                 audit.log_invocation(
                     "get_supplier_data",
                     params=params,
-                    result_summary="Lieferant nicht gefunden",
+                    result_summary="Nicht gefunden",
                 )
-                return [
-                    TextContent(
-                        type="text",
-                        text=json.dumps(
-                            {
-                                "error": f"Lieferant '{supplier_id}' nicht gefunden",
-                                "hint": (
-                                    "Verwende list_available_tables"
-                                    " oder query_database um"
-                                    " verfuegbare Lieferanten"
-                                    " zu finden"
-                                ),
-                            },
-                            ensure_ascii=False,
+                return _json_response(
+                    {
+                        "error": (f"Lieferant '{supplier_id}'" " nicht gefunden"),
+                        "hint": (
+                            "Verwende query_database mit" " SELECT * FROM suppliers"
                         ),
-                    )
-                ]
+                    }
+                )
 
             supplier = dict(supplier_row)
+            sid = supplier.get("supplier_id", supplier_id)
 
             # Zugehoerige Lieferungen
             cursor = conn.execute(
@@ -415,19 +480,18 @@ async def tool_get_supplier_data(supplier_id: str) -> list[TextContent]:
                 " WHERE supplier_id = ?"
                 " ORDER BY delivery_date DESC"
                 " LIMIT 20",
-                (supplier.get("supplier_id", supplier_id),),
+                (sid,),
             )
             deliveries = [dict(row) for row in cursor.fetchall()]
 
-            # Zugehoerige Items (ueber Lieferungen)
-            delivery_numbers = [d.get("delivery_number", "") for d in deliveries]
+            # Items zaehlen
             items_count = 0
-            if delivery_numbers:
-                placeholders = ",".join(["?" for _ in delivery_numbers])
+            d_numbers = [d["delivery_number"] for d in deliveries]
+            if d_numbers:
+                ph = ",".join("?" * len(d_numbers))
                 cursor = conn.execute(
-                    "SELECT COUNT(*) FROM items"
-                    f" WHERE delivery_number IN ({placeholders})",
-                    delivery_numbers,
+                    "SELECT COUNT(*) FROM items" f" WHERE delivery_number IN ({ph})",
+                    d_numbers,
                 )
                 items_count = cursor.fetchone()[0]
 
@@ -442,33 +506,37 @@ async def tool_get_supplier_data(supplier_id: str) -> list[TextContent]:
             audit.log_invocation(
                 "get_supplier_data",
                 params=params,
-                result_summary=f"Lieferant gefunden, {len(deliveries)} Lieferungen",
+                result_summary=(f"Gefunden, {len(deliveries)}" " Lieferungen"),
                 duration_ms=duration,
             )
-
-            return [
-                TextContent(
-                    type="text",
-                    text=json.dumps(result, indent=2, default=str, ensure_ascii=False),
-                )
-            ]
+            return _json_response(result)
         finally:
             conn.close()
 
     except Exception as e:
         duration = (time.time() - start) * 1000
         audit.log_invocation(
-            "get_supplier_data", params=params, error=str(e), duration_ms=duration
+            "get_supplier_data",
+            params=params,
+            error=str(e),
+            duration_ms=duration,
         )
-        return [TextContent(type="text", text=f"Fehler: {e}")]
+        return _error_response(f"Fehler: {e}")
 
 
+@_register("get_inspection_data")
 async def tool_get_inspection_data(
     article_number: Optional[str] = None,
     delivery_number: Optional[str] = None,
     limit: int = 50,
+    **kwargs,
 ) -> list[TextContent]:
-    """Gibt Wareneingangspruefungs-Daten zurueck."""
+    """Gibt Wareneingangspruefungs-Daten zurueck.
+
+    Verbindet items mit item_workflow_steps via
+    LEFT JOIN (article_number + batch_number +
+    delivery_number).
+    """
     start = time.time()
     params = {
         "article_number": article_number,
@@ -479,7 +547,6 @@ async def tool_get_inspection_data(
     try:
         conn = get_readonly_connection()
         try:
-            # Query bauen
             query = """
                 SELECT
                     i.article_number,
@@ -497,14 +564,10 @@ async def tool_get_inspection_data(
                     i.notes,
                     ws.data_checked_by,
                     ws.data_checked_at,
-                    ws.documents_checked_by,
-                    ws.documents_checked_at,
                     ws.measured_by,
                     ws.measured_at,
                     ws.visually_inspected_by,
                     ws.visually_inspected_at,
-                    ws.documents_merged_by,
-                    ws.documents_merged_at,
                     ws.completed_by,
                     ws.completed_at,
                     ws.rejected_by,
@@ -516,6 +579,7 @@ async def tool_get_inspection_data(
                     AND i.batch_number = ws.batch_number
                     AND i.delivery_number = ws.delivery_number
             """
+
             conditions = []
             query_params = []
 
@@ -544,50 +608,50 @@ async def tool_get_inspection_data(
                 duration_ms=duration,
                 rows_returned=len(result),
             )
-
-            return [
-                TextContent(
-                    type="text",
-                    text=json.dumps(result, indent=2, default=str, ensure_ascii=False),
-                )
-            ]
+            return _json_response(result)
         finally:
             conn.close()
 
     except Exception as e:
         duration = (time.time() - start) * 1000
         audit.log_invocation(
-            "get_inspection_data", params=params, error=str(e), duration_ms=duration
+            "get_inspection_data",
+            params=params,
+            error=str(e),
+            duration_ms=duration,
         )
-        return [TextContent(type="text", text=f"Fehler: {e}")]
+        return _error_response(f"Fehler: {e}")
 
 
-async def tool_query_database(sql: str, timeout: int = 30) -> list[TextContent]:
-    """Fuehrt eine validierte Read-Only SQL-Query aus."""
+@_register("query_database")
+async def tool_query_database(
+    sql: str = "", timeout: int = 30, **kwargs
+) -> list[TextContent]:
+    """Fuehrt eine validierte Read-Only SQL-Query aus.
+
+    Akzeptiert nur SELECT/WITH-Queries. Verbotene
+    Keywords werden per Regex geprueft. Ergebnisse
+    werden auf max_result_rows limitiert.
+    """
     start = time.time()
     params = {"sql": sql, "timeout": timeout}
 
-    # Validierung
+    # SQL-Validierung
     is_valid, error_msg = validate_sql(sql)
     if not is_valid:
         audit.log_invocation(
-            "query_database", params=params, error=f"Abgelehnt: {error_msg}"
+            "query_database",
+            params=params,
+            error=f"Abgelehnt: {error_msg}",
         )
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps(
-                    {
-                        "error": f"Query abgelehnt: {error_msg}",
-                        "hint": (
-                            "Nur SELECT-Queries sind erlaubt."
-                            " Keine INSERT/UPDATE/DELETE/DROP."
-                        ),
-                    },
-                    ensure_ascii=False,
+        return _json_response(
+            {
+                "error": f"Query abgelehnt: {error_msg}",
+                "hint": (
+                    "Nur SELECT-Queries erlaubt." " Kein INSERT/UPDATE/DELETE/DROP."
                 ),
-            )
-        ]
+            }
+        )
 
     try:
         conn = get_readonly_connection()
@@ -604,84 +668,60 @@ async def tool_query_database(sql: str, timeout: int = 30) -> list[TextContent]:
                 duration_ms=duration,
                 rows_returned=len(result),
             )
-
-            return [
-                TextContent(
-                    type="text",
-                    text=json.dumps(result, indent=2, default=str, ensure_ascii=False),
-                )
-            ]
+            return _json_response(result)
         finally:
             conn.close()
 
     except Exception as e:
         duration = (time.time() - start) * 1000
         audit.log_invocation(
-            "query_database", params=params, error=str(e), duration_ms=duration
+            "query_database",
+            params=params,
+            error=str(e),
+            duration_ms=duration,
         )
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps(
-                    {"error": f"Query-Fehler: {e}", "sql": sql}, ensure_ascii=False
-                ),
-            )
-        ]
+        return _json_response(
+            {
+                "error": f"Query-Fehler: {e}",
+                "sql": sql,
+            }
+        )
 
 
-async def tool_get_open_capas(priority: Optional[str] = None) -> list[TextContent]:
+@_register("get_open_capas")
+async def tool_get_open_capas(
+    priority: Optional[str] = None, **kwargs
+) -> list[TextContent]:
     """Placeholder: CAPA-Tabelle noch nicht implementiert."""
     audit.log_invocation(
         "get_open_capas",
         params={"priority": priority},
-        result_summary="Tabelle nicht implementiert",
+        result_summary="Nicht implementiert",
     )
-    return [
-        TextContent(
-            type="text",
-            text=json.dumps(
-                {
-                    "status": "not_implemented",
-                    "message": (
-                        "Die CAPA-Tabelle ist noch nicht"
-                        " implementiert. Sie wird in einer"
-                        " zukuenftigen Phase als separate"
-                        " QMS-Datenbank erstellt."
-                    ),
-                    "data": [],
-                },
-                ensure_ascii=False,
-            ),
-        )
-    ]
+    return _json_response(
+        {
+            "status": "not_implemented",
+            "message": _MSG_NOT_IMPLEMENTED,
+            "data": [],
+        }
+    )
 
 
-async def tool_get_expiring_documents(days: int = 30) -> list[TextContent]:
+@_register("get_expiring_documents")
+async def tool_get_expiring_documents(days: int = 30, **kwargs) -> list[TextContent]:
     """Placeholder: Dokumentenlenkung noch nicht implementiert."""
     audit.log_invocation(
         "get_expiring_documents",
         params={"days": days},
-        result_summary="Tabelle nicht implementiert",
+        result_summary="Nicht implementiert",
     )
-    return [
-        TextContent(
-            type="text",
-            text=json.dumps(
-                {
-                    "status": "not_implemented",
-                    "message": (
-                        "Die Dokumentenlenkung-Tabelle ist"
-                        " noch nicht implementiert."
-                        " Sie wird in einer zukuenftigen"
-                        " Phase als separate"
-                        " QMS-Datenbank erstellt."
-                    ),
-                    "data": [],
-                },
-                ensure_ascii=False,
-            ),
-        )
-    ]
+    return _json_response(
+        {
+            "status": "not_implemented",
+            "message": _MSG_NOT_IMPLEMENTED,
+            "data": [],
+        }
+    )
 
 
 # ============================================================
@@ -690,17 +730,18 @@ async def tool_get_expiring_documents(days: int = 30) -> list[TextContent]:
 
 
 async def main():
-    """Startet den MCP-Server via stdio."""
+    """Startet den MCP-Server via stdio-Transport."""
     from mcp.server.stdio import stdio_server
 
+    db = config.database_path or "NICHT KONFIGURIERT"
     logger.info("QMS Database MCP Server startet...")
-    logger.info(f"Datenbank: {config.database_path or 'NICHT KONFIGURIERT'}")
+    logger.info(f"Datenbank: {db}")
     logger.info(f"Audit-Log: {config.audit_db_path}")
 
-    async with stdio_server() as (read_stream, write_stream):
+    async with stdio_server() as streams:
         await app.run(
-            read_stream,
-            write_stream,
+            streams[0],
+            streams[1],
             app.create_initialization_options(),
         )
 
