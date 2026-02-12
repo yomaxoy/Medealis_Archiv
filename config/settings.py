@@ -29,7 +29,12 @@ class Settings:
 
     # Storage Configuration
     # UNC-Pfad statt Laufwerksbuchstabe (robuster für Sub-Prozesse)
-    SERVER_BASE_PATH = Path(r"\\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Medealis Archiv")
+    SERVER_BASE_PATH = Path(
+        r"\\10.190.140.10\Allgemein"
+        r"\Qualitätsmanagement\QM_MEDEALIS"
+        r"\03. Produkte\Produktprüfung"
+        r"\Medealis Archiv"
+    )
 
     # Datenbank
     DATABASE_NAME = "warehouse_new.db"
@@ -44,7 +49,9 @@ class Settings:
         r"""
         Ermittelt den Datenbank-Pfad basierend auf Verfügbarkeit.
 
-        Primär: A:\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Medealis Archiv\database\
+        Primär: A:\Qualitätsmanagement\QM_MEDEALIS
+            \03. Produkte\Produktprüfung
+            \Medealis Archiv\database\
         Fallback: C:\Users\<Username>\.medealis\
 
         Returns:
@@ -63,7 +70,10 @@ class Settings:
                     print(f"Datenbank-Speicherort: Server (UNC) - {server_db_dir}")
                     return server_db_dir
             except (OSError, PermissionError) as e:
-                print(f"Server-Speicherung nicht verfügbar ({e}), verwende lokalen Fallback")
+                print(
+                    "Server-Speicherung nicht verfügbar"
+                    f" ({e}), verwende lokalen Fallback"
+                )
 
         # Fallback: Lokaler Speicher
         local_db_dir = Path.home() / ".medealis"
@@ -84,6 +94,10 @@ class Settings:
     # API Keys
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+
+    # AI Service
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "claude")
+    CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
 
     # UI Einstellungen
     WINDOW_WIDTH = 1000
@@ -161,4 +175,5 @@ class Settings:
 settings = Settings()
 
 # WICHTIG: ensure_directories() wird NICHT mehr beim Import aufgerufen!
-# Stattdessen wird es in initialize_database() aufgerufen, wenn .env garantiert geladen ist
+# Stattdessen wird es in initialize_database() aufgerufen,
+# wenn .env garantiert geladen ist

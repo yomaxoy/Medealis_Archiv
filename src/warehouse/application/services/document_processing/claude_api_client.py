@@ -1,5 +1,11 @@
 """
-Claude API Client - Vereinheitlichter Client für alle Dokumenttypen
+Claude API Client - Backward-kompatibler Wrapper.
+
+Delegiert an die neue ai_service-Abstraktionsschicht wenn verfuegbar,
+faellt auf die bisherige Implementierung zurueck wenn nicht.
+
+Bestehende Imports bleiben funktionsfaehig:
+    from .claude_api_client import ClaudeAPIClient, claude_api_client
 """
 
 import os
@@ -7,58 +13,79 @@ import json
 import base64
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Load .env file if available
+# Versuche die neue AI-Service-Schicht zu laden
+_AI_SERVICE_AVAILABLE = False
+_ai_client_instance = None
+
 try:
-    from dotenv import load_dotenv
-    env_file = Path(__file__).parent.parent.parent.parent.parent / ".env"
-    if env_file.exists():
-        load_dotenv(env_file)
-        logger.debug(f"Loaded .env file: {env_file}")
+    from ai_service import AIClient
+
+    _ai_client_instance = AIClient()
+    _AI_SERVICE_AVAILABLE = True
+    logger.info("Claude API Client: Verwende neue ai_service-Abstraktionsschicht")
 except ImportError:
-    logger.debug("python-dotenv not available")
+    logger.info(
+        "Claude API Client: ai_service nicht verfuegbar,"
+        " verwende Legacy-Implementierung"
+    )
 except Exception as e:
-    logger.debug(f"Could not load .env file: {e}")
+    logger.warning(f"Claude API Client: ai_service-Initialisierung fehlgeschlagen: {e}")
 
-try:
-    import anthropic
-    from anthropic import Anthropic
-    ANTHROPIC_AVAILABLE = True
-except ImportError:
-    ANTHROPIC_AVAILABLE = False
 
-try:
-    from config.settings import settings
-except ImportError:
-    # Fallback wie im Original
-    import os
-    from pathlib import Path
-    import sys
+# Legacy-Imports (nur wenn ai_service nicht verfuegbar)
+if not _AI_SERVICE_AVAILABLE:
+    try:
+        from dotenv import load_dotenv
 
-    project_root = Path(__file__).parent.parent.parent.parent
-    config_path = project_root / "config"
-    sys.path.insert(0, str(config_path))
+        env_file = Path(__file__).parent.parent.parent.parent.parent / ".env"
+        if env_file.exists():
+            load_dotenv(env_file)
+    except (ImportError, Exception):
+        pass
 
     try:
-        from settings import settings
+        from anthropic import Anthropic
+
+        ANTHROPIC_AVAILABLE = True
     except ImportError:
-        class FallbackSettings:
-            ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-        settings = FallbackSettings()
+        ANTHROPIC_AVAILABLE = False
+
+    try:
+        from config.settings import settings
+    except ImportError:
+        import sys
+
+        project_root = Path(__file__).parent.parent.parent.parent
+        config_path = project_root / "config"
+        sys.path.insert(0, str(config_path))
+        try:
+            from settings import settings
+        except ImportError:
+
+            class FallbackSettings:
+                ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+            settings = FallbackSettings()
 
 
 class ClaudeAPIClient:
     """
     Vereinheitlichter Claude API Client.
+
+    Delegiert an ai_service.AIClient wenn verfuegbar,
+    nutzt sonst die direkte Anthropic-API als Fallback.
     """
 
     def __init__(self):
+        self._use_new_service = (
+            _AI_SERVICE_AVAILABLE and _ai_client_instance is not None
+        )
         self.client = None
         self.primary_model = "claude-sonnet-4-20250514"
-        # Fallback-Modelle aus dem Original übernommen
         self.fallback_models = [
             "claude-3-5-sonnet-20250106",
             "claude-3-5-sonnet-20241022",
@@ -66,172 +93,168 @@ class ClaudeAPIClient:
             "claude-3-sonnet-20240229",
             "claude-3-haiku-20240307",
         ]
-        self._initialize_client()
 
-    def _initialize_client(self):
-        """Initialisiert Anthropic Client - kopiert aus Original."""
+        if not self._use_new_service:
+            self._initialize_legacy_client()
+
+    def _initialize_legacy_client(self):
+        """Legacy: Initialisiert Anthropic Client direkt."""
         try:
+            if not ANTHROPIC_AVAILABLE:
+                logger.warning("Anthropic library not available")
+                return
+
             api_key = (
                 os.getenv("ANTHROPIC_API_KEY") or settings.ANTHROPIC_API_KEY
                 if hasattr(settings, "ANTHROPIC_API_KEY")
                 else None
             )
-            if api_key and ANTHROPIC_AVAILABLE:
+            if api_key:
                 self.client = Anthropic(api_key=api_key)
-                logger.info("Claude API Client initialized successfully")
+                logger.info("Claude API Client initialized (legacy mode)")
             else:
-                logger.warning("No Anthropic API key found or anthropic library not available")
+                logger.warning("No Anthropic API key found")
         except Exception as e:
             logger.error(f"Claude client initialization failed: {e}")
             self.client = None
 
     def is_available(self) -> bool:
-        """Prüft ob Claude Service verfügbar ist."""
-        return self.client is not None and ANTHROPIC_AVAILABLE
+        """Prueft ob Claude Service verfuegbar ist."""
+        if self._use_new_service:
+            return _ai_client_instance.is_available()
+        return self.client is not None
 
     def analyze_document(
-        self,
-        document_path: str,
-        prompt: str,
-        debug: bool = False
+        self, document_path: str, prompt: str, debug: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
-        Einheitlicher Claude API Call - basiert auf _call_claude_api aus Original.
+        Einheitlicher Claude API Call fuer Dokument-Analyse.
 
         Args:
-            document_path: Pfad zum temporären Dokument
-            prompt: Vollständiger Prompt
+            document_path: Pfad zum Dokument
+            prompt: Vollstaendiger Prompt
             debug: Debug-Ausgaben
 
         Returns:
             Geparste JSON-Response
         """
+        # Neue AI-Service-Schicht verwenden
+        if self._use_new_service:
+            try:
+                if debug:
+                    doc_name = Path(document_path).name
+                    logger.info(
+                        "Claude API call via ai_service" f" - Document: {doc_name}"
+                    )
+                result = _ai_client_instance.analyze_document_json(
+                    document_path=document_path,
+                    prompt=prompt,
+                )
+                if debug and result:
+                    logger.info("JSON successfully parsed via ai_service!")
+                return result
+            except Exception as e:
+                logger.error(f"ai_service Dokument-Analyse fehlgeschlagen: {e}")
+                return None
+
+        # Legacy-Fallback
+        return self._legacy_analyze_document(document_path, prompt, debug)
+
+    def _legacy_analyze_document(
+        self, document_path: str, prompt: str, debug: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """Legacy: Direkte Anthropic API fuer Dokument-Analyse."""
         if not self.is_available():
             logger.error("Claude client not available")
             return None
 
         try:
-            # Read document data
-            with open(document_path, 'rb') as f:
+            with open(document_path, "rb") as f:
                 document_data = f.read()
 
-            if debug:
-                logger.info(f"📤 Claude API call started - Document: {Path(document_path).name}")
-
-            # Determine media type - aus Original übernommen
             media_type = self._get_media_type_from_data(document_data, document_path)
 
-            if debug:
-                logger.info(f"📄 Detected media type: {media_type}")
-
-            # Create message with document - Format aus Original
             message = {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    },
+                    {"type": "text", "text": prompt},
                     {
                         "type": "document",
                         "source": {
                             "type": "base64",
                             "media_type": media_type,
-                            "data": base64.b64encode(document_data).decode('utf-8')
-                        }
-                    }
-                ]
+                            "data": base64.b64encode(document_data).decode("utf-8"),
+                        },
+                    },
+                ],
             }
 
-            # Call Claude API with fallback models - Logik aus Original
             response = None
             models_to_try = [self.primary_model] + self.fallback_models
 
             for model in models_to_try:
                 try:
-                    if debug:
-                        logger.info(f"📤 Trying model: {model}")
-
                     response = self.client.messages.create(
                         model=model,
                         max_tokens=4000,
                         temperature=0.1,
-                        messages=[message]
+                        messages=[message],
                     )
-
                     if debug:
-                        logger.info(f"✅ Success with model: {model}")
+                        logger.info(f"Success with model: {model}")
                     break
-
                 except Exception as e:
                     if "not_found_error" in str(e):
-                        if debug:
-                            logger.warning(f"❌ Model {model} not available")
                         continue
                     else:
-                        # Other error, re-raise
                         raise e
 
             if not response:
-                raise Exception("All models failed - no available Claude models")
+                raise Exception("All models failed")
 
-            # Extract and parse response - aus Original übernommen
             response_text = response.content[0].text
-
-            if debug:
-                logger.info(f"📥 RAW RESPONSE ({len(response_text)} chars):")
-                logger.info(response_text[:500] + "..." if len(response_text) > 500 else response_text)
-
-            # Clean and parse JSON - Methode aus Original
-            parsed_data = self._clean_and_parse_response(response_text, debug)
-
-            if parsed_data:
-                if debug:
-                    logger.info("✅ JSON successfully parsed!")
-                return parsed_data
-            else:
-                if debug:
-                    logger.error("❌ Failed to parse JSON response")
-                return None
+            return self._clean_and_parse_response(response_text, debug)
 
         except Exception as e:
             logger.error(f"Error in Claude API call: {e}")
-            if debug:
-                logger.error(f"❌ CLAUDE API ERROR: {e}")
             return None
 
-    def _get_media_type_from_data(self, document_data: bytes, file_path: str = None) -> str:
-        """
-        Bestimmt Media-Type - aus Original übernommen.
-        """
-        # Check file extension if path provided
+    def _get_media_type_from_data(
+        self, document_data: bytes, file_path: str = None
+    ) -> str:
+        """Bestimmt Media-Type eines Dokuments."""
         if file_path:
             file_path_lower = file_path.lower()
-            if file_path_lower.endswith('.pdf'):
+            if file_path_lower.endswith(".pdf"):
                 return "application/pdf"
-            elif file_path_lower.endswith('.docx'):
-                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            elif file_path_lower.endswith('.doc'):
+            elif file_path_lower.endswith(".docx"):
+                return (
+                    "application/vnd.openxmlformats"
+                    "-officedocument"
+                    ".wordprocessingml.document"
+                )
+            elif file_path_lower.endswith(".doc"):
                 return "application/msword"
-            elif file_path_lower.endswith('.txt'):
+            elif file_path_lower.endswith(".txt"):
                 return "text/plain"
 
-        # Check magic bytes for common formats - aus Original
-        if document_data.startswith(b'%PDF'):
+        if document_data.startswith(b"%PDF"):
             return "application/pdf"
-        elif document_data.startswith(b'PK'):  # ZIP-based formats like DOCX
-            if b'word/' in document_data[:1024]:
-                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif document_data.startswith(b"PK"):
+            if b"word/" in document_data[:1024]:
+                return (
+                    "application/vnd.openxmlformats"
+                    "-officedocument"
+                    ".wordprocessingml.document"
+                )
 
-        # Default fallback
         return "application/pdf"
 
-    def _clean_and_parse_response(self, response_text: str, debug: bool = False) -> Optional[Dict[str, Any]]:
-        """
-        JSON Response bereinigen und parsen - aus Original übernommen und vereinfacht.
-        """
+    def _clean_and_parse_response(
+        self, response_text: str, debug: bool = False
+    ) -> Optional[Dict[str, Any]]:
+        """JSON Response bereinigen und parsen."""
         try:
-            # Remove code blocks - aus Original
             cleaned_text = response_text.strip()
 
             if cleaned_text.startswith("```json"):
@@ -243,11 +266,6 @@ class ClaudeAPIClient:
                 cleaned_text = cleaned_text[:-3]
 
             cleaned_text = cleaned_text.strip()
-
-            if debug:
-                logger.info(f"🧹 Cleaned response: {len(cleaned_text)} chars")
-
-            # Parse JSON
             return json.loads(cleaned_text)
 
         except json.JSONDecodeError as e:
@@ -258,5 +276,5 @@ class ClaudeAPIClient:
             return None
 
 
-# Global instance
+# Global instance (backward-kompatibel)
 claude_api_client = ClaudeAPIClient()
