@@ -45,16 +45,25 @@ def initialize_database(database_url: str = None) -> None:
         if database_url is None:
             # Fallback: SQLite aus config
             try:
-                from config.settings import settings
+                import sys
+                from pathlib import Path as ConfigPath
 
-                settings.DATABASE_DIR = None
-                settings.DATABASE_PATH = None
-                settings.ensure_directories()
-                database_path = settings.get_database_path()
+                # Add project root to path to import config
+                project_root = ConfigPath(__file__).parent.parent.parent.parent.parent
+                if str(project_root) not in sys.path:
+                    sys.path.insert(0, str(project_root))
+
+                from config.settings import Settings
+
+                Settings.DATABASE_DIR = None
+                Settings.DATABASE_PATH = None
+                Settings.ensure_directories()
+                database_path = Settings.get_database_path()
                 database_url = f"sqlite:///{database_path}"
-                print("WARNING: Fallback - Using SQLite database")
-            except ImportError:
+                print(f"Server storage configured: {database_url}")
+            except (ImportError, Exception) as e:
                 # Letzter Fallback
+                print(f"WARNING: Could not load config.settings: {e}")
                 db_dir = Path.home() / ".medealis"
                 db_dir.mkdir(parents=True, exist_ok=True)
                 database_path = db_dir / "warehouse_new.db"
@@ -130,7 +139,7 @@ def get_session():
     Yields:
         SQLAlchemy Session
     """
-    global _session_factory
+    global _session_factory, _engine
 
     # Auto-initialize if not yet done (handles Streamlit reruns)
     if _session_factory is None:
@@ -140,6 +149,18 @@ def get_session():
     try:
         yield session
         session.commit()
+
+        # CRITICAL FIX: Force WAL checkpoint for SQLite to ensure immediate visibility
+        # This fixes the issue where newly inserted items are not immediately visible
+        # in subsequent queries due to SQLite WAL (Write-Ahead Logging) isolation
+        if _engine and str(_engine.url).startswith("sqlite"):
+            from sqlalchemy import text
+            try:
+                session.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
+                session.commit()
+            except Exception:
+                pass  # Ignore if WAL is not enabled or checkpoint fails
+
     except Exception:
         session.rollback()
         raise

@@ -13,6 +13,7 @@ class ArticleNumber:
     - Standard: Buchstabe + Zahlen (z.B. A0001, B0002, CT003, NE0001_SI00151)
     - Mit Punkten: Artikelnummern können Punkte enthalten (z.B. A0001.123, CT003.5)
     - Terrats Medical: 71000XX-X, 71000XX-XX, 71000XX-XXX (z.B. 7100001-1, 7100012-45)
+    - Numerisch: Rein numerische Artikelnummern (z.B. 00307537 von Bredent)
     """
 
     value: str
@@ -29,7 +30,8 @@ class ArticleNumber:
         if not self._is_valid_format():
             raise ValueError(
                 f"Ungültiges Artikelnummern-Format: '{self.value}'. "
-                "Erlaubt: Buchstaben-Prefix (z.B. CT0001, A0001.123) oder Terrats Medical Format (z.B. 7100001-1)"
+                "Erlaubt: Buchstaben-Prefix (z.B. CT0001), Terrats Medical "
+                "(z.B. 7100001-1) oder numerisch (z.B. 00307537)"
             )
 
     def _is_valid_format(self) -> bool:
@@ -47,6 +49,11 @@ class ArticleNumber:
         # Pattern: ^71000\d{2}-\d{1,3}$
         terrats_pattern = r'^71000\d{2}-\d{1,3}$'
         if re.match(terrats_pattern, self.value):
+            return True
+
+        # Format 3: Numerische Artikelnummern (z.B. 00307537 von Bredent)
+        # Pattern: Nur Zahlen, mindestens 4 Stellen
+        if self.value.isdigit() and len(self.value) >= 4:
             return True
 
         # Weitere Formate können hier hinzugefügt werden
