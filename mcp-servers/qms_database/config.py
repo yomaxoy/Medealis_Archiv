@@ -68,19 +68,17 @@ class MCPDatabaseConfig:
         db_path = os.getenv("MEDEALIS_DB_PATH", "")
 
         if not db_path:
-            # Auto-Detection: Bekannte Pfade durchprobieren
-            candidates = [
-                project_root / "data" / "medealis_db" / "warehouse_new.db",
-                Path.home() / ".medealis" / "warehouse_new.db",
-            ]
-
-            # Server-Pfad (UNC) - nur pruefen wenn erreichbar
+            # Auto-Detection: Server-Pfad hat Prioritaet (gleiche DB wie App)
             server_path = Path(
                 r"\\10.190.140.10\Allgemein\Qualitätsmanagement"
                 r"\QM_MEDEALIS\03. Produkte\Produktprüfung"
                 r"\Medealis Archiv\database\warehouse_new.db"
             )
-            candidates.append(server_path)
+            candidates = [
+                server_path,
+                project_root / "data" / "medealis_db" / "warehouse_new.db",
+                Path.home() / ".medealis" / "warehouse_new.db",
+            ]
 
             for candidate in candidates:
                 try:

@@ -71,3 +71,6 @@ data/
 
 # Streamlit secrets (contains credentials)
 .streamlit/secrets.toml
+
+# Deployment package (contains large Docker images)
+deployment_package/
