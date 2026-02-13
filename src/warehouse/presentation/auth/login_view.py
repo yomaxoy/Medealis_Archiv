@@ -3,6 +3,7 @@
 import streamlit as st
 import logging
 from typing import Optional
+import streamlit.components.v1 as components
 
 from warehouse.application.services.user_service import UserService
 from warehouse.infrastructure.database.repositories.user_repository_impl import (
@@ -17,6 +18,22 @@ from warehouse.domain.exceptions.user_exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Cookie Manager initialisieren
+try:
+    import os
+    from streamlit_cookies_manager import EncryptedCookieManager
+
+    cookie_secret = os.getenv("COOKIE_SECRET_KEY", "medealis-default-secret-change-in-production")
+    cookies = EncryptedCookieManager(
+        prefix="medealis_",
+        password=cookie_secret
+    )
+    if not cookies.ready():
+        st.stop()
+except ImportError:
+    cookies = None
+    logger.warning("streamlit-cookies-manager nicht verfügbar - Cookie-basierte Persistenz deaktiviert")
 
 
 class LoginView:
@@ -214,7 +231,7 @@ class LoginView:
         return False
 
     def _complete_login(self, user) -> None:
-        """Erstellt Session und speichert User in Session State."""
+        """Erstellt Session und speichert User in Session State + Cookies."""
         token = self._session_manager.create_session(
             user_id=user.user_id,
             username=str(user.username),
@@ -229,6 +246,14 @@ class LoginView:
             "role": user.role.value,
             "full_name": user.full_name,
         }
+
+        # Session-Token in Cookie speichern (für Persistenz über Reloads)
+        if cookies:
+            try:
+                cookies["auth_token"] = token
+                cookies.save()
+            except Exception as e:
+                logger.warning(f"Could not save auth_token to cookie: {e}")
 
     def _clear_force_change_state(self) -> None:
         """Entfernt Force-Password-Change State."""
@@ -256,6 +281,15 @@ class LoginView:
 
         self._clear_force_change_state()
 
+        # Cookie löschen
+        if cookies:
+            try:
+                if "auth_token" in cookies:
+                    del cookies["auth_token"]
+                    cookies.save()
+            except Exception as e:
+                logger.warning(f"Could not delete auth_token cookie: {e}")
+
         logger.info(f"User logged out: {username}")
         st.rerun()
 
@@ -267,8 +301,39 @@ def show_login_view():
 
 
 def is_authenticated() -> bool:
-    """Prüft ob User eingeloggt ist."""
-    return "auth_token" in st.session_state and "current_user" in st.session_state
+    """Prüft ob User eingeloggt ist - mit Cookie-Fallback."""
+    # 1. Prüfe Session State
+    if "auth_token" in st.session_state and "current_user" in st.session_state:
+        return True
+
+    # 2. Versuche Session aus Cookie wiederherzustellen
+    if cookies and "auth_token" in cookies:
+        token = cookies.get("auth_token")
+        if token:
+            try:
+                session_manager = SessionManager()
+                session_data = session_manager.validate_session(token)
+
+                if session_data:
+                    # Session ist gültig - restore in Session State
+                    st.session_state.auth_token = token
+                    st.session_state.current_user = {
+                        "user_id": session_data.get("user_id"),
+                        "username": session_data.get("username"),
+                        "email": session_data.get("email", ""),
+                        "role": session_data.get("role"),
+                        "full_name": session_data.get("full_name", ""),
+                    }
+                    logger.info(f"Session restored from cookie for user: {session_data.get('username')}")
+                    return True
+                else:
+                    # Token ungültig - Cookie löschen
+                    del cookies["auth_token"]
+                    cookies.save()
+            except Exception as e:
+                logger.warning(f"Could not restore session from cookie: {e}")
+
+    return False
 
 
 def get_current_user() -> Optional[dict]:

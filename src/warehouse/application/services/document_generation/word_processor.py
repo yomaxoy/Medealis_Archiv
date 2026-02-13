@@ -242,11 +242,11 @@ class DocumentProcessor:
 
     def _replace_paragraph_text(self, paragraph, new_text: str):
         """
-        Ersetzt Paragraph-Text und behält Formatierung bei.
+        Ersetzt Paragraph-Text und formatiert ersetzten Text fett.
 
         Args:
             paragraph: python-docx Paragraph Objekt
-            new_text: Neuer Text
+            new_text: Neuer Text (wird fett formatiert)
         """
         try:
             # Behält erste Run-Formatierung bei
@@ -256,16 +256,20 @@ class DocumentProcessor:
                 for _ in range(len(paragraph.runs) - 1, 0, -1):
                     paragraph._element.remove(paragraph.runs[_]._element)
 
-                # Setze neuen Text im ersten Run
+                # Setze neuen Text im ersten Run und formatiere fett
                 first_run.text = new_text
+                first_run.bold = True
             else:
-                # Kein Run vorhanden, erstelle neuen
-                paragraph.text = new_text
+                # Kein Run vorhanden, erstelle neuen mit fetter Formatierung
+                run = paragraph.add_run(new_text)
+                run.bold = True
 
         except Exception as e:
             logger.warning(f"Error replacing paragraph text: {e}")
-            # Fallback: Direkter Text-Ersatz
-            paragraph.text = new_text
+            # Fallback: Direkter Text-Ersatz mit fetter Formatierung
+            paragraph.clear()
+            run = paragraph.add_run(new_text)
+            run.bold = True
 
     def _update_document_metadata(self, document: Document, context: GenerationContext):
         """Updated Dokument-Metadaten mit Context-Informationen."""

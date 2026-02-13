@@ -5,7 +5,7 @@ Simplified main page for warehouse users focusing on ease of use.
 
 import streamlit as st
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 # Import popups
 from warehouse.presentation.user.popups.visual_inspection import (
@@ -26,6 +26,185 @@ from warehouse.presentation.user.popups.iteminfo_edit_dialog import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Session state keys for delivery document handling
+SESSION_KEY_ORIGINAL_EXTRACTION = "original_extraction_data"
+SESSION_KEY_UPLOADED_FILE_DATA = "uploaded_delivery_file_data"
+SESSION_KEY_UPLOADED_FILE_NAME = "uploaded_delivery_file_name"
+SESSION_KEY_EXTRACTION_CONFIRMED = "extraction_confirmed"
+SESSION_KEY_EXTRACTED_DELIVERY = "extracted_delivery_data"
+
+
+def _save_delivery_slip_to_article_folders(extraction_data: Dict[str, Any]) -> None:
+    """
+    Speichert das Lieferschein-Dokument in alle relevanten Artikelordner.
+
+    Diese Funktion wird nach erfolgreicher Datenbank-Speicherung aufgerufen und
+    stellt sicher, dass das Lieferschein-PDF in jedem Artikelordner verfügbar ist.
+
+    Args:
+        extraction_data: Bestätigte Extraktionsdaten mit Items-Liste
+            - delivery_number: Lieferscheinnummer
+            - supplier_name: Lieferantenname
+            - items: Liste von Item-Dictionaries mit article_number und batch_number
+
+    Returns:
+        None. Zeigt Erfolgs-/Fehlermeldungen direkt in der UI an.
+    """
+    try:
+        # Get original extraction data with document storage info
+        original_data = st.session_state.get(SESSION_KEY_ORIGINAL_EXTRACTION, {})
+
+        # Extract delivery information
+        delivery_number = extraction_data.get("delivery_number", "")
+        supplier_name = extraction_data.get("supplier_name", "")
+        items = extraction_data.get("items", [])
+
+        if not items:
+            logger.warning("No items found in extraction data - skipping document save")
+            return
+
+        # Check if we have storage information from the original upload
+        storage_info = original_data.get("storage", {})
+        pdf_stored = original_data.get("pdf_stored", False)
+        pdf_path = original_data.get("pdf_path") or storage_info.get("file_path")
+
+        logger.info(f"Attempting to save delivery slip to {len(items)} article folders")
+        logger.info(f"PDF stored: {pdf_stored}, PDF path: {pdf_path}")
+
+        # Load document data from either stored file or session state
+        document_data = _load_delivery_document_data(pdf_path)
+        if not document_data:
+            return  # Warning already shown in _load_delivery_document_data
+
+        # Get document storage service
+        from warehouse.application.services.service_registry import get_document_storage_service
+        storage_service = get_document_storage_service()
+
+        if not storage_service:
+            st.warning("⚠️ Document Storage Service nicht verfügbar")
+            return
+
+        # Save to each article folder
+        saved_count, failed_count = _save_to_all_article_folders(
+            items=items,
+            document_data=document_data,
+            delivery_number=delivery_number,
+            supplier_name=supplier_name,
+            storage_service=storage_service
+        )
+
+        # Show summary
+        if saved_count > 0:
+            st.success(f"✅ Lieferschein in {saved_count} Artikelordner gespeichert")
+        if failed_count > 0:
+            st.warning(f"⚠️ {failed_count} Artikel: Lieferschein konnte nicht gespeichert werden")
+
+    except Exception as e:
+        logger.error(f"Error saving delivery slip to article folders: {e}", exc_info=True)
+        st.warning(f"⚠️ Fehler beim Speichern des Lieferscheins in Artikelordner: {e}")
+
+
+def _load_delivery_document_data(pdf_path: Optional[str]) -> Optional[bytes]:
+    """
+    Lädt Lieferschein-Dokument aus Dateipfad oder Session State.
+
+    Args:
+        pdf_path: Optionaler Pfad zur gespeicherten PDF-Datei
+
+    Returns:
+        Dokument als Bytes oder None bei Fehler
+    """
+    if not pdf_path:
+        # Try to get document data from session state (uploaded file)
+        document_data = st.session_state.get(SESSION_KEY_UPLOADED_FILE_DATA)
+        if document_data:
+            logger.info("Using uploaded file data from session state")
+            return document_data
+        else:
+            logger.info("No PDF path found and no uploaded file data - cannot save to article folders")
+            st.warning("⚠️ Lieferschein-Dokument konnte nicht in Artikelordner gespeichert werden (kein Dateipfad)")
+            return None
+
+    # Read the stored PDF file
+    try:
+        from pathlib import Path
+        pdf_file = Path(pdf_path)
+        if pdf_file.exists():
+            with open(pdf_file, 'rb') as f:
+                document_data = f.read()
+            logger.info(f"Read delivery slip PDF from {pdf_path}")
+            return document_data
+        else:
+            logger.warning(f"PDF file not found at {pdf_path}")
+            st.warning(f"⚠️ Lieferschein-Datei nicht gefunden: {pdf_path}")
+            return None
+    except Exception as e:
+        logger.error(f"Error reading PDF file: {e}")
+        st.warning(f"⚠️ Fehler beim Lesen der Lieferschein-Datei: {e}")
+        return None
+
+
+def _save_to_all_article_folders(
+    items: List[Dict[str, Any]],
+    document_data: bytes,
+    delivery_number: str,
+    supplier_name: str,
+    storage_service: Any
+) -> tuple[int, int]:
+    """
+    Speichert das Dokument in alle Artikelordner.
+
+    Args:
+        items: Liste von Items mit article_number und batch_number
+        document_data: Dokument-Binärdaten
+        delivery_number: Lieferscheinnummer
+        supplier_name: Lieferantenname
+        storage_service: Document Storage Service
+
+    Returns:
+        Tuple (saved_count, failed_count)
+    """
+    saved_count = 0
+    failed_count = 0
+
+    for item in items:
+        article_number = item.get("article_number", "")
+        batch_number = item.get("batch_number", "")
+
+        if not article_number or not batch_number:
+            logger.warning(f"Skipping item with missing article or batch number: {item}")
+            failed_count += 1
+            continue
+
+        try:
+            # Create filename
+            filename = f"Lieferschein_{delivery_number}.pdf" if delivery_number else "Lieferschein.pdf"
+
+            # Save to article folder
+            save_result = storage_service.save_document(
+                document_data=document_data,
+                document_name=filename,
+                document_type="delivery_slip",
+                batch_number=batch_number,
+                delivery_number=delivery_number,
+                article_number=article_number,
+                supplier_name=supplier_name,
+            )
+
+            if save_result.success:
+                saved_count += 1
+                logger.info(f"Saved delivery slip to article folder: {article_number}")
+            else:
+                failed_count += 1
+                logger.error(f"Failed to save delivery slip for {article_number}: {save_result.error}")
+
+        except Exception as item_error:
+            failed_count += 1
+            logger.error(f"Error saving delivery slip for article {article_number}: {item_error}")
+
+    return saved_count, failed_count
 
 
 def show_main_user_view():
@@ -645,12 +824,20 @@ def show_item_table(services):
         st.info("ℹ️ Keine Artikel gefunden.")
 
 
-def handle_extraction_confirmation(services):
+def handle_extraction_confirmation(services: Dict[str, Any]) -> None:
     """
     Verarbeitet die bestätigten Lieferschein-Daten und speichert sie in der Datenbank.
+
+    Diese Funktion:
+    1. Speichert Lieferung und Items in der Datenbank
+    2. Speichert das Lieferschein-Dokument in allen Artikelordnern
+    3. Bereinigt Session State
+
+    Args:
+        services: Dictionary mit verfügbaren Services (delivery, item, etc.)
     """
     try:
-        extraction_data = st.session_state.get("extraction_confirmed")
+        extraction_data = st.session_state.get(SESSION_KEY_EXTRACTION_CONFIRMED)
         if not extraction_data:
             st.error("Keine Extraktionsdaten gefunden")
             return
@@ -675,12 +862,11 @@ def handle_extraction_confirmation(services):
 
             st.success(success_message)
 
+            # Save delivery slip document to article folders
+            _save_delivery_slip_to_article_folders(extraction_data)
+
             # Clean up session state
-            st.session_state.popup_action = None
-            if "extraction_confirmed" in st.session_state:
-                del st.session_state.extraction_confirmed
-            if "extracted_delivery_data" in st.session_state:
-                del st.session_state.extracted_delivery_data
+            _cleanup_delivery_session_state()
 
             # Rerun to update the item table
             st.rerun()
@@ -696,3 +882,22 @@ def handle_extraction_confirmation(services):
         # Always clean up popup action
         if "popup_action" in st.session_state:
             st.session_state.popup_action = None
+
+
+def _cleanup_delivery_session_state() -> None:
+    """
+    Bereinigt alle Session State Variablen die für Lieferschein-Verarbeitung verwendet wurden.
+    """
+    cleanup_keys = [
+        "popup_action",
+        SESSION_KEY_EXTRACTION_CONFIRMED,
+        SESSION_KEY_EXTRACTED_DELIVERY,
+        SESSION_KEY_ORIGINAL_EXTRACTION,
+        SESSION_KEY_UPLOADED_FILE_DATA,
+        SESSION_KEY_UPLOADED_FILE_NAME,
+    ]
+
+    for key in cleanup_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+            logger.debug(f"Cleaned up session state key: {key}")

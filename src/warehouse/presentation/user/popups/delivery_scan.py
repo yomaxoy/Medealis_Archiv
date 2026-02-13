@@ -11,6 +11,16 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Session state keys for delivery document handling
+SESSION_KEY_ORIGINAL_EXTRACTION = "original_extraction_data"
+SESSION_KEY_UPLOADED_FILE_DATA = "uploaded_delivery_file_data"
+SESSION_KEY_UPLOADED_FILE_NAME = "uploaded_delivery_file_name"
+SESSION_KEY_EXTRACTION_CONFIRMED = "extraction_confirmed"
+SESSION_KEY_EXTRACTED_DELIVERY = "extracted_delivery_data"
+SESSION_KEY_SHOW_SCAN_POPUP = "show_scan_popup"
+SESSION_KEY_SHOW_EXTRACTION_POPUP = "show_extraction_popup"
+SESSION_KEY_ITEMS_TO_REMOVE = "items_to_remove"
+
 
 @st.dialog("📄 Lieferschein scannen", width="large")
 def show_delivery_scan_popup():
@@ -62,6 +72,11 @@ def show_delivery_scan_popup():
                         "❌ Dokumenten-Upload abgebrochen - keine Speicher-Option verfügbar"
                     )
                 else:
+                    # Store uploaded file data in session state for later use
+                    uploaded_pdf.seek(0)
+                    st.session_state[SESSION_KEY_UPLOADED_FILE_DATA] = uploaded_pdf.read()
+                    st.session_state[SESSION_KEY_UPLOADED_FILE_NAME] = uploaded_pdf.name
+                    uploaded_pdf.seek(0)  # Reset for processing
                     process_uploaded_delivery_file(uploaded_pdf)
 
     st.write("---")
@@ -70,14 +85,25 @@ def show_delivery_scan_popup():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("❌ Abbrechen", use_container_width=True, key="user_scan_cancel"):
-            st.session_state.show_scan_popup = False
+            st.session_state[SESSION_KEY_SHOW_SCAN_POPUP] = False
+            # Cleanup uploaded file data
+            _cleanup_uploaded_file_data()
             st.rerun()
+
+
+def _cleanup_uploaded_file_data() -> None:
+    """Bereinigt hochgeladene Datei-Daten aus Session State."""
+    cleanup_keys = [SESSION_KEY_UPLOADED_FILE_DATA, SESSION_KEY_UPLOADED_FILE_NAME]
+    for key in cleanup_keys:
+        if key in st.session_state:
+            del st.session_state[key]
 
 
 def show_system_status_check():
     """Zeigt den System-Status für OCR und Claude API."""
-    # API Key Check
-    api_key_available = bool(os.getenv("ANTHROPIC_API_KEY"))
+    # API Key Check - use EnvironmentConfig to ensure .env is loaded
+    from warehouse.shared.config.environment_config import env_config
+    api_key_available = bool(env_config.get("ANTHROPIC_API_KEY"))
 
     col1, col2 = st.columns(2)
 
@@ -153,7 +179,7 @@ def process_uploaded_delivery_file(uploaded_file):
 
         if result:
             # Store result in session state for confirmation popup
-            st.session_state.extracted_delivery_data = result
+            st.session_state[SESSION_KEY_EXTRACTED_DELIVERY] = result
 
             with status_container:
                 st.success("🎉 **Schritt 4/4:** Extraktion erfolgreich!")
@@ -174,8 +200,8 @@ def process_uploaded_delivery_file(uploaded_file):
             progress_bar.progress(100)
 
             # Show extraction confirmation popup
-            st.session_state.show_extraction_popup = True
-            st.session_state.show_scan_popup = False  # Close scan popup
+            st.session_state[SESSION_KEY_SHOW_EXTRACTION_POPUP] = True
+            st.session_state[SESSION_KEY_SHOW_SCAN_POPUP] = False  # Close scan popup
             st.rerun()
         else:
             st.error("❌ Keine Daten extrahiert. Bitte prüfen Sie die Datei.")
@@ -210,6 +236,10 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
         delivery_data = extraction_data
 
     items_data = delivery_data.get("items", [])
+
+    # Store original extraction_data in session state for later use (document saving)
+    if SESSION_KEY_ORIGINAL_EXTRACTION not in st.session_state:
+        st.session_state[SESSION_KEY_ORIGINAL_EXTRACTION] = extraction_data
 
     # DEBUG: Log what's in the items
     import logging
@@ -276,8 +306,8 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
     st.write("### 📦 Enthaltene Artikel")
 
     # Initialize items_to_remove in session state
-    if "items_to_remove" not in st.session_state:
-        st.session_state.items_to_remove = set()
+    if SESSION_KEY_ITEMS_TO_REMOVE not in st.session_state:
+        st.session_state[SESSION_KEY_ITEMS_TO_REMOVE] = set()
 
     # Items table section - editable
     if items_data:
@@ -299,7 +329,7 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
         edited_items = []
         for i, item in enumerate(items_data):
             # Skip if marked for removal
-            if i in st.session_state.items_to_remove:
+            if i in st.session_state[SESSION_KEY_ITEMS_TO_REMOVE]:
                 continue
 
             col1, col2, col3, col4, col5, col6 = st.columns([3, 4, 2, 2, 1, 1])
@@ -348,7 +378,7 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
                     st.rerun()
             with col6:
                 if st.button("🗑️", key=f"user_popup_remove_{i}", help="Item entfernen"):
-                    st.session_state.items_to_remove.add(i)
+                    st.session_state[SESSION_KEY_ITEMS_TO_REMOVE].add(i)
                     st.rerun()
 
             # Keep all original fields from Claude extraction (like description, storage_location, etc.)
@@ -430,12 +460,12 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
             }
 
             # Store confirmed data in session state
-            st.session_state.extraction_confirmed = updated_extraction_data
+            st.session_state[SESSION_KEY_EXTRACTION_CONFIRMED] = updated_extraction_data
             st.session_state.popup_action = "extraction_confirm"
-            st.session_state.show_extraction_popup = False
+            st.session_state[SESSION_KEY_SHOW_EXTRACTION_POPUP] = False
             # Cleanup session state
-            if "items_to_remove" in st.session_state:
-                del st.session_state.items_to_remove
+            if SESSION_KEY_ITEMS_TO_REMOVE in st.session_state:
+                del st.session_state[SESSION_KEY_ITEMS_TO_REMOVE]
             st.rerun()
 
     with col2:
@@ -452,10 +482,21 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
             use_container_width=True,
             key="user_cancel_extraction",
         ):
-            st.session_state.show_extraction_popup = False
-            if "extracted_delivery_data" in st.session_state:
-                del st.session_state.extracted_delivery_data
+            st.session_state[SESSION_KEY_SHOW_EXTRACTION_POPUP] = False
             # Cleanup session state
-            if "items_to_remove" in st.session_state:
-                del st.session_state.items_to_remove
+            _cleanup_extraction_session_state()
             st.rerun()
+
+
+def _cleanup_extraction_session_state() -> None:
+    """Bereinigt alle Session State Variablen für Extraktion."""
+    cleanup_keys = [
+        SESSION_KEY_EXTRACTED_DELIVERY,
+        SESSION_KEY_ITEMS_TO_REMOVE,
+        SESSION_KEY_ORIGINAL_EXTRACTION,
+        SESSION_KEY_UPLOADED_FILE_DATA,
+        SESSION_KEY_UPLOADED_FILE_NAME,
+    ]
+    for key in cleanup_keys:
+        if key in st.session_state:
+            del st.session_state[key]

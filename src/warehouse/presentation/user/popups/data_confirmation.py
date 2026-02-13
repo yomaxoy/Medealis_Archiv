@@ -44,7 +44,12 @@ def _get_supplier_id(supplier_name: str) -> str:
 
 
 class DataConfirmationPopup(InspectionPopup):
-    """Popup für Datenbestätigung (Schritt 1)."""
+    """
+    Popup für Datenbestätigung (Schritt 1).
+
+    WICHTIG: Ordner werden ERST beim Klick auf einen Action-Button erstellt,
+    NICHT beim Öffnen des Popups!
+    """
 
     def __init__(self, item_data: Dict[str, Any]):
         super().__init__(
@@ -53,6 +58,9 @@ class DataConfirmationPopup(InspectionPopup):
             show_info_box=False,
             info_text=None,
         )
+
+        # WICHTIG: Beim Initialisieren werden KEINE Ordner erstellt!
+        logger.info(f"DataConfirmationPopup initialized for article {self.article_number}, batch {self.batch_number} - NO folders created yet")
 
     def render_header(self) -> None:
         """Rendert kompakten Artikel-Header."""
@@ -303,29 +311,62 @@ class DataConfirmationPopup(InspectionPopup):
 
         # Sektion 4: Bestelldokumente hochladen
         st.markdown("---")
+        st.write("### 📋 Bestelldokument")
 
-        uploaded_docs = render_document_uploader(
-            label="Bestelldokumente hochladen",
-            key="data_order_documents",
-            file_types=["pdf", "png", "jpg", "jpeg", "docx"],
-            accept_multiple=True,
-            help_text="Laden Sie die Bestelldokumente hoch (z.B. Bestellung, Auftragsbestätigung)",
+        # File uploader for order document
+        uploaded_order_doc = st.file_uploader(
+            "Bestelldokument auswählen:",
+            type=['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
+            key="data_order_doc_upload",
+            help="Bestelldokument wird beim Bestätigen in den Artikelordner gespeichert",
+            accept_multiple_files=True
         )
 
+        if uploaded_order_doc:
+            # Show uploaded document info
+            num_files = len(uploaded_order_doc) if isinstance(uploaded_order_doc, list) else 1
+            files_list = uploaded_order_doc if isinstance(uploaded_order_doc, list) else [uploaded_order_doc]
+
+            st.success(f"📄 {num_files} Bestelldokument(e) hochgeladen")
+
+            for idx, doc in enumerate(files_list):
+                with st.expander(f"📄 {idx + 1}. {doc.name}", expanded=False):
+                    st.write(f"📊 Dateigröße: {doc.size} bytes")
+                    st.write(f"📋 Dateityp: {doc.type}")
+
+            # Store in session state to preserve across reruns
+            st.session_state['uploaded_order_documents'] = files_list
+
         # Speichere hochgeladene Dokumente in form_data
-        form_data["uploaded_documents"] = uploaded_docs
+        form_data["uploaded_documents"] = st.session_state.get('uploaded_order_documents', None)
 
         return form_data
 
     def render_footer(self) -> Optional[str]:
-        """Rendert Standard-Footer."""
-        return render_standard_footer(
-            save_label="💾 Daten bestätigen", cancel_label="❌ Abbrechen"
-        )
+        """Rendert Footer mit zwei Action-Buttons."""
+        col1, col2, col3 = st.columns([2, 2, 1])
+
+        action = None
+
+        with col1:
+            if st.button("🤖 KI-Analyse und speichern", type="primary", use_container_width=True):
+                action = "ai_save"
+
+        with col2:
+            if st.button("📄 Daten bestätigen und Dokumente erstellen", type="primary", use_container_width=True):
+                action = "save"
+
+        with col3:
+            if st.button("❌ Abbrechen", use_container_width=True):
+                action = "cancel"
+
+        return action
 
     def handle_primary_action(self, form_data: Dict[str, Any]) -> None:
         """
-        Speichert bestätigte Daten in die Datenbank.
+        Speichert bestätigte Daten in die Datenbank und erstellt Artikelordner.
+
+        WICHTIG: Artikelordner werden HIER (beim Button-Klick) erstellt!
 
         Args:
             form_data: Formulardaten vom Body
@@ -337,6 +378,8 @@ class DataConfirmationPopup(InspectionPopup):
         )
 
         logger = logging.getLogger(__name__)
+
+        logger.info("🔵 handle_primary_action called - Artikelordner werden JETZT erstellt!")
 
         try:
             # Extract data
@@ -460,10 +503,14 @@ class DataConfirmationPopup(InspectionPopup):
                 )
                 st.success("📋 Bestellnummer erfolgreich gespeichert!")
 
-            # 3. Save uploaded order documents (ADMIN STYLE - MISSING IN USER VIEW!)
-            uploaded_docs = form_data.get("uploaded_documents", [])
-            if uploaded_docs:
+            # 3. Bestelldokumente speichern (falls vorhanden)
+            # WICHTIG: Ordner werden HIER (beim Button-Klick) erstellt!
+            uploaded_docs = form_data.get("uploaded_documents")
+            logger.info(f"DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}")
+
+            if uploaded_docs and len(uploaded_docs) > 0:
                 st.write(f"📤 Speichere {len(uploaded_docs)} Bestelldokument(e)...")
+                logger.info(f"🟢 Speichere {len(uploaded_docs)} Bestelldokumente - Ordner wird JETZT erstellt!")
                 try:
                     from warehouse.application.services.service_registry import (
                         get_document_storage_service,
@@ -486,7 +533,7 @@ class DataConfirmationPopup(InspectionPopup):
                                 f"Bestellung_{safe_order_number}_{doc.name}"
                             )
 
-                            # Save order document to article folder
+                            # Save document to article folder (creates folder if needed)
                             save_result = storage_service.save_document(
                                 document_data=document_data,
                                 document_name=order_doc_filename,
@@ -495,6 +542,7 @@ class DataConfirmationPopup(InspectionPopup):
                                 delivery_number=delivery_number,
                                 article_number=confirmed_article,
                                 supplier_name="",  # Will be auto-determined
+                                create_folders=True  # Explicitly create folders NOW
                             )
 
                             if save_result.success:
@@ -653,6 +701,45 @@ class DataConfirmationPopup(InspectionPopup):
             logger.error(f"Error in data confirmation: {e}", exc_info=True)
             st.error(f"❌ Fehler beim Speichern: {str(e)}")
 
+    def handle_ai_analysis_action(self, form_data: Dict[str, Any]) -> None:
+        """
+        Führt KI-Analyse durch und speichert dann die Daten.
+
+        Args:
+            form_data: Formulardaten vom Body
+        """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Extract data
+            employee_name = form_data.get("data_employee_name", "").strip()
+            confirmed_article = form_data.get("data_article_number", "").strip()
+            confirmed_batch = form_data.get("data_batch_number", "").strip()
+            delivery_number = self.item_data.get("delivery_number", "")
+
+            st.info("🤖 **KI-Analyse wird durchgeführt...**")
+
+            # TODO: Implementiere KI-Analyse hier
+            # Beispiel: Analysiere hochgeladene Dokumente
+            uploaded_docs = form_data.get("uploaded_documents", [])
+
+            if uploaded_docs:
+                st.write(f"📄 {len(uploaded_docs)} Dokument(e) werden analysiert...")
+                # KI-Analyse-Logik hier einfügen
+                st.info("⚠️ KI-Analyse noch nicht implementiert - führe normale Speicherung durch")
+            else:
+                st.warning("⚠️ Keine Dokumente zum Analysieren hochgeladen")
+
+            # Nach KI-Analyse: Normale Speicherung durchführen
+            st.info("💾 Speichere Daten nach KI-Analyse...")
+            self.handle_primary_action(form_data)
+
+        except Exception as e:
+            logger.error(f"Error in AI analysis: {e}", exc_info=True)
+            st.error(f"❌ Fehler bei KI-Analyse: {str(e)}")
+
     def handle_secondary_action(self, form_data: Dict[str, Any]) -> None:
         """Zurückweisen - markiert Artikel als Ausschuss."""
         # Nicht verwendet für Data Confirmation
@@ -664,9 +751,17 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     """
     Zeigt Data Confirmation Popup.
 
+    WICHTIG: Artikelordner werden ERST beim Klick auf einen Action-Button erstellt!
+
     Args:
         item_data: Dictionary mit Item-Informationen
     """
+    # WICHTIG: Flag setzen, dass Popup nur am Rendern ist - KEINE Ordner erstellen!
+    if "data_confirmation_action_clicked" not in st.session_state:
+        st.session_state["data_confirmation_action_clicked"] = False
+
+    logger.info("🟡 show_data_confirmation_popup called - Rendering nur, KEINE Ordner-Erstellung")
+
     popup = DataConfirmationPopup(item_data)
 
     # Render Popup
@@ -674,8 +769,16 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     form_data = popup.render_body()
     action = popup.render_footer()
 
-    # Handle Actions
+    # Handle Actions - NUR hier werden Ordner erstellt!
     if action == "save":
+        st.session_state["data_confirmation_action_clicked"] = True
+        logger.info("🟢 'Daten bestätigen' Button geklickt - Ordner werden JETZT erstellt!")
         popup.handle_primary_action(form_data)
+    elif action == "ai_save":
+        st.session_state["data_confirmation_action_clicked"] = True
+        logger.info("🟢 'KI-Analyse' Button geklickt - Ordner werden JETZT erstellt!")
+        popup.handle_ai_analysis_action(form_data)
     elif action == "cancel":
+        st.session_state["data_confirmation_action_clicked"] = False
+        logger.info("⚪ 'Abbrechen' Button geklickt - keine Ordner erstellt")
         st.rerun()
