@@ -7,6 +7,16 @@ import os
 from pathlib import Path
 from typing import Optional
 
+# Load .env file FIRST to ensure environment variables are available
+try:
+    from dotenv import load_dotenv
+    # .env is in project root, one level up from config/
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file, override=True)
+except (ImportError, Exception):
+    pass
+
 # Basis-Pfade
 BASE_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = BASE_DIR / "src"

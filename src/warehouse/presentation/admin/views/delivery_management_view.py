@@ -369,8 +369,9 @@ def show_ocr_claude_workflow(delivery_service):
 
 def show_system_status_check():
     """Show system status for OCR and Claude API."""
-    # API Key Check
-    api_key_available = bool(os.getenv("ANTHROPIC_API_KEY"))
+    # API Key Check - use EnvironmentConfig to ensure .env is loaded
+    from warehouse.shared.config.environment_config import env_config
+    api_key_available = bool(env_config.get("ANTHROPIC_API_KEY"))
 
     col1, col2 = st.columns(2)
 

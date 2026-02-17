@@ -46,7 +46,15 @@ class ClaudeProvider(AIProvider):
         timeout: float = 60.0,
         max_retries: int = 2,
     ):
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        # Try to get API key from EnvironmentConfig first (ensures .env is loaded)
+        if not api_key:
+            try:
+                from warehouse.shared.config.environment_config import env_config
+                api_key = env_config.get("ANTHROPIC_API_KEY")
+            except ImportError:
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+
+        self.api_key = api_key
         self.default_model = default_model or self.DEFAULT_MODELS[0]
         self.timeout = timeout
         self.max_retries = max_retries

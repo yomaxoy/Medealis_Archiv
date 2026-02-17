@@ -4,6 +4,61 @@ Popup for measurement inspections of items.
 """
 
 import streamlit as st
+from typing import List, Tuple, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _save_measurement_protocols(
+    uploaded_files: List[Any],
+    item_data: Dict[str, Any]
+) -> Tuple[List[str], List[str]]:
+    """
+    Speichert hochgeladene Vermessungsprotokolle in den Artikelordner.
+
+    Args:
+        uploaded_files: Liste der hochgeladenen Dateien
+        item_data: Item-Informationen (article_number, batch_number, etc.)
+
+    Returns:
+        Tuple (successful_saves, failed_saves)
+    """
+    from warehouse.application.services.document_storage.document_storage_service import DocumentStorageService
+
+    storage_service = DocumentStorageService()
+    successful_saves = []
+    failed_saves = []
+
+    for uploaded_file in uploaded_files:
+        try:
+            document_data = uploaded_file.read()
+            uploaded_file.seek(0)
+
+            measurement_filename = f"Vermessungsprotokoll_{item_data.get('article_number', 'UNKNOWN')}_{uploaded_file.name}"
+
+            save_result = storage_service.save_document(
+                document_data=document_data,
+                document_name=measurement_filename,
+                document_type="vermessungsprotokoll",
+                batch_number=item_data.get('batch_number', ''),
+                delivery_number=item_data.get('delivery_number', ''),
+                article_number=item_data.get('article_number', ''),
+                supplier_name=''
+            )
+
+            if save_result.success:
+                successful_saves.append(uploaded_file.name)
+                logger.info(f"Saved measurement protocol: {uploaded_file.name} to {save_result.file_path}")
+            else:
+                failed_saves.append(f"{uploaded_file.name}: {save_result.error}")
+                logger.error(f"Failed to save {uploaded_file.name}: {save_result.error}")
+
+        except Exception as file_error:
+            failed_saves.append(f"{uploaded_file.name}: {str(file_error)}")
+            logger.error(f"Error saving {uploaded_file.name}: {file_error}")
+
+    return successful_saves, failed_saves
 
 
 @st.dialog("📏 Vermessung durchführen")
@@ -133,126 +188,7 @@ def show_measurement_popup(item_data):
                 st.write(f"📊 Dateigröße: {uploaded_file.size} bytes")
                 st.write(f"📋 Dateityp: {uploaded_file.type}")
 
-        # Simple save button (no AI analysis needed)
-        if st.button("💾 Alle Protokolle speichern", key="save_measurement_doc_btn", use_container_width=True, type="primary"):
-            # ⚠️ NEU: Storage-Verfügbarkeits-Check VOR Dokumenten-Upload
-            from warehouse.presentation.user.popups.components.storage_warning_dialog import (
-                check_and_show_storage_warning
-            )
-
-            # Zeige Warnung wenn Server nicht verfügbar
-            can_continue = check_and_show_storage_warning(
-                batch_number=item_data.get('batch_number', ''),
-                delivery_number=item_data.get('delivery_number', ''),
-                article_number=item_data.get('article_number', ''),
-                supplier_name=item_data.get('supplier_name', ''),
-                compact=True  # Kompakte Warnung
-            )
-
-            if not can_continue:
-                st.error("❌ Dokumenten-Upload abgebrochen - keine Speicher-Option verfügbar")
-            else:
-                try:
-                    # Import new document storage service
-                    from warehouse.application.services.document_storage.document_storage_service import DocumentStorageService
-
-                    storage_service = DocumentStorageService()
-
-                    # Track results
-                    successful_saves = []
-                    failed_saves = []
-                    all_warnings = []
-
-                    # Process each uploaded file
-                    for uploaded_file in uploaded_measurement_doc:
-                        try:
-                            # Read document data
-                            document_data = uploaded_file.read()
-                            uploaded_file.seek(0)  # Reset file pointer
-
-                            # Create safe filename for measurement protocol
-                            measurement_filename = f"Vermessungsprotokoll_{item_data.get('article_number', 'UNKNOWN')}_{uploaded_file.name}"
-
-                            # Use new DocumentStorageService to save document
-                            save_result = storage_service.save_document(
-                                document_data=document_data,
-                                document_name=measurement_filename,
-                                document_type="vermessungsprotokoll",
-                                batch_number=item_data.get('batch_number', ''),
-                                delivery_number=item_data.get('delivery_number', ''),
-                                article_number=item_data.get('article_number', ''),
-                                supplier_name=''  # Will be resolved by storage service
-                            )
-
-                            if save_result.success:
-                                successful_saves.append({
-                                    'filename': uploaded_file.name,
-                                    'path': save_result.file_path
-                                })
-
-                                # Collect warnings
-                                if save_result.warnings:
-                                    all_warnings.extend(save_result.warnings)
-                            else:
-                                failed_saves.append({
-                                    'filename': uploaded_file.name,
-                                    'error': save_result.error
-                                })
-
-                                # Collect warnings
-                                if save_result.warnings:
-                                    all_warnings.extend(save_result.warnings)
-
-                        except Exception as file_error:
-                            failed_saves.append({
-                                'filename': uploaded_file.name,
-                                'error': str(file_error)
-                            })
-
-                    # Show results summary
-                    if successful_saves:
-                        st.success(f"✅ {len(successful_saves)} von {len(uploaded_measurement_doc)} Vermessungsprotokoll{'en' if len(uploaded_measurement_doc) > 1 else ''} erfolgreich gespeichert!")
-
-                        # Show each successful save
-                        for save_info in successful_saves:
-                            st.info(f"📁 {save_info['filename']} → {save_info['path']}")
-
-                        # Store success info in session state
-                        st.session_state.measurement_document_saved = True
-                        st.session_state.measurement_document_paths = [s['path'] for s in successful_saves]
-
-                    if failed_saves:
-                        st.error(f"❌ {len(failed_saves)} Datei{'en' if len(failed_saves) > 1 else ''} konnte{'n' if len(failed_saves) > 1 else ''} nicht gespeichert werden:")
-                        for fail_info in failed_saves:
-                            st.error(f"  • {fail_info['filename']}: {fail_info['error']}")
-
-                    # Show any warnings
-                    if all_warnings:
-                        for warning in set(all_warnings):  # Remove duplicates
-                            st.warning(f"⚠️ {warning}")
-
-                except Exception as e:
-                    st.error(f"❌ Fehler beim Speichern der Vermessungsprotokolle: {e}")
-                    import traceback
-                    st.error(f"Debug: {traceback.format_exc()}")
-
-        # Clear document button
-        st.write("")  # spacer
-        if st.button("❌ Protokoll entfernen", key="remove_measurement_doc_btn", use_container_width=False):
-            # Clear the uploaded document but keep popup open
-            if 'measurement_document_saved' in st.session_state:
-                del st.session_state['measurement_document_saved']
-            if 'measurement_document_path' in st.session_state:
-                del st.session_state['measurement_document_path']
-            # Don't rerun to keep popup open, just clear the file
-
-        # Show success message if document was saved (but no uploaded file currently)
-        if st.session_state.get('measurement_document_saved', False) and not uploaded_measurement_doc:
-            st.success("✅ Vermessungsprotokoll wurde erfolgreich im Artikelordner gespeichert!")
-            # Reset the upload area for another document
-            if st.button("📊 Weiteres Protokoll hochladen", key="upload_another_measurement_btn"):
-                st.session_state.measurement_document_saved = False
-                # Upload area stays visible, no rerun needed
+        st.info("ℹ️ Die Protokolle werden automatisch beim Klicken auf 'Vermessung bestätigen' gespeichert.")
 
     st.write("---")
 
@@ -269,12 +205,60 @@ def show_measurement_popup(item_data):
 
     with col_btn1:
         if st.button("✅ Vermessung bestätigen", type="primary", use_container_width=True):
+            """
+            Bestätigt die Vermessung und speichert:
+            1. Hochgeladene Vermessungsprotokolle (automatisch)
+            2. Vermessungsstatus in der Datenbank
+            """
             # Validierung
             if measurement_performed == "Ja" and not measured_by.strip():
                 st.error("⚠️ Bitte geben Sie den Namen des Bearbeiters ein!")
                 st.stop()
 
-            # Save measurement to database (ALWAYS if performed)
+            # 1. Save uploaded measurement protocols FIRST (if any)
+            if uploaded_measurement_doc:
+                # Storage-Verfügbarkeits-Check VOR Dokumenten-Upload
+                from warehouse.presentation.user.popups.components.storage_warning_dialog import (
+                    check_and_show_storage_warning
+                )
+
+                can_continue = check_and_show_storage_warning(
+                    batch_number=item_data.get('batch_number', ''),
+                    delivery_number=item_data.get('delivery_number', ''),
+                    article_number=item_data.get('article_number', ''),
+                    supplier_name=item_data.get('supplier_name', ''),
+                    compact=True
+                )
+
+                if not can_continue:
+                    st.error("❌ Dokumenten-Upload abgebrochen - keine Speicher-Option verfügbar")
+                    st.stop()
+
+                try:
+                    st.write("💾 Speichere Vermessungsprotokolle...")
+
+                    # Use helper function to save protocols
+                    successful_saves, failed_saves = _save_measurement_protocols(
+                        uploaded_measurement_doc, item_data
+                    )
+
+                    if successful_saves:
+                        st.success(f"✅ {len(successful_saves)} Vermessungsprotokoll{'e' if len(successful_saves) > 1 else ''} gespeichert!")
+                        for filename in successful_saves:
+                            st.info(f"  📄 {filename}")
+
+                    if failed_saves:
+                        st.error(f"❌ Fehler beim Speichern einiger Dateien:")
+                        for fail in failed_saves:
+                            st.error(f"  • {fail}")
+                        # Don't stop - continue with measurement save
+
+                except Exception as e:
+                    logger.error(f"Error saving measurement protocols: {e}", exc_info=True)
+                    st.warning(f"⚠️ Fehler beim Speichern der Protokolle: {e}")
+                    # Don't stop - continue with measurement save
+
+            # 2. Save measurement to database (if performed)
             if measurement_performed == "Ja":
                 try:
                     from warehouse.application.services.entity_services.item_service import ItemService
@@ -283,7 +267,7 @@ def show_measurement_popup(item_data):
                     logger = logging.getLogger(__name__)
                     item_service = ItemService()
 
-                    # Prepare measurements dict (currently simple, can be extended later)
+                    # Prepare measurements dict
                     measurements_dict = {
                         'date': measurement_date.strftime('%Y-%m-%d'),
                         'notes': measurement_notes.strip() if measurement_notes else ''
@@ -315,10 +299,11 @@ def show_measurement_popup(item_data):
                 # Measurement not performed - just close popup
                 st.info("ℹ️ Vermessung nicht durchgeführt - Status bleibt unverändert")
 
-            # Clean up session state (fallback if needed)
+            # Clean up session state
             cleanup_keys = [
                 'measurement_document_saved',
                 'measurement_document_path',
+                'measurement_document_paths',
                 'confirmed_measurement_item',
                 'popup_action'
             ]

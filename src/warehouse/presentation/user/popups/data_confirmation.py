@@ -695,6 +695,11 @@ class DataConfirmationPopup(InspectionPopup):
                 st.warning(f"⚠️ Dokument-Generierung teilweise fehlgeschlagen: {e}")
 
             st.success("🎉 **Datenbestätigung abgeschlossen!**")
+
+            # Cleanup session state
+            if 'uploaded_order_documents' in st.session_state:
+                del st.session_state['uploaded_order_documents']
+
             st.rerun()
 
         except Exception as e:
@@ -780,5 +785,8 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
         popup.handle_ai_analysis_action(form_data)
     elif action == "cancel":
         st.session_state["data_confirmation_action_clicked"] = False
+        # Cleanup uploaded documents from session state
+        if 'uploaded_order_documents' in st.session_state:
+            del st.session_state['uploaded_order_documents']
         logger.info("⚪ 'Abbrechen' Button geklickt - keine Ordner erstellt")
         st.rerun()
