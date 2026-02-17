@@ -16,7 +16,8 @@ if str(src_dir) not in sys.path:
 # Load .env file BEFORE anything else - ALWAYS load to ensure API keys are available
 try:
     from dotenv import load_dotenv
-    env_file = src_dir / ".env"
+    # .env is in project root, one level up from src
+    env_file = src_dir.parent / ".env"
     if env_file.exists():
         # Always load with override=True to ensure values are set
         load_dotenv(env_file, override=True)

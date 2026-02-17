@@ -28,6 +28,9 @@ except ImportError as e:
     DocumentGenerationService = None
     logging.warning(f"🔥 DEBUG: Centralized services not available - using fallback. Error: {e}")
 
+# Import shared helper from package
+from . import get_current_username as _get_current_username
+
 logger = logging.getLogger(__name__)
 
 
@@ -652,7 +655,7 @@ def show_data_confirmation_step1_popup(item_data):
                         new_article_number=current_article,
                         new_batch_number=current_batch if original_batch and original_batch != current_batch else None,
                         new_quantity=new_quantity,
-                        employee_name=st.session_state.get('current_user', 'System'),
+                        employee_name=_get_current_username(),
                         order_number=step1_data.get('order_number'),
                         delivery_slip_quantity=delivery_slip_qty,  # FIXED
                         ordered_quantity=ordered_qty  # FIXED
@@ -684,7 +687,7 @@ def show_data_confirmation_step1_popup(item_data):
                         delivery_number=step1_data['delivery_number'],
                         new_batch_number=current_batch,  # Set new batch number
                         new_quantity=new_quantity,  # Update quantity if provided
-                        employee_name=st.session_state.get('current_user', 'System'),
+                        employee_name=_get_current_username(),
                         order_number=step1_data.get('order_number'),
                         delivery_slip_quantity=delivery_slip_qty,  # FIXED
                         ordered_quantity=ordered_qty  # FIXED
@@ -709,7 +712,7 @@ def show_data_confirmation_step1_popup(item_data):
                             batch_number=step1_data['batch_number'],
                             delivery_number=step1_data['delivery_number'],
                             new_quantity=delivered_qty,
-                            employee_name=st.session_state.get('current_user', 'System'),
+                            employee_name=_get_current_username(),
                             order_number=step1_data.get('order_number'),
                             delivery_slip_quantity=delivery_slip_qty,  # FIXED: Pass LSQ from correct field
                             ordered_quantity=ordered_qty  # FIXED: Pass ordered_quantity
@@ -728,7 +731,7 @@ def show_data_confirmation_step1_popup(item_data):
                             article_number=step1_data['article_number'],
                             batch_number=step1_data['batch_number'],
                             delivery_number=step1_data['delivery_number'],
-                            employee_name=st.session_state.get('current_user', 'System'),
+                            employee_name=_get_current_username(),
                             order_number=step1_data.get('order_number')
                         )
                         st.success("📋 Bestellnummer erfolgreich gespeichert!")
@@ -742,7 +745,7 @@ def show_data_confirmation_step1_popup(item_data):
                     article_number=step1_data['article_number'],
                     batch_number=status_batch,
                     delivery_number=step1_data['delivery_number'],
-                    employee=st.session_state.get('current_user', 'System')
+                    employee=_get_current_username()
                 )
                 st.success("✅ Datenprüfung abgeschlossen")
 
@@ -787,7 +790,7 @@ def show_data_confirmation_step1_popup(item_data):
                                 article_number=step1_data['article_number'],
                                 supplier_name="",  # Will be auto-determined
                                 quantity=int(step1_data.get('delivered_quantity', 0)) if step1_data.get('delivered_quantity') else 0,
-                                employee_name=st.session_state.get('current_user', 'System'),
+                                employee_name=_get_current_username(),
                                 additional_data={
                                     'status': 'Daten bestätigt',
                                     'order_number': step1_data.get('order_number', '')
@@ -816,7 +819,7 @@ def show_data_confirmation_step1_popup(item_data):
                                 article_number=step1_data['article_number'],
                                 supplier_name="",  # Will be auto-determined
                                 quantity=int(step1_data.get('delivered_quantity', 0)) if step1_data.get('delivered_quantity') else 0,
-                                employee_name=st.session_state.get('current_user', 'System'),
+                                employee_name=_get_current_username(),
                                 additional_data={
                                     'we_date': datetime.now().strftime('%d.%m.%Y'),
                                     'artikel': step1_data['article_number'],
@@ -847,7 +850,7 @@ def show_data_confirmation_step1_popup(item_data):
                                 article_number=step1_data['article_number'],
                                 supplier_name="",  # Will be auto-determined
                                 quantity=int(step1_data.get('delivered_quantity', 0)) if step1_data.get('delivered_quantity') else 0,
-                                employee_name=st.session_state.get('current_user', 'System'),
+                                employee_name=_get_current_username(),
                                 additional_data={
                                     'barcode_type': 'CODE128',
                                     'filename_prefix': 'label',

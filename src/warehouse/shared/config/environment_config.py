@@ -48,11 +48,16 @@ class EnvironmentConfig:
     def _load_env_file(self):
         """Lädt .env Datei falls vorhanden."""
         try:
-            env_file = Path(__file__).parent.parent.parent.parent / ".env"
+            # Path: src/warehouse/shared/config/environment_config.py
+            # Go up 5 levels to reach project root: config -> shared -> warehouse -> src -> root
+            env_file = Path(__file__).parent.parent.parent.parent.parent / ".env"
             if env_file.exists():
                 from dotenv import load_dotenv
-                load_dotenv(env_file)
+                # Use override=True to ensure .env values are loaded even if env vars exist
+                load_dotenv(env_file, override=True)
                 logger.debug(f"Loaded .env file: {env_file}")
+            else:
+                logger.debug(f".env file not found at: {env_file}")
         except ImportError:
             logger.debug("python-dotenv not available, skipping .env file")
         except Exception as e:
@@ -96,6 +101,7 @@ class EnvironmentConfig:
             'USE_SHAREPOINT',
             'USE_SERVER_STORAGE',  # NEU: Server-Storage aktivieren
             'ANTHROPIC_API_KEY',  # Claude API Key
+            'AI_PROVIDER',  # AI Provider selection
             'DEBUG'
         ]
 
@@ -103,6 +109,7 @@ class EnvironmentConfig:
             value = os.getenv(var)
             if value:
                 self._config_cache[var] = value
+                logger.debug(f"Loaded {var} from environment")
 
     def get(self, key: str, default: Any = None) -> Any:
         """
@@ -197,7 +204,7 @@ class EnvironmentConfig:
                 key for key, value in sp_config.items() if not value
             ],
             'config_sources_available': {
-                'env_file': (Path(__file__).parent.parent.parent.parent / ".env").exists(),
+                'env_file': (Path(__file__).parent.parent.parent.parent.parent / ".env").exists(),
                 'streamlit_secrets': self._has_streamlit_secrets(),
                 'system_env': bool(os.getenv('SHAREPOINT_SITE_URL'))
             }

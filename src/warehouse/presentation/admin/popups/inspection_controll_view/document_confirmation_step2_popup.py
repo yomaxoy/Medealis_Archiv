@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 import logging
+from . import get_current_username
 from warehouse.domain.enums.certificate_type import CertificateType
 
 # NEW: Import centralized services via ServiceRegistry
@@ -694,7 +695,7 @@ def show_document_confirmation_step2_popup(item_data, step1_data=None):
                     article_number=article_number,
                     batch_number=batch_number,
                     delivery_number=item_data.get('delivery_number', ''),
-                    employee=st.session_state.get('current_user', 'System'),
+                    employee=get_current_username(),
                     certificates=certificates_dict
                 )
 

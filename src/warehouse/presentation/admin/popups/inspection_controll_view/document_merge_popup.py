@@ -7,6 +7,7 @@ import streamlit as st
 from datetime import datetime
 from pathlib import Path
 from warehouse.application.services.entity_services.item_service import ItemService
+from . import get_current_username
 
 
 @st.dialog("📁 Dokumente zusammenführen", width="large")
@@ -172,7 +173,7 @@ def show_document_merge_popup(item_data):
                                     article_number=article_number,
                                     batch_number=batch_number,
                                     delivery_number=delivery_number,
-                                    employee=st.session_state.get('current_user', 'System')
+                                    employee=get_current_username()
                                 )
 
                                 if notes_success and workflow_success:

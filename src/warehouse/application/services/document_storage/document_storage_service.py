@@ -93,6 +93,7 @@ class DocumentStorageService:
         delivery_number: str = "",
         article_number: str = "",
         supplier_name: str = "",
+        create_folders: bool = True,
         **additional_context
     ) -> StorageResult:
         """
@@ -161,12 +162,12 @@ class DocumentStorageService:
 
             if self.use_server_storage and server_available:
                 # SERVER-Speicherung (PRIMÄR)
-                path_result = self.path_resolver.resolve_server_storage_path(context, create_folders=True)
+                path_result = self.path_resolver.resolve_server_storage_path(context, create_folders=create_folders)
                 storage_location = "server"
                 self.logger.info(f"Using SERVER storage (primary): {path_result.path if path_result.success else 'N/A'}")
             else:
                 # LOKALE Speicherung (Fallback wenn Server nicht verfügbar)
-                path_result = self.path_resolver.resolve_storage_path(context, create_folders=True)
+                path_result = self.path_resolver.resolve_storage_path(context, create_folders=create_folders)
                 storage_location = "local"
 
                 if self.use_server_storage:
