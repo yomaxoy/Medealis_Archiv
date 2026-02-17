@@ -19,7 +19,9 @@
       "Read(//c/Users/kkrue/.medealis/postgres_data/**)",
       "Bash(docker logs:*)",
       "Bash(git push:*)",
-      "mcp__qms-database__query_database"
+      "mcp__qms-database__query_database",
+      "Bash(git ls-files:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []
