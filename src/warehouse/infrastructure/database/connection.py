@@ -108,17 +108,32 @@ def initialize_database(database_url: str = None) -> None:
         # SQLite PRAGMAs aktivieren (nur für SQLite)
         from sqlalchemy import event
 
+        # Netzwerk-Pfad erkennen (UNC oder mapped drive, nicht C:)
+        _db_path = database_url.replace("sqlite:///", "")
+        _is_network = _db_path.startswith("\\\\") or (
+            len(_db_path) >= 2
+            and _db_path[1] == ":"
+            and not _db_path.upper().startswith("C:")
+        )
+
         @event.listens_for(_engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             """Aktiviert SQLite-spezifische Optimierungen."""
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
+            if _is_network:
+                cursor.execute("PRAGMA journal_mode=DELETE")
+                cursor.execute("PRAGMA synchronous=FULL")
+            else:
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=-64000")
             cursor.close()
 
-        print(f"SQLite initialized: {database_url}")
+        if _is_network:
+            print(f"SQLite initialized (network, DELETE mode): {database_url}")
+        else:
+            print(f"SQLite initialized (local, WAL mode): {database_url}")
 
     else:
         raise ValueError(f"Unsupported database URL: {database_url}")
@@ -150,16 +165,17 @@ def get_session():
         yield session
         session.commit()
 
-        # CRITICAL FIX: Force WAL checkpoint for SQLite to ensure immediate visibility
-        # This fixes the issue where newly inserted items are not immediately visible
-        # in subsequent queries due to SQLite WAL (Write-Ahead Logging) isolation
+        # WAL checkpoint nur wenn WAL-Modus aktiv (nicht bei Netzwerk/DELETE-Modus)
         if _engine and str(_engine.url).startswith("sqlite"):
             from sqlalchemy import text
+
             try:
-                session.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
-                session.commit()
+                mode = session.execute(text("PRAGMA journal_mode")).scalar()
+                if mode and mode.lower() == "wal":
+                    session.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
+                    session.commit()
             except Exception:
-                pass  # Ignore if WAL is not enabled or checkpoint fails
+                pass
 
     except Exception:
         session.rollback()

@@ -11,7 +11,6 @@ from typing import Dict, List, Any, Optional, Tuple
 from contextlib import contextmanager
 from functools import wraps
 import sqlite3
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +31,25 @@ class ConnectionPool:
 
     def _init_pool(self):
         """Initialisiert Connection Pool."""
+        # Netzwerk-Pfad erkennen (UNC oder mapped drive, nicht C:)
+        is_network = self.db_path.startswith("\\\\") or (
+            len(self.db_path) >= 2
+            and self.db_path[1] == ":"
+            and not self.db_path.upper().startswith("C:")
+        )
+
         for _ in range(self.pool_size):
-            conn = sqlite3.connect(
-                self.db_path,
-                check_same_thread=False,
-                timeout=30.0
-            )
+            conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30.0)
             # Performance Settings
             conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute("PRAGMA cache_size = -64000")  # 64MB cache
             conn.execute("PRAGMA temp_store = MEMORY")
-            conn.execute("PRAGMA journal_mode = WAL")
+            if is_network:
+                conn.execute("PRAGMA journal_mode = DELETE")
+                conn.execute("PRAGMA synchronous = FULL")
+            else:
+                conn.execute("PRAGMA journal_mode = WAL")
+                conn.execute("PRAGMA synchronous = NORMAL")
 
             self._connections.append(conn)
             self._in_use[conn] = False
@@ -102,8 +108,10 @@ class QueryBatcher:
         self._pending_queries[query_type].append(query_data)
 
         # Auto-flush bei Batch-Size oder Zeit-Limit
-        if (len(self._pending_queries[query_type]) >= self.batch_size or
-            time.time() - self._last_flush > self.flush_interval):
+        if (
+            len(self._pending_queries[query_type]) >= self.batch_size
+            or time.time() - self._last_flush > self.flush_interval
+        ):
             self.flush(query_type)
 
     def flush(self, query_type: Optional[str] = None):
@@ -132,6 +140,7 @@ def query_performance_monitor(func):
 
     Misst Query-Zeiten und identifiziert langsame Queries.
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -188,7 +197,7 @@ class BulkOperationOptimizer:
 
         # Bereite Statement vor
         columns = list(records[0].keys())
-        placeholders = ', '.join(['?' for _ in columns])
+        placeholders = ", ".join(["?" for _ in columns])
         query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})"
 
         # Konvertiere zu Tupeln
@@ -203,7 +212,9 @@ class BulkOperationOptimizer:
         return len(records)
 
     @query_performance_monitor
-    def bulk_update(self, table: str, updates: List[Dict[str, Any]], where_column: str) -> int:
+    def bulk_update(
+        self, table: str, updates: List[Dict[str, Any]], where_column: str
+    ) -> int:
         """
         Optimierter Bulk Update.
 
@@ -220,7 +231,7 @@ class BulkOperationOptimizer:
 
         # Gruppiere Updates nach Schema
         update_columns = [col for col in updates[0].keys() if col != where_column]
-        set_clause = ', '.join([f"{col} = ?" for col in update_columns])
+        set_clause = ", ".join([f"{col} = ?" for col in update_columns])
         query = f"UPDATE {table} SET {set_clause} WHERE {where_column} = ?"
 
         # Bereite Daten vor
@@ -270,7 +281,7 @@ class IndexOptimizer:
     def track_query(self, query: str):
         """Verfolgt Query-Pattern für Index-Optimierung."""
         # Extrahiere WHERE-Bedingungen
-        if 'WHERE' in query.upper():
+        if "WHERE" in query.upper():
             pattern = self._extract_where_pattern(query)
             self._query_patterns[pattern] = self._query_patterns.get(pattern, 0) + 1
 
@@ -278,11 +289,11 @@ class IndexOptimizer:
         """Extrahiert WHERE-Pattern aus Query."""
         # Vereinfachte Pattern-Extraktion
         upper_query = query.upper()
-        where_pos = upper_query.find('WHERE')
+        where_pos = upper_query.find("WHERE")
         if where_pos == -1:
             return ""
 
-        where_clause = query[where_pos:].split('ORDER BY')[0].split('GROUP BY')[0]
+        where_clause = query[where_pos:].split("ORDER BY")[0].split("GROUP BY")[0]
         return where_clause.strip()
 
     def suggest_indexes(self) -> List[str]:
@@ -306,10 +317,16 @@ class IndexOptimizer:
     def _pattern_to_index(self, pattern: str) -> Optional[str]:
         """Konvertiert Query-Pattern zu Index-Vorschlag."""
         # Vereinfachte Index-Vorschläge
-        if 'article_number' in pattern and 'batch_number' in pattern:
-            return "CREATE INDEX IF NOT EXISTS idx_item_article_batch ON items(article_number, batch_number)"
-        elif 'delivery_number' in pattern:
-            return "CREATE INDEX IF NOT EXISTS idx_delivery_number ON items(delivery_number)"
+        if "article_number" in pattern and "batch_number" in pattern:
+            return (
+                "CREATE INDEX IF NOT EXISTS idx_item_article_batch"
+                " ON items(article_number, batch_number)"
+            )
+        elif "delivery_number" in pattern:
+            return (
+                "CREATE INDEX IF NOT EXISTS idx_delivery_number"
+                " ON items(delivery_number)"
+            )
 
         return None
 
