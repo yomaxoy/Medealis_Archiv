@@ -50,16 +50,29 @@ class Settings:
     DATABASE_NAME = "warehouse_new.db"
 
     @classmethod
-    def _get_use_server_storage(cls) -> bool:
-        """Liest USE_SERVER_STORAGE dynamisch aus Umgebung (nicht beim Import!)."""
-        return os.getenv("USE_SERVER_STORAGE", "true").lower() == "true"
+    def _get_use_server_storage_db(cls) -> bool:
+        """Liest USE_SERVER_STORAGE_DB dynamisch aus Umgebung (nicht beim Import!)."""
+        # Fallback auf alte Variable für Kompatibilität
+        db_setting = os.getenv("USE_SERVER_STORAGE_DB")
+        if db_setting is None:
+            db_setting = os.getenv("USE_SERVER_STORAGE", "true")
+        return db_setting.lower() == "true"
+
+    @classmethod
+    def _get_use_server_storage_documents(cls) -> bool:
+        """Liest USE_SERVER_STORAGE_DOCUMENTS dynamisch aus Umgebung (nicht beim Import!)."""
+        # Fallback auf alte Variable für Kompatibilität
+        doc_setting = os.getenv("USE_SERVER_STORAGE_DOCUMENTS")
+        if doc_setting is None:
+            doc_setting = os.getenv("USE_SERVER_STORAGE", "true")
+        return doc_setting.lower() == "true"
 
     @classmethod
     def _get_database_path(cls) -> Path:
         r"""
         Ermittelt den Datenbank-Pfad basierend auf Verfügbarkeit.
 
-        Primär: A:\Qualitätsmanagement\QM_MEDEALIS
+        Primär: \\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS
             \03. Produkte\Produktprüfung
             \Medealis Archiv\database\
         Fallback: C:\Users\<Username>\.medealis\
@@ -67,7 +80,7 @@ class Settings:
         Returns:
             Path: Pfad zum Datenbankverzeichnis
         """
-        if cls._get_use_server_storage():
+        if cls._get_use_server_storage_db():
             server_db_dir = cls.SERVER_BASE_PATH / "database"
             try:
                 # Prüfe ob Server-Laufwerk verfügbar und beschreibbar
@@ -81,7 +94,7 @@ class Settings:
                     return server_db_dir
             except (OSError, PermissionError) as e:
                 print(
-                    "Server-Speicherung nicht verfügbar"
+                    "Server-Speicherung (DB) nicht verfügbar"
                     f" ({e}), verwende lokalen Fallback"
                 )
 
@@ -91,12 +104,52 @@ class Settings:
         print(f"Datenbank-Speicherort: Lokal - {local_db_dir}")
         return local_db_dir
 
+    @classmethod
+    def _get_documents_path(cls) -> Path:
+        r"""
+        Ermittelt den Dokumente-Pfad basierend auf Verfügbarkeit.
+
+        Primär: \\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS
+            \03. Produkte\Produktprüfung
+            \Medealis Archiv\documents\
+        Fallback: C:\Users\<Username>\Medealis\Wareneingang\
+
+        Returns:
+            Path: Pfad zum Dokumentenverzeichnis
+        """
+        if cls._get_use_server_storage_documents():
+            server_docs_dir = cls.SERVER_BASE_PATH / "documents"
+            try:
+                # Prüfe ob Server-Laufwerk verfügbar und beschreibbar
+                if server_docs_dir.parent.exists():
+                    server_docs_dir.mkdir(parents=True, exist_ok=True)
+                    # Test Schreibrechte
+                    test_file = server_docs_dir / ".write_test"
+                    test_file.touch()
+                    test_file.unlink()
+                    print(f"Dokumente-Speicherort: Server (UNC) - {server_docs_dir}")
+                    return server_docs_dir
+            except (OSError, PermissionError) as e:
+                print(
+                    "Server-Speicherung (Dokumente) nicht verfügbar"
+                    f" ({e}), verwende lokalen Fallback"
+                )
+
+        # Fallback: Lokaler Speicher
+        local_docs_dir = Path.home() / "Medealis" / "Wareneingang"
+        local_docs_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Dokumente-Speicherort: Lokal - {local_docs_dir}")
+        return local_docs_dir
+
     # Datenbank-Pfade werden dynamisch ermittelt
     DATABASE_DIR = None  # Wird über Property gesetzt
     DATABASE_PATH = None  # Wird über Property gesetzt
 
+    # Dokumenten-Pfad wird dynamisch ermittelt
+    DOCUMENTS_DIR = None  # Wird über Property gesetzt
+
     # Verzeichnisse
-    USER_DATA_DIR = Path.home() / "Medealis" / "Wareneingang"
+    USER_DATA_DIR = Path.home() / "Medealis" / "Wareneingang"  # Deprecated, nutze get_documents_dir()
     TEMPLATE_DIR = RESOURCES_DIR / "templates"
     LOG_DIR = DATA_DIR / "logs"
     TEMP_DIR = DATA_DIR / "temp"
@@ -154,16 +207,24 @@ class Settings:
         return cls.DATABASE_PATH
 
     @classmethod
+    def get_documents_dir(cls) -> Path:
+        """Gibt das Dokumentenverzeichnis zurück (cached nach erstem Aufruf)."""
+        if cls.DOCUMENTS_DIR is None:
+            cls.DOCUMENTS_DIR = cls._get_documents_path()
+        return cls.DOCUMENTS_DIR
+
+    @classmethod
     def ensure_directories(cls):
         """Stellt sicher, dass alle benötigten Verzeichnisse existieren."""
-        # DATABASE_DIR wird dynamisch über get_database_dir() erstellt
-        directories = [cls.USER_DATA_DIR, cls.LOG_DIR, cls.TEMP_DIR]
+        # DATABASE_DIR und DOCUMENTS_DIR werden dynamisch erstellt
+        directories = [cls.LOG_DIR, cls.TEMP_DIR]
 
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
 
-        # Datenbank-Verzeichnis separat sicherstellen
+        # Datenbank- und Dokumenten-Verzeichnisse separat sicherstellen
         cls.get_database_dir()
+        cls.get_documents_dir()
 
     @classmethod
     def get_template_path(cls, template_name: str) -> Path:

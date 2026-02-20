@@ -99,7 +99,9 @@ class EnvironmentConfig:
             'SHAREPOINT_CLIENT_SECRET',
             'SHAREPOINT_TENANT_ID',
             'USE_SHAREPOINT',
-            'USE_SERVER_STORAGE',  # NEU: Server-Storage aktivieren
+            'USE_SERVER_STORAGE',  # DEPRECATED: Legacy-Variable
+            'USE_SERVER_STORAGE_DB',  # NEU: Getrennte DB-Storage
+            'USE_SERVER_STORAGE_DOCUMENTS',  # NEU: Getrennte Dokument-Storage
             'ANTHROPIC_API_KEY',  # Claude API Key
             'AI_PROVIDER',  # AI Provider selection
             'DEBUG'
@@ -156,9 +158,37 @@ class EnvironmentConfig:
         """Prüft ob SharePoint aktiviert ist."""
         return self.get_bool('USE_SHAREPOINT', False)
 
+    def is_server_storage_db_enabled(self) -> bool:
+        """
+        Prüft ob Server-Storage für DB aktiviert ist.
+
+        Returns:
+            True wenn Server-Storage als primärer DB-Speicherort verwendet werden soll
+        """
+        # Neue Variable hat Priorität, Fallback auf alte Variable
+        value = self.get('USE_SERVER_STORAGE_DB')
+        if value is None:
+            value = self.get('USE_SERVER_STORAGE', 'true')
+        return str(value).lower() in ('true', '1', 'yes', 'on')
+
+    def is_server_storage_documents_enabled(self) -> bool:
+        """
+        Prüft ob Server-Storage für Dokumente aktiviert ist.
+
+        Returns:
+            True wenn Server-Storage als primärer Dokument-Speicherort verwendet werden soll
+        """
+        # Neue Variable hat Priorität, Fallback auf alte Variable
+        value = self.get('USE_SERVER_STORAGE_DOCUMENTS')
+        if value is None:
+            value = self.get('USE_SERVER_STORAGE', 'true')
+        return str(value).lower() in ('true', '1', 'yes', 'on')
+
     def is_server_storage_enabled(self) -> bool:
         """
-        Prüft ob Server-Storage aktiviert ist.
+        DEPRECATED: Nutze is_server_storage_db_enabled() oder is_server_storage_documents_enabled()
+
+        Prüft ob Server-Storage aktiviert ist (Legacy-Kompatibilität).
 
         Returns:
             True wenn Server-Storage als primärer Speicherort verwendet werden soll
@@ -167,7 +197,9 @@ class EnvironmentConfig:
 
     def get_storage_mode(self) -> str:
         """
-        Bestimmt aktuellen Storage-Modus basierend auf Konfiguration.
+        DEPRECATED: Nutze get_db_storage_mode() oder get_documents_storage_mode()
+
+        Bestimmt aktuellen Storage-Modus basierend auf Konfiguration (Legacy).
 
         Returns:
             "server" - Server primär, SharePoint fallback (Standard)
@@ -175,6 +207,35 @@ class EnvironmentConfig:
             "local" - Nur lokal (Entwicklung)
         """
         server_enabled = self.is_server_storage_enabled()
+        sharepoint_enabled = self.is_sharepoint_enabled()
+
+        if server_enabled:
+            return "server"
+        elif sharepoint_enabled:
+            return "sharepoint"
+        else:
+            return "local"
+
+    def get_db_storage_mode(self) -> str:
+        """
+        Bestimmt aktuellen Datenbank-Storage-Modus.
+
+        Returns:
+            "server" - Server/NAS primär
+            "local" - Nur lokal
+        """
+        return "server" if self.is_server_storage_db_enabled() else "local"
+
+    def get_documents_storage_mode(self) -> str:
+        """
+        Bestimmt aktuellen Dokumente-Storage-Modus.
+
+        Returns:
+            "server" - Server/NAS primär
+            "sharepoint" - SharePoint primär (Legacy)
+            "local" - Nur lokal
+        """
+        server_enabled = self.is_server_storage_documents_enabled()
         sharepoint_enabled = self.is_sharepoint_enabled()
 
         if server_enabled:
@@ -194,8 +255,12 @@ class EnvironmentConfig:
         sp_config = self.get_sharepoint_config()
 
         return {
-            'storage_mode': self.get_storage_mode(),
-            'server_storage_enabled': self.is_server_storage_enabled(),
+            'storage_mode': self.get_storage_mode(),  # Legacy
+            'db_storage_mode': self.get_db_storage_mode(),  # NEU
+            'documents_storage_mode': self.get_documents_storage_mode(),  # NEU
+            'server_storage_db_enabled': self.is_server_storage_db_enabled(),
+            'server_storage_documents_enabled': self.is_server_storage_documents_enabled(),
+            'server_storage_enabled': self.is_server_storage_enabled(),  # Legacy
             # Prüfe UNC-Pfad direkt (robuster als gemapptes Laufwerk)
             'server_available': os.path.exists(r"\\10.190.140.10\Allgemein"),
             'sharepoint_enabled': self.is_sharepoint_enabled(),
