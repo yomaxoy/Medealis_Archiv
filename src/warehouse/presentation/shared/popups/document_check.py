@@ -1,13 +1,17 @@
 """
-Document Check Popup
-User-facing popup for checking certificates and documents.
-Matches Admin implementation exactly.
+Document Check Popup - Shared across User & Admin View.
+
+Popup for checking certificates and documents.
+Permission-ready: required_permission="check_documents"
+
+Author: Medealis
+Version: 2.0.0 - Shared Implementation
 """
 
 import streamlit as st
 from typing import Dict, Any, Optional
-from warehouse.presentation.user.popups.core.base_popup import InspectionPopup
-from warehouse.presentation.user.popups.components import (
+from warehouse.presentation.shared.inspection_popup import InspectionPopup
+from warehouse.presentation.shared.components import (
     render_article_header,
     FormBuilder,
     render_standard_footer,
@@ -20,7 +24,7 @@ from warehouse.application.services.audit_service import audit_service
 
 
 class DocumentCheckPopup(InspectionPopup):
-    """Popup für Dokumentenprüfung (Schritt 2)."""
+    """Popup für Dokumentenprüfung (Schritt 2) - Shared für User & Admin."""
 
     def __init__(self, item_data: Dict[str, Any]):
         super().__init__(
@@ -28,6 +32,8 @@ class DocumentCheckPopup(InspectionPopup):
             item_data=item_data,
             show_info_box=False,
             info_text=None,
+            css_style="compact",  # ← Kompaktes CSS
+            required_permission="check_documents"  # ← Permission-Ready
         )
 
     def render_header(self) -> None:
@@ -48,23 +54,17 @@ class DocumentCheckPopup(InspectionPopup):
 
     def render_body(self) -> Dict[str, Any]:
         """Rendert Formular für Dokumentenprüfung."""
-        form = FormBuilder(columns=1)
-
-        # Sektion 1: Prüfer (oben)
-        form.add_section("👤 Prüfer", expanded=True, use_expander=False)
-
-        form.add_text_input(
-            "Name des durchführenden Mitarbeiters:",
+        # Prüfer-Eingabe DIREKT ohne FormBuilder
+        employee_name = st.text_input(
+            "👤 Name des durchführenden Mitarbeiters:",
             key="doc_inspector_name",
             value=self.get_current_user(),
             placeholder="Vollständiger Name für PDB-Dokument",
             help="Wird für die Nachvollziehbarkeit benötigt",
         )
 
-        # Render Prüfer
-        form_data = form.render()
+        form_data = {"doc_inspector_name": employee_name}
 
-        # Sektion 2: Begleitdokumente hochladen
         st.markdown("---")
 
         uploaded_docs = render_document_uploader(
@@ -321,8 +321,9 @@ class DocumentCheckPopup(InspectionPopup):
                 st.error(f"❌ Error saving certificates and document flags: {e}")
                 return
 
-            # 1.5 Save uploaded documents (ADMIN STYLE - MISSING IN USER VIEW!)
+            # 1.5 Save uploaded documents
             uploaded_docs = form_data.get("uploaded_documents", [])
+            logger.info(f"🔍 DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}")
             if uploaded_docs:
                 st.write(
                     f"📤 Speichere {len(uploaded_docs)} hochgeladene Dokument(e)..."

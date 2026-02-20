@@ -7,15 +7,15 @@ import streamlit as st
 import logging
 from typing import Dict, Any, List, Optional
 
-# Import popups
-from warehouse.presentation.user.popups.visual_inspection import (
+# Import shared popups (User & Admin nutzen die gleichen!)
+from warehouse.presentation.shared.popups import (
     show_visual_inspection_popup,
-)
-from warehouse.presentation.user.popups.data_confirmation import (
     show_data_confirmation_popup,
+    show_measurement_popup,
+    show_document_check_popup,
 )
-from warehouse.presentation.user.popups.measurement import show_measurement_popup
-from warehouse.presentation.user.popups.document_check import show_document_check_popup
+
+# Import User-spezifische Popups (nicht Teil der Inspection-Workflow)
 from warehouse.presentation.user.popups.document_merge import show_document_merge_popup
 from warehouse.presentation.user.popups.delivery_scan import (
     show_delivery_scan_popup,

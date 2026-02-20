@@ -1,13 +1,18 @@
 """
-Data Confirmation Popup
-User-facing popup for confirming delivery slip data.
+Data Confirmation Popup - Shared across User & Admin View.
+
+Popup for confirming delivery slip data.
+Permission-ready: required_permission="confirm_data"
+
+Author: Medealis
+Version: 2.0.0 - Shared Implementation
 """
 
 import streamlit as st
 import logging
 from typing import Dict, Any, Optional
-from warehouse.presentation.user.popups.core.base_popup import InspectionPopup
-from warehouse.presentation.user.popups.components import (
+from warehouse.presentation.shared.inspection_popup import InspectionPopup
+from warehouse.presentation.shared.components import (
     render_article_header,
     FormBuilder,
     render_standard_footer,
@@ -45,7 +50,7 @@ def _get_supplier_id(supplier_name: str) -> str:
 
 class DataConfirmationPopup(InspectionPopup):
     """
-    Popup für Datenbestätigung (Schritt 1).
+    Popup für Datenbestätigung (Schritt 1) - Shared für User & Admin.
 
     WICHTIG: Ordner werden ERST beim Klick auf einen Action-Button erstellt,
     NICHT beim Öffnen des Popups!
@@ -57,6 +62,8 @@ class DataConfirmationPopup(InspectionPopup):
             item_data=item_data,
             show_info_box=False,
             info_text=None,
+            css_style="compact",  # ← Kompaktes CSS
+            required_permission="confirm_data"  # ← Permission-Ready
         )
 
         # WICHTIG: Beim Initialisieren werden KEINE Ordner erstellt!
@@ -255,14 +262,10 @@ class DataConfirmationPopup(InspectionPopup):
         action = None
 
         with col1:
-            if st.button("🤖 KI-Analyse und speichern", type="primary", use_container_width=True):
-                action = "ai_save"
-
-        with col2:
-            if st.button("📄 Daten bestätigen und Dokumente erstellen", type="primary", use_container_width=True):
+            if st.button("✅ Daten bestätigen", type="primary", use_container_width=True):
                 action = "save"
 
-        with col3:
+        with col2:
             if st.button("❌ Abbrechen", use_container_width=True):
                 action = "cancel"
 

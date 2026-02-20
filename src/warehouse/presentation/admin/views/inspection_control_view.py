@@ -9,19 +9,18 @@ from typing import Dict, Any, List, Optional
 from warehouse.application.services.entity_services.delivery_service import (
     DeliveryService,
 )
-from warehouse.presentation.admin.popups.inspection_controll_view.inspection_popups import (
+
+# Import shared popups (User & Admin nutzen die gleichen!)
+from warehouse.presentation.shared.popups import (
     show_visual_inspection_popup,
     show_measurement_popup,
     show_document_check_popup,
+    show_data_confirmation_popup,
 )
+
+# Admin-spezifische Popups (nur Merge bleibt)
 from warehouse.presentation.admin.popups.inspection_controll_view.merge_check_popup import (
     show_merge_check_popup,
-)
-from warehouse.presentation.admin.popups.inspection_controll_view.data_confirmation_step1_popup import (
-    show_data_confirmation_step1_popup,
-)
-from warehouse.presentation.admin.popups.inspection_controll_view.document_confirmation_step2_popup import (
-    show_document_confirmation_step2_popup,
 )
 from warehouse.presentation.admin.utils.document_workflow_handler import (
     create_workflow_documents,
@@ -673,8 +672,8 @@ def show_main_inspection_interface(services):
                         # Use full data if available, otherwise fallback to basic item_data
                         popup_data = full_item_data if full_item_data else item_data
 
-                        # Always start Step 1 (data confirmation)
-                        show_data_confirmation_step1_popup(popup_data)
+                        # Always start Step 1 (data confirmation) - SHARED POPUP!
+                        show_data_confirmation_popup(popup_data)
 
                 with action_col2:
                     # Step 2 Button: Document confirmation - show completion status
@@ -713,15 +712,8 @@ def show_main_inspection_interface(services):
                         # Use full data if available, otherwise fallback to basic item_data
                         popup_data = full_item_data if full_item_data else item_data
 
-                        # Create mock step1_data for Step 2 dialog
-                        step1_data = {
-                            "article_number": item_data["article_number"],
-                            "batch_number": item_data["batch_number"],
-                            "delivery_number": item_data["delivery_number"],
-                        }
-
-                        # Start Step 2 (document confirmation)
-                        show_document_confirmation_step2_popup(popup_data, step1_data)
+                        # Start Step 2 (document confirmation) - USE SHARED POPUP!
+                        show_document_check_popup(popup_data)
 
                 with action_col3:
                     # Visual inspection button: Show completion status independent of hierarchy

@@ -83,9 +83,16 @@ def show_document_confirmation_step2_popup(item_data, step1_data=None):
 
     # === MITARBEITERNAME ===
     st.markdown("#### 👤 Prüfer")
+    # FIX: current_user kann Dictionary sein (Admin) - extrahiere username
+    current_user_raw = st.session_state.get('current_user', '')
+    if isinstance(current_user_raw, dict):
+        current_user_str = current_user_raw.get('username', current_user_raw.get('full_name', ''))
+    else:
+        current_user_str = str(current_user_raw) if current_user_raw else ''
+
     employee_name = st.text_input(
         "Name des durchführenden Mitarbeiters:",
-        value=st.session_state.get('current_user', ''),
+        value=current_user_str,
         placeholder="Vollständiger Name für PDB-Dokument",
         key="step2_employee_name",
         help="Dieser Name wird auf dem PDB-Dokument angezeigt"

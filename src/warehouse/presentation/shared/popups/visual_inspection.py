@@ -1,8 +1,11 @@
 """
-Visual Inspection Popup - User View
-Sichtkontrolle mit Ausschusserfassung.
+Visual Inspection Popup - Shared across User & Admin View.
 
-Standardisierte Implementierung mit modularen Komponenten.
+Sichtkontrolle mit Ausschusserfassung.
+Permission-ready: required_permission="perform_visual_inspection"
+
+Author: Medealis
+Version: 2.0.0 - Shared Implementation
 """
 
 import streamlit as st
@@ -10,8 +13,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
 
-from .core.base_popup import InspectionPopup
-from .components import (
+from warehouse.presentation.shared.inspection_popup import InspectionPopup
+from warehouse.presentation.shared.components import (
     render_article_header,
     FormBuilder,
     render_quality_footer,
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class VisualInspectionPopup(InspectionPopup):
     """
-    Sichtkontrolle Popup für User-View.
+    Sichtkontrolle Popup - Shared für User & Admin.
 
     Features:
     - Ausschussmenge erfassen
@@ -39,8 +42,10 @@ class VisualInspectionPopup(InspectionPopup):
         super().__init__(
             title="👁️ Sichtkontrolle durchführen",
             item_data=item_data,
-            show_info_box=False,  # Info-Box deaktiviert für kompaktes Layout
+            show_info_box=False,
             info_text=None,
+            css_style="compact",  # ← Kompaktes CSS
+            required_permission="perform_visual_inspection"  # ← Permission-Ready
         )
 
     def render_header(self) -> None:
@@ -61,22 +66,18 @@ class VisualInspectionPopup(InspectionPopup):
         form = FormBuilder(columns=2)
 
         # ===== PRÜFERNAME GANZ OBEN (PFLICHTFELD) =====
-        form.add_section("👤 Prüfer", expanded=True, use_expander=False)
-
         current_user = get_current_username()
         form.add_text_input(
-            "Name des Prüfers: *",
+            "👤 Name des Prüfers: *",
             key="visual_inspector_name",
             value=current_user if current_user != "System" else "",
             placeholder="Vollständiger Name des durchführenden Mitarbeiters",
             help="Wird für die Nachvollziehbarkeit benötigt (Pflichtfeld)",
         )
 
-        # Sektion 1: Ausschusserfassung
-        form.add_section("📊 Ausschuss erfassen", expanded=True, use_expander=False)
-
+        # Ausschusserfassung (ohne Section-Header)
         form.add_number_input(
-            "Ausschussmenge: *",
+            "📊 Ausschussmenge: *",
             key="visual_waste_quantity",
             value=0,
             min_value=0,
@@ -84,11 +85,9 @@ class VisualInspectionPopup(InspectionPopup):
             help=f"Menge des nicht verwendbaren Materials (Pflichtfeld, max. {self.quantity})",
         )
 
-        # Sektion 2: Qualitätsbewertung
-        form.add_section("📝 Qualitätsbewertung", expanded=True, use_expander=False)
-
+        # Qualitätsbewertung (ohne Section-Header)
         form.add_text_area(
-            "Bemerkungen zur Qualitätskontrolle:",
+            "📝 Bemerkungen zur Qualitätskontrolle:",
             key="visual_quality_notes",
             value="",
             height=60,

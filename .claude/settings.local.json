@@ -1,27 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)",
-      "Bash(unzip:*)",
-      "Bash(docker-compose:*)",
-      "Bash(docker-compose build:*)",
-      "Bash(docker-compose up:*)",
-      "Bash(ls:*)",
-      "Read(//c/Users/krueg/OneDrive/Dokumente/Medealis/**)",
-      "Bash(pip install:*)",
-      "Bash($env:PYTHONPATH=\"$PWD\\src\")",
-      "Bash(docker exec:*)",
-      "Bash(.venvScriptspython.exe migration_scriptsQUICKTEST_MIGRATION.py)",
-      "Bash(PYTHONPATH=\"$PWD/src\" python migration_scripts/QUICKTEST_MIGRATION.py)",
-      "Bash(PYTHONPATH=\"/c/Users/krueg/OneDrive/Dokumente/Medealis/neu_Medealis_Archiv/src\" python migration_scripts/QUICKTEST_MIGRATION.py)",
-      "Bash(export:*)",
-      "Bash(curl:*)",
-      "Read(//c/Users/kkrue/.medealis/postgres_data/**)",
-      "Bash(docker logs:*)",
-      "Bash(git push:*)",
-      "mcp__qms-database__query_database",
-      "Bash(git ls-files:*)",
-      "Bash(git fetch:*)"
+      "Bash(git pull --rebase)",
+      "Bash(git stash)",
+      "Bash(git stash pop)",
+      "Bash(git stash drop)",
+      "Bash(git add .claude/settings.local.json src/warehouse/presentation/)"
     ],
     "deny": [],
     "ask": []

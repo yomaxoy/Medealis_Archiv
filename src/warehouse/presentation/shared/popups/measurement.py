@@ -1,6 +1,11 @@
 """
-Measurement Popup
-User-facing popup for measurement inspections.
+Measurement Popup - Shared across User & Admin View.
+
+Popup for measurement inspections.
+Permission-ready: required_permission="perform_measurement"
+
+Author: Medealis
+Version: 2.0.0 - Shared Implementation
 """
 
 import streamlit as st
@@ -8,8 +13,8 @@ from typing import Dict, Any, Optional
 from datetime import date
 from PIL import Image
 import io
-from warehouse.presentation.user.popups.core.base_popup import InspectionPopup
-from warehouse.presentation.user.popups.components import (
+from warehouse.presentation.shared.inspection_popup import InspectionPopup
+from warehouse.presentation.shared.components import (
     render_article_header,
     FormBuilder,
     render_standard_footer,
@@ -29,6 +34,8 @@ class MeasurementPopup(InspectionPopup):
             item_data=item_data,
             show_info_box=False,
             info_text=None,
+            css_style="compact",  # ← Kompaktes CSS
+            required_permission="perform_measurement"  # ← Permission-Ready
         )
 
     def render_header(self) -> None:
@@ -46,22 +53,17 @@ class MeasurementPopup(InspectionPopup):
 
     def render_body(self) -> Dict[str, Any]:
         """Rendert Formular für Vermessung."""
-        form = FormBuilder(columns=2)
-
-        # ===== PRÜFERNAME GANZ OBEN (PFLICHTFELD) =====
-        form.add_section("👤 Prüfer", expanded=True, use_expander=False)
-
+        # ===== PRÜFERNAME DIREKT ohne FormBuilder =====
         current_user = get_current_username()
-        form.add_text_input(
-            "Prüfername: *",
+        inspector_name = st.text_input(
+            "👤 Prüfername: *",
             key="measurement_inspector_name",
             value=current_user if current_user != "System" else "",
             placeholder="Vollständiger Name des Mitarbeiters",
             help="Name des Mitarbeiters der die Vermessung durchführt (Pflichtfeld)",
         )
 
-        # Render Prüfer-Sektion
-        form_data = form.render()
+        form_data = {"measurement_inspector_name": inspector_name}
 
         st.markdown("---")
 
