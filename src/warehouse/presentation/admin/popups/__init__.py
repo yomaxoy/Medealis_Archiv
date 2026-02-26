@@ -41,19 +41,15 @@ from .view_independent.workflow_popups import (
 )
 
 # Inspection and Quality Control Popups
-from .inspection_controll_view.enhanced_document_check_popup import (
-    show_document_check_popup_new,
-    handle_document_check_popup_actions,
-)
-from .inspection_controll_view.document_check_popup import show_document_check_popup
-from .inspection_controll_view.visual_inspection_popup import show_visual_inspection_popup
-from .inspection_controll_view.measurement_popup import show_measurement_popup
+# Note: Core inspection popups migrated to shared (visual_inspection, measurement, document_check, data_confirmation)
 from .inspection_controll_view.document_merge_popup import show_document_merge_popup
-from .inspection_controll_view.data_confirmation_step1_popup import (
-    show_data_confirmation_step1_popup,
-)
-from .inspection_controll_view.document_confirmation_step2_popup import (
-    show_document_confirmation_step2_popup,
+
+# Re-export shared popups for backward compatibility
+from warehouse.presentation.shared.popups import (
+    show_visual_inspection_popup,
+    show_measurement_popup,
+    show_document_check_popup,
+    show_data_confirmation_popup,
 )
 
 # Utility and System Popups
@@ -95,15 +91,12 @@ __all__ = [
     "show_ls_confirmation_popup",
     "show_finalize_popup",
     "handle_workflow_popup_actions",
-    # Inspection popups
-    "show_document_check_popup_new",
-    "handle_document_check_popup_actions",
-    "show_document_check_popup",
+    # Inspection popups (core popups now in shared)
     "show_visual_inspection_popup",
     "show_measurement_popup",
+    "show_document_check_popup",
+    "show_data_confirmation_popup",
     "show_document_merge_popup",
-    "show_data_confirmation_step1_popup",
-    "show_document_confirmation_step2_popup",
     # Utility popups
     "show_success_popup",
     "show_error_popup",

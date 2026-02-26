@@ -1,18 +1,23 @@
 """
 User Popups Package
 Simplified popup dialogs for warehouse users.
+
+Note: Core inspection popups (visual_inspection, measurement, document_check, data_confirmation)
+have been migrated to warehouse.presentation.shared.popups and are used by both User & Admin apps.
 """
 
-from .core.base_popup import InspectionPopup
 from .delivery_scan import show_delivery_scan_popup, show_extraction_confirmation_popup
-from .visual_inspection import show_visual_inspection_popup
-from .data_confirmation import show_data_confirmation_popup
-from .measurement import show_measurement_popup
-from .document_check import show_document_check_popup
 from .document_merge import show_document_merge_popup
 
+# Re-export shared popups for backward compatibility
+from warehouse.presentation.shared.popups import (
+    show_visual_inspection_popup,
+    show_data_confirmation_popup,
+    show_measurement_popup,
+    show_document_check_popup,
+)
+
 __all__ = [
-    "InspectionPopup",
     "show_delivery_scan_popup",
     "show_extraction_confirmation_popup",
     "show_visual_inspection_popup",
