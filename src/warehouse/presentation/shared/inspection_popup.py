@@ -437,11 +437,15 @@ class InspectionPopup(ABC):
     # ========== Utility Methods ==========
 
     def get_current_user(self) -> str:
-        """Gibt den aktuellen Username aus Session-State zurück."""
+        """Gibt den aktuellen vollständigen Namen aus Session-State zurück."""
         user = st.session_state.get('current_user')
         if user is None:
             return 'System'
         if isinstance(user, dict):
+            # Priorisiere full_name, fallback auf username
+            full_name = user.get('full_name')
+            if full_name and full_name.strip():
+                return full_name
             return user.get('username', 'System')
         return str(user)
 

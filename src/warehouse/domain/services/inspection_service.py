@@ -276,15 +276,19 @@ class InspectionService:
             )
 
     def _get_next_recommended_action(self, item: Item) -> str:
-        """Empfiehlt nächste Aktion basierend auf Item-Status."""
+        """Empfiehlt nächste Aktion basierend auf Item-Status (IST-Zustand)."""
         current_status = item.get_current_status()
 
+        # Mapping: IST-Zustand → Nächste SOLL-Aktion
         action_mapping = {
             ItemStatus.ARTIKEL_ANGELEGT: "Datenprüfung durchführen",
-            ItemStatus.DATEN_GEPRUEFT: "Sichtprüfung durchführen",
-            ItemStatus.SICHT_GEPRUEFT: "Dokumente/Zertifikate prüfen",
+            ItemStatus.DATEN_GEPRUEFT: "Dokumentenprüfung durchführen",
             ItemStatus.DOKUMENTE_GEPRUEFT: "Vermessung durchführen",
-            ItemStatus.VERMESSEN: "Bearbeitung abschließen",
+            ItemStatus.VERMESSEN: "Sichtkontrolle durchführen",
+            ItemStatus.SICHTKONTROLLE_DURCHGEFUEHRT: "Dokumente zusammenführen",
+            ItemStatus.DOKUMENTE_ZUSAMMENGEFUEHRT: "Waren einlagern",
+            ItemStatus.WAREN_EINGELAGERT: "Keine Aktion erforderlich (abgeschlossen)",
+            ItemStatus.AUSSCHUSS: "Keine Aktion erforderlich (Ausschuss)",
         }
 
         return action_mapping.get(current_status, "Keine Aktion erforderlich")

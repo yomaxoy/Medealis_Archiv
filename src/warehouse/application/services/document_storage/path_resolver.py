@@ -170,9 +170,14 @@ class PathResolver:
             )
 
             # Validiere dass Server erreichbar ist
-            if not self._server_storage_path.exists():
+            try:
+                if not self._server_storage_path.exists():
+                    self.logger.warning(
+                        f"Server-Pfad nicht erreichbar: {self._server_storage_path}"
+                    )
+            except (OSError, PermissionError) as e:
                 self.logger.warning(
-                    f"Server-Pfad nicht erreichbar: {self._server_storage_path}"
+                    f"Server-Pfad nicht verfügbar: {self._server_storage_path} ({e})"
                 )
 
         return self._server_storage_path

@@ -198,18 +198,18 @@ class Delivery:
                 self.completed_at = datetime.now()
 
         # 3. IN_BEARBEITUNG: Mindestens ein Artikel über DATEN_GEPRUEFT
-        # NEU: String-basierte Status
+        # IST-Zustand: Artikel haben bereits Prüfungen abgeschlossen
         elif any(
-            status in ["Vermessen", "Sichtkontrolle", "Dokumente zusammenführen", "Bereit zum Abschluss"]
+            status in ["Dokumente geprüft", "Vermessen", "Sichtkontrolle durchgeführt", "Dokumente zusammengeführt"]
             for status in item_statuses
         ):
             self.status = DeliveryStatus.IN_BEARBEITUNG
 
-        # 2. ERFASST: Alle Artikel mindestens DATEN_GEPRUEFT (haben "Daten prüfen" abgeschlossen)
-        elif all(status != "Daten prüfen" for status in item_statuses):
+        # 2. ERFASST: Alle Artikel mindestens DATEN_GEPRUEFT (haben Datenprüfung abgeschlossen)
+        elif all(status != "Artikel angelegt" for status in item_statuses):
             self.status = DeliveryStatus.ERFASST
 
-        # 1. EMPFANGEN: Default (alle oder einige Artikel noch bei "Daten prüfen")
+        # 1. EMPFANGEN: Default (alle oder einige Artikel noch nur angelegt)
         else:
             self.status = DeliveryStatus.EMPFANGEN
 
@@ -228,64 +228,55 @@ class Delivery:
         if not self.items:
             return 0.0
 
-        # NEU: Status ist String
+        # IST-Zustand: Status gibt abgeschlossene Aktionen an
         final_items = len([
             item for item in self.items
-            if item.get_current_status() in ["Abgeschlossen", "Ausschuss"]
+            if item.get_current_status() in ["Waren eingelagert", "Ausschuss"]
         ])
         return (final_items / len(self.items)) * 100
 
     def all_items_final(self) -> bool:
-        """Prüft, ob alle Artikel final sind (ABGESCHLOSSEN oder AUSSCHUSS)."""
-        # NEU: Status ist String
+        """Prüft, ob alle Artikel final sind (WAREN_EINGELAGERT oder AUSSCHUSS)."""
+        # IST-Zustand
         return all(
-            item.get_current_status() in ["Abgeschlossen", "Ausschuss"]
+            item.get_current_status() in ["Waren eingelagert", "Ausschuss"]
             for item in self.items
         )
 
     def all_items_data_checked(self) -> bool:
         """Prüft, ob alle Artikel mindestens Status DATEN_GEPRUEFT haben."""
-        # NEU: Status ist String - "Daten prüfen" ist der erste Schritt
-        return all(item.get_current_status() != "Daten prüfen" for item in self.items)
+        # IST-Zustand: Alle Items haben Datenprüfung abgeschlossen
+        return all(item.get_current_status() != "Artikel angelegt" for item in self.items)
 
     def get_non_final_items(self) -> List[Item]:
         """Gibt alle nicht-finalen Artikel zurück."""
-        # NEU: Status ist String
+        # IST-Zustand
         return [
             item for item in self.items
-            if item.get_current_status() not in ["Abgeschlossen", "Ausschuss"]
+            if item.get_current_status() not in ["Waren eingelagert", "Ausschuss"]
         ]
 
     def get_items_needing_data_check(self) -> List[Item]:
         """Gibt Artikel zurück, die noch Datenprüfung benötigen."""
-        # NEU: Status ist String
+        # IST-Zustand: Nur angelegt, aber noch nicht geprüft
         return [
-            item for item in self.items if item.get_current_status() == "Daten prüfen"
+            item for item in self.items if item.get_current_status() == "Artikel angelegt"
         ]
 
     def has_items_in_processing(self) -> bool:
         """Prüft, ob Artikel in Bearbeitung sind (über DATEN_GEPRUEFT hinaus)."""
-        # NEU: Status ist String
+        # IST-Zustand: Artikel haben bereits Prüfungen abgeschlossen
         processing_statuses = [
-            "Dokumente prüfen",
+            "Daten geprüft",
+            "Dokumente geprüft",
             "Vermessen",
-            "Sichtkontrolle",
-            "Dokumente zusammenführen",
-            "Bereit zum Abschluss"
+            "Sichtkontrolle durchgeführt",
+            "Dokumente zusammengeführt"
         ]
         return any(
             item.get_current_status() in processing_statuses
             for item in self.items
         )
-
-    def _old_has_items_in_processing(self) -> bool:
-        """ALTE VERSION - KANN GELÖSCHT WERDEN."""
-        processing_statuses = [
-            ItemStatus.SICHT_GEPRUEFT,
-            ItemStatus.DOKUMENTE_GEPRUEFT,
-            ItemStatus.VERMESSEN,
-        ]
-        return any(item.status in processing_statuses for item in self.items)
 
     def get_delivery_progress_summary(self) -> Dict[str, Any]:
         """Gibt detaillierte Fortschritts-Übersicht zurück."""

@@ -1,11 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git pull --rebase)",
-      "Bash(git stash)",
-      "Bash(git stash pop)",
-      "Bash(git stash drop)",
-      "Bash(git add .claude/settings.local.json src/warehouse/presentation/)"
+      "Bash(python -m py_compile \"src\\warehouse\\presentation\\shared\\popups\\data_confirmation.py\")",
+      "Bash(git add src/warehouse/presentation/shared/popup_styles.py src/warehouse/presentation/shared/popups/data_confirmation.py src/warehouse/presentation/shared/popups/document_check.py src/warehouse/presentation/shared/popups/measurement.py src/warehouse/presentation/shared/popups/visual_inspection.py)",
+      "Bash(git push origin master)"
     ],
     "deny": [],
     "ask": []

@@ -156,11 +156,59 @@ def render_admin_interface():
     # Sidebar navigation
     render_admin_sidebar()
 
+    # Handle global popups (available from all pages)
+    handle_global_popups()
+
     # Main content area
     render_admin_main_content()
 
     # Handle popup actions
     handle_popup_actions()
+
+
+def handle_global_popups():
+    """
+    Handle global popups that should be accessible from all admin pages.
+    These popups are triggered by the sidebar quick actions.
+    """
+    try:
+        # Import shared popups used by both User & Admin
+        from warehouse.presentation.user.popups.delivery_scan import (
+            show_delivery_scan_popup,
+            show_extraction_confirmation_popup,
+        )
+        from warehouse.presentation.user.popups.iteminfo_edit_dialog import (
+            show_iteminfo_edit_dialog,
+        )
+        from warehouse.presentation.user.views.main_user_view import (
+            handle_extraction_confirmation,
+            SESSION_KEY_EXTRACTION_CONFIRMED,
+        )
+
+        # Handle Lieferschein-Scan Popup
+        if st.session_state.get("show_scan_popup"):
+            show_delivery_scan_popup()
+
+        # Handle ItemInfo Edit Dialog
+        if st.session_state.get("show_iteminfo_edit_dialog"):
+            article_data = st.session_state.get("edit_iteminfo_item_data", {})
+            if article_data:
+                show_iteminfo_edit_dialog(article_data)
+
+        # Handle Extraction Confirmation Popup
+        if st.session_state.get("show_extraction_popup") and st.session_state.get(
+            "extracted_delivery_data"
+        ):
+            show_extraction_confirmation_popup(st.session_state.extracted_delivery_data)
+
+        # Handle popup actions (extraction confirm)
+        if st.session_state.get("popup_action") == "extraction_confirm":
+            services = st.session_state.get("services", {})
+            handle_extraction_confirmation(services)
+
+    except Exception as e:
+        logger.error(f"Error handling global popups: {e}")
+        st.error(f"Popup-Fehler: {e}")
 
 
 def render_admin_sidebar():
@@ -418,20 +466,14 @@ def render_audit_log_page():
 
 
 def handle_popup_actions():
-    """Handle popup actions from session state."""
+    """Handle popup actions from session state (legacy page-specific popups)."""
     try:
-        # Show scan popup
-        if st.session_state.get("show_scan_popup"):
-            from warehouse.presentation.admin.popups.delivery_view.delivery_popups import (
-                show_scan_delivery_slip_popup,
-            )
+        # NOTE: Global popups (scan, extraction) are now handled in handle_global_popups()
+        # This function only handles page-specific popup actions
 
-            show_scan_delivery_slip_popup()
-            st.session_state.show_scan_popup = False
-
-        # Handle popup action results
+        # Handle popup action results (non-extraction actions)
         popup_action = st.session_state.get("popup_action")
-        if popup_action:
+        if popup_action and popup_action != "extraction_confirm":
             handle_popup_action_result(popup_action)
             st.session_state.popup_action = None
 

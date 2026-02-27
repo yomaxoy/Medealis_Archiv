@@ -104,6 +104,10 @@ class GenerationContext:
                 'chargennr': self.batch_number,    # Für Begleitschein Dateiname
                 'batch_number': self.batch_number,  # Added for barcode template compatibility
 
+                # Kombinierte Placeholders für Wareneingangskontrolle
+                'artikel': f"{self.article_number}_{self.batch_number}" if self.article_number and self.batch_number else self.article_number,  # Artikelnummer_Chargennummer
+                'charge': self.batch_number,       # Chargennummer separat
+
                 'lieferant': self.supplier_name,
                 'datum': self.generation_timestamp.strftime("%d.%m.%Y"),
                 'date': self.generation_timestamp.strftime("%d.%m.%Y"),
@@ -131,7 +135,7 @@ class GenerationContext:
                 'manufacturer': self.manufacturer,
                 'hersteller': self.manufacturer,
                 'lieferantnr': self.supplier_normalized or '',  # Lieferantennummer
-                'itemnrL': '',                     # Artikelnummer Lieferant (meist leer)
+                'itemnrL': '.-',                   # Artikelnummer Lieferant (Standard: .-)
 
                 # Employee & Timestamps
                 'name': self.employee_name,

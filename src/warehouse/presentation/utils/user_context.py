@@ -26,17 +26,22 @@ def get_current_user() -> Optional[dict]:
 
 def get_current_username() -> str:
     """
-    Gibt den Benutzernamen des aktuell eingeloggten Users zurück.
+    Gibt den vollständigen Namen des aktuell eingeloggten Users zurück.
 
+    Fallback auf username wenn full_name nicht vorhanden ist.
     Fallback auf "System" wenn kein User eingeloggt ist.
 
     Returns:
-        Username als String
+        Vollständiger Name oder Username als String
     """
     user = st.session_state.get("current_user")
     if user is None:
         return "System"
     if isinstance(user, dict):
+        # Priorisiere full_name, fallback auf username
+        full_name = user.get("full_name")
+        if full_name and full_name.strip():
+            return full_name
         return user.get("username", "System")
     return str(user)
 

@@ -271,7 +271,7 @@ def show_main_user_view():
 
 def show_item_table(services):
     """Show item table with latest items at the bottom."""
-    # Compact table CSS for reduced row height
+    # Compact table CSS for reduced row height and centered button icons
     st.markdown(
         """
         <style>
@@ -285,13 +285,17 @@ def show_item_table(services):
             margin-bottom: 0.2rem !important;
         }
 
-        /* Compact buttons */
+        /* Compact buttons with centered icons */
         div[data-testid="column"] button {
-            padding: 0.2rem 0.3rem !important;
-            font-size: 0.85rem !important;
-            min-height: 2rem !important;
+            padding: 0.4rem 0.3rem !important;
+            font-size: 1rem !important;
+            min-height: 2.2rem !important;
             width: 100% !important;
             margin: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1 !important;
         }
 
         /* Remove padding from button columns */
@@ -332,7 +336,7 @@ def show_item_table(services):
                 del st.session_state.user_filter_status
             st.rerun()
 
-    # Status filter buttons
+    # Status filter buttons (IST-Zustand)
     st.write("**📊 Status-Filter:**")
     (
         status_col1,
@@ -356,25 +360,25 @@ def show_item_table(services):
 
     with status_col2:
         button_type = (
-            "primary" if current_status_filter == "Daten prüfen" else "secondary"
+            "primary" if current_status_filter == "Daten geprüft" else "secondary"
         )
         if st.button(
-            "📋 Daten prüfen",
+            "📋 Daten geprüft",
             use_container_width=True,
             type=button_type,
             key="status_data",
         ):
-            st.session_state.user_filter_status = "Daten prüfen"
+            st.session_state.user_filter_status = "Daten geprüft"
             st.rerun()
 
     with status_col3:
         button_type = (
-            "primary" if current_status_filter == "Dokumente prüfen" else "secondary"
+            "primary" if current_status_filter == "Dokumente geprüft" else "secondary"
         )
         if st.button(
             "📄 Dokumente", use_container_width=True, type=button_type, key="status_docs"
         ):
-            st.session_state.user_filter_status = "Dokumente prüfen"
+            st.session_state.user_filter_status = "Dokumente geprüft"
             st.rerun()
 
     with status_col4:
@@ -390,7 +394,7 @@ def show_item_table(services):
 
     with status_col5:
         button_type = (
-            "primary" if current_status_filter == "Sichtkontrolle" else "secondary"
+            "primary" if current_status_filter == "Sichtkontrolle durchgeführt" else "secondary"
         )
         if st.button(
             "👁️ Sichtkontrolle",
@@ -398,20 +402,20 @@ def show_item_table(services):
             type=button_type,
             key="status_visual",
         ):
-            st.session_state.user_filter_status = "Sichtkontrolle"
+            st.session_state.user_filter_status = "Sichtkontrolle durchgeführt"
             st.rerun()
 
     with status_col6:
         button_type = (
-            "primary" if current_status_filter == "Freigegeben" else "secondary"
+            "primary" if current_status_filter == "Waren eingelagert" else "secondary"
         )
         if st.button(
-            "✅ Freigegeben",
+            "✅ Eingelagert",
             use_container_width=True,
             type=button_type,
             key="status_approved",
         ):
-            st.session_state.user_filter_status = "Freigegeben"
+            st.session_state.user_filter_status = "Waren eingelagert"
             st.rerun()
 
     st.write("---")
@@ -524,16 +528,16 @@ def show_item_table(services):
 
     # Display table
     if filtered_items:
-        # Table header with Status column after Chargen-Nr
-        header_cols = st.columns([1.2, 1.5, 2.0, 0.8, 1.2, 1.5, 1.8, 3.0])
+        # Table header with Status column after Chargen-Nr (harmonized with Admin View)
+        header_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0])
         header_labels = [
             "LS-Nr",
             "Artikel-Nr",
             "Chargen-Nr",
             "Menge",
+            "Status",
             "WE-Datum",
             "Lieferant",
-            "Status",
             "Aktionen",
         ]
 
@@ -545,27 +549,23 @@ def show_item_table(services):
 
         # Table rows - oldest first, newest last (as requested)
         for i, item in enumerate(filtered_items):
-            row_cols = st.columns([1.2, 1.5, 2.0, 0.8, 1.2, 1.5, 1.8, 3.0])
+            row_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0])
 
             with row_cols[0]:
                 st.markdown(f"`{item['delivery_number']}`")
             with row_cols[1]:
                 st.markdown(f"`{item['article_number']}`")
             with row_cols[2]:
-                # Truncate long batch numbers for compact display
-                batch = item["batch_number"]
-                if len(batch) > 15:
-                    st.markdown(f"`{batch[:12]}...`")
-                else:
-                    st.markdown(f"`{batch}`")
+                # Show full batch number (no truncation)
+                st.markdown(f"`{item['batch_number']}`")
             with row_cols[3]:
                 st.markdown(f"**{item['quantity']}**")
             with row_cols[4]:
-                st.markdown(item["delivery_date"])
-            with row_cols[5]:
-                st.markdown(item["supplier"])
-            with row_cols[6]:
                 st.markdown(item["status"])
+            with row_cols[5]:
+                st.markdown(item["delivery_date"])
+            with row_cols[6]:
+                st.markdown(item["supplier"])
 
             # Action buttons column - 6 buttons (ItemInfo + 5 workflow buttons)
             with row_cols[7]:
@@ -599,14 +599,14 @@ def show_item_table(services):
 
                     if domain_item:
                         iteminfo_completed = domain_item.is_step_completed(
-                            "Artikeldetails vollständig"
+                            "Artikel angelegt"
                         )
-                        data_completed = domain_item.is_step_completed("Daten prüfen")
+                        data_completed = domain_item.is_step_completed("Daten geprüft")
                         docs_completed = domain_item.is_step_completed(
-                            "Dokumente prüfen"
+                            "Dokumente geprüft"
                         )
                         visual_completed = domain_item.is_step_completed(
-                            "Sichtkontrolle"
+                            "Sichtkontrolle durchgeführt"
                         )
                         measurement_completed = domain_item.is_step_completed(
                             "Vermessen"

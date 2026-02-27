@@ -263,13 +263,13 @@ class DeliveryWorkflowService:
             delivery_number = delivery_data.get('delivery_number', '')
             item_status = override_status or first_item.get('status', '').strip()
 
-            # Define available documents with status requirements
+            # Define available documents with status requirements (IST-Zustand)
             # NOTE: Sichtkontrolle removed - only created via Visual Inspection Popup
             all_documents = [
-                ('PDB', 'create_pdb_document', 'Daten bestätigt'),
+                ('PDB', 'create_pdb_document', 'Daten geprüft'),
                 ('Begleitschein', 'create_begleitschein_document', 'Dokumente geprüft'),
                 ('Wareneingangskontrolle', 'create_wareneingangskontrolle_document', 'Dokumente geprüft'),
-                ('Barcode', '_create_barcode_files', 'Daten bestätigt')
+                ('Barcode', '_create_barcode_files', 'Daten geprüft')
             ]
 
             # Filter documents if specific types requested

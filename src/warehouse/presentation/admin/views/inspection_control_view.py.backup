@@ -1,0 +1,1199 @@
+"""
+Inspection Control View - Admin Presentation Layer
+Wareneingangskontrolle (Goods Receipt Control) functionality.
+"""
+
+import streamlit as st
+import logging
+from typing import Dict, Any, List, Optional
+from warehouse.application.services.entity_services.delivery_service import (
+    DeliveryService,
+)
+
+# Import shared popups (User & Admin nutzen die gleichen!)
+from warehouse.presentation.shared.popups import (
+    show_visual_inspection_popup,
+    show_measurement_popup,
+    show_document_check_popup,
+    show_data_confirmation_popup,
+)
+
+# Admin-spezifische Popups (nur Merge bleibt)
+from warehouse.presentation.admin.popups.inspection_controll_view.merge_check_popup import (
+    show_merge_check_popup,
+)
+from warehouse.presentation.admin.utils.document_workflow_handler import (
+    create_workflow_documents,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def show_inspection_control_view():
+    """Show Wareneingangskontrolle (Goods Receipt Control) - matches original streamlit_app.py"""
+    st.subheader("🔍 Wareneingangskontrolle")
+    st.write(
+        "Übersicht und Kontrolle aller eingehenden Artikel mit strukturiertem Workflow."
+    )
+
+    # Check system initialization
+    if not st.session_state.get("system_initialized"):
+        st.warning("System nicht initialisiert")
+        return
+
+    # Check for refresh flag and trigger refresh if needed
+    if st.session_state.get("refresh_main_page"):
+        # Show success message if available
+        if st.session_state.get("status_update_success"):
+            st.success(f"✅ {st.session_state['status_update_success']}")
+            del st.session_state["status_update_success"]
+        # Clear the refresh flag
+        del st.session_state["refresh_main_page"]
+        # Trigger immediate refresh to reload data
+        st.rerun()
+
+    # Get services
+    services = st.session_state.get("services", {})
+    if "item" not in services:
+        st.error("Item Service nicht verfügbar")
+        return
+
+    # Show main inspection interface (no tabs, direct implementation like original)
+    show_main_inspection_interface(services)
+
+    # Handle popup actions
+    if st.session_state.get("popup_action"):
+        action = st.session_state.popup_action
+
+        # Debug: Show what action is being processed
+        st.write(f"🔍 **DEBUG - Processing popup action: '{action}'**")
+        if st.session_state.get("confirmed_data_item"):
+            confirmed_item_str = str(st.session_state["confirmed_data_item"])
+            st.write(
+                f"🔍 **DEBUG - confirmed_data_item exists: {confirmed_item_str[:100]}...**"
+            )
+
+        if action == "extraction_confirm":
+            # User confirmed extraction data - save to database using working implementation
+            extraction_data = st.session_state.extraction_confirmed
+
+            try:
+                # Use the DeliveryService.create_delivery_from_extraction method
+                delivery_service = DeliveryService()
+                result = delivery_service.create_delivery_from_extraction(
+                    extraction_data
+                )
+
+                if result.get("success"):
+                    st.success(
+                        f"✅ Daten erfolgreich gespeichert! Lieferung: {extraction_data.get('delivery_number')}"
+                    )
+                    st.balloons()
+
+                    # Clean up session state
+                    if "extracted_delivery_data" in st.session_state:
+                        del st.session_state.extracted_delivery_data
+                else:
+                    st.error(
+                        f"❌ Fehler beim Speichern: {result.get('error', 'Unbekannter Fehler')}"
+                    )
+
+            except Exception as e:
+                logger.error(f"Database save error: {e}")
+                st.error(f"❌ Fehler beim Speichern: {e}")
+
+            st.session_state.confirmed_extraction = extraction_data
+
+        elif action == "extraction_edit":
+            # User wants to edit extraction data
+            st.info("📝 Bearbeitung noch nicht implementiert")
+
+        elif action == "extraction_discard":
+            # User discarded extraction data
+            st.warning("❌ Daten wurden verworfen")
+
+        # NOTE: Visual inspection handler removed - popup now handles everything directly
+        # Popup calls complete_visual_inspection() or mark_item_as_waste() and does st.rerun()
+        # No handler needed!
+
+        # NOTE: Measurement handler removed - popup now handles everything directly
+        # Popup calls complete_measurement() and does st.rerun()
+        # No handler needed!
+
+        elif action in [
+            "data_confirmed",
+            "data_and_docs_confirmed",
+            "step1_completed",
+            "step2_completed",
+        ] and st.session_state.get("confirmed_data_item"):
+            # Handle data confirmation popup result - copied from original streamlit_app.py
+            try:
+                confirmed_item = st.session_state.confirmed_data_item
+
+                # REMOVED: Session state status override - DB is single source of truth
+                # article_key = f"{confirmed_item['article_number']}_{confirmed_item['batch_number']}_{confirmed_item['delivery_number']}"
+                # st.session_state[f"item_status_{article_key}"] = confirmed_item["status"]
+
+                # Update in database
+                item_service = services["item"]
+
+                # Check if batch number was changed
+                if (
+                    confirmed_item.get("original_batch_number")
+                    != confirmed_item["batch_number"]
+                ):
+                    st.info(
+                        f"🔄 Chargennummer geändert: {confirmed_item.get('original_batch_number')} → {confirmed_item['batch_number']}"
+                    )
+
+                    # Update batch number using the service
+                    try:
+                        batch_update_result = item_service.update_item(
+                            article_number=confirmed_item["article_number"],
+                            batch_number=confirmed_item.get("original_batch_number"),
+                            delivery_number=confirmed_item["delivery_number"],
+                            new_batch_number=confirmed_item["batch_number"],
+                        )
+
+                        if batch_update_result:
+                            st.success(f"✅ Chargennummer erfolgreich aktualisiert")
+                        else:
+                            st.warning("⚠️ Chargennummer-Update fehlgeschlagen")
+                    except Exception as e:
+                        st.error(f"❌ Fehler beim Update der Chargennummer: {e}")
+
+                # Update quantities if they differ
+                if confirmed_item.get("confirmed_quantity") and str(
+                    confirmed_item["confirmed_quantity"]
+                ) != str(confirmed_item.get("delivered_quantity", "")):
+                    try:
+                        # Update confirmed quantity
+                        quantity_result = item_service.update_item(
+                            article_number=confirmed_item["article_number"],
+                            batch_number=confirmed_item["batch_number"],
+                            delivery_number=confirmed_item["delivery_number"],
+                            quantity=int(confirmed_item["confirmed_quantity"]),
+                        )
+
+                        if quantity_result:
+                            st.success(
+                                f"✅ Menge aktualisiert: {confirmed_item['confirmed_quantity']}"
+                            )
+                        else:
+                            st.warning("⚠️ Mengen-Update fehlgeschlagen")
+                    except (ValueError, TypeError):
+                        st.warning(
+                            "⚠️ Ungültige Mengeneingabe - wurde nicht gespeichert"
+                        )
+
+                # NOTE: Status update removed - popup already calls complete_data_check() or complete_document_check()
+                # Handler only does POST-PROCESSING (batch/quantity updates) + NAVIGATION
+
+                try:
+
+                    # 🔄 EVENT-DRIVEN DOCUMENT CREATION: Trigger document creation for 'data_and_docs_confirmed'
+                    if action == "data_and_docs_confirmed":
+                        st.info(
+                            "📄 **Erstelle automatisch Dokumente für Wareneingangskontrolle...**"
+                        )
+
+                        try:
+                            # Trigger document creation event
+                            document_result = create_workflow_documents(
+                                trigger_event="documents_confirmed",
+                                delivery_number=confirmed_item["delivery_number"],
+                                item_data={
+                                    "article_number": confirmed_item["article_number"],
+                                    "batch_number": confirmed_item["batch_number"],
+                                    "quantity": confirmed_item.get(
+                                        "confirmed_quantity",
+                                        confirmed_item.get("delivered_quantity", ""),
+                                    ),
+                                    "storage_location": confirmed_item.get(
+                                        "storage_location", ""
+                                    ),
+                                    "order_number": confirmed_item.get(
+                                        "order_number", ""
+                                    ),
+                                },
+                                user_preferences={
+                                    "save_to_folder": True,
+                                    "auto_print": False,
+                                    "auto_open": False,
+                                    "auto_download": False,
+                                },
+                            )
+
+                            if document_result.get("success"):
+                                st.balloons()
+                                st.success(
+                                    f"🎉 **Workflow-Dokumente erfolgreich erstellt!**"
+                                )
+                            else:
+                                st.warning(
+                                    "⚠️ Dokument-Erstellung teilweise fehlgeschlagen"
+                                )
+
+                        except Exception as doc_e:
+                            logger.error(f"Document creation error: {doc_e}")
+                            st.error(f"❌ Fehler bei der Dokument-Erstellung: {doc_e}")
+
+                except Exception as e:
+                    st.error(f"❌ Fehler beim Status-Update: {e}")
+
+                # Process document information if combined check was performed
+                if (
+                    action == "data_and_docs_confirmed"
+                    and "documents_found" in confirmed_item
+                ):
+                    documents_found = confirmed_item["documents_found"]
+                    document_summary = []
+
+                    if documents_found.get("materialzeugnis"):
+                        document_summary.append("📋 Materialzeugnis")
+                    if documents_found.get("messprotokolle"):
+                        document_summary.append("📊 Messprotokolle")
+                    if documents_found.get("beschichtungszeugnis"):
+                        document_summary.append("🎨 Beschichtungszeugnis")
+                    if documents_found.get("haertezeugnis"):
+                        document_summary.append("🔨 Härtezeugnis")
+                    if documents_found.get("weitere_zeugnisse"):
+                        document_summary.append(
+                            f"📝 {documents_found['weitere_zeugnisse']}"
+                        )
+
+                    if document_summary:
+                        st.info(f"📄 Dokumente erfasst: {', '.join(document_summary)}")
+                    else:
+                        st.warning("⚠️ Keine Dokumente angegeben")
+
+                # Show storage location if provided
+                if confirmed_item.get("storage_location"):
+                    st.info(f"📦 Lagerplatz: {confirmed_item['storage_location']}")
+
+                # Show order information if provided
+                if confirmed_item.get("order_number"):
+                    st.info(f"📋 Bestellnummer: {confirmed_item['order_number']}")
+
+                # Show order document path if saved
+                if confirmed_item.get("order_document_path"):
+                    st.info(
+                        f"📄 Bestelldokument gespeichert: {confirmed_item['order_document_path']}"
+                    )
+
+                # Handle two-step workflow transitions
+                if action == "step1_completed":
+                    st.success("🎉 **Schritt 1 abgeschlossen! Gehe zu Schritt 2...**")
+                    # Keep step1_confirmed_data for step 2, but clear confirmed_data_item
+                    st.session_state.confirmed_data_item = None
+                    st.rerun()  # Trigger rerun to show step 2 popup
+                    return  # Exit early to avoid general cleanup
+
+                elif action == "step2_completed":
+                    st.success(
+                        "🎉 **Zwei-Schritt-Workflow erfolgreich abgeschlossen!**"
+                    )
+                    # Show summary of both steps
+                    if confirmed_item.get("step1_data"):
+                        st.info("📄 **Zusammenfassung:**")
+                        st.write("  - ✅ Schritt 1: Daten bestätigt")
+                        st.write("  - ✅ Schritt 2: Dokumente bestätigt")
+
+                    # Clean up both step data
+                    if "step1_confirmed_data" in st.session_state:
+                        del st.session_state["step1_confirmed_data"]
+
+                # HANDLER CLEANUP: Clean up session state after processing
+                st.session_state.confirmed_data_item = None
+                if 'popup_action' in st.session_state:
+                    del st.session_state['popup_action']
+
+                # Force refresh of item list to show updated status
+                if "cached_items" in st.session_state:
+                    del st.session_state.cached_items
+
+                st.success("✅ Artikel-Status erfolgreich aktualisiert!")
+
+            except Exception as e:
+                logger.error(f"Data confirmation processing error: {e}")
+                st.error(f"❌ Fehler bei der Datenbestätigung: {e}")
+
+        elif action == "close":
+            # Close popup
+            pass
+
+        elif action == "cancel":
+            # Handle cancel action from two-step workflow or legacy workflow
+            st.info("❌ Vorgang abgebrochen")
+
+            # HANDLER CLEANUP: Clean up step-related session state on cancel
+            if "step1_confirmed_data" in st.session_state:
+                del st.session_state["step1_confirmed_data"]
+            if "confirmed_data_item" in st.session_state:
+                del st.session_state["confirmed_data_item"]
+            if "popup_action" in st.session_state:
+                del st.session_state["popup_action"]
+
+        # Clear popup state
+        st.session_state.popup_action = None
+        st.session_state.show_extraction_popup = False
+        if action != "close":
+            st.rerun()
+
+
+def show_main_inspection_interface(services):
+    """Show main inspection interface matching original streamlit_app.py layout."""
+
+    # Filter controls (harmonized with User View)
+    st.write("### 🔍 Filter-Optionen")
+
+    # Text filters row
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        filter_delivery_number = st.text_input(
+            "LS-Nr Filter:",
+            value=st.session_state.get("wek_filter_ls", ""),
+            key="wek_filter_ls",
+            help="Lieferscheinnummer filtern",
+        )
+
+    with col2:
+        filter_article_number = st.text_input(
+            "Artikel-Nr Filter:",
+            value=st.session_state.get("wek_filter_article", ""),
+            key="wek_filter_article",
+            help="Artikelnummer filtern",
+        )
+
+    with col3:
+        filter_batch_number = st.text_input(
+            "Chargen-Nr Filter:",
+            value=st.session_state.get("wek_filter_batch", ""),
+            key="wek_filter_batch",
+            help="Chargennummer filtern",
+        )
+
+    with col4:
+        if st.button("🔄 Zurücksetzen", use_container_width=True):
+            # Clear filter session state
+            keys_to_delete = [
+                "wek_filter_ls",
+                "wek_filter_status",
+                "wek_filter_article",
+                "wek_filter_batch",
+            ]
+            for key in keys_to_delete:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+
+    # Status filter buttons (IST-Zustand) - harmonized with User View
+    st.write("**📊 Status-Filter:**")
+    (
+        status_col1,
+        status_col2,
+        status_col3,
+        status_col4,
+        status_col5,
+        status_col6,
+    ) = st.columns(6)
+
+    # Get current filter status
+    current_status_filter = st.session_state.get("wek_filter_status", None)
+
+    with status_col1:
+        button_type = "primary" if current_status_filter is None else "secondary"
+        if st.button(
+            "Alle", use_container_width=True, type=button_type, key="admin_status_all"
+        ):
+            st.session_state.wek_filter_status = None
+            st.rerun()
+
+    with status_col2:
+        button_type = (
+            "primary" if current_status_filter == "Daten geprüft" else "secondary"
+        )
+        if st.button(
+            "📋 Daten geprüft",
+            use_container_width=True,
+            type=button_type,
+            key="admin_status_data",
+        ):
+            st.session_state.wek_filter_status = "Daten geprüft"
+            st.rerun()
+
+    with status_col3:
+        button_type = (
+            "primary" if current_status_filter == "Dokumente geprüft" else "secondary"
+        )
+        if st.button(
+            "📄 Dokumente", use_container_width=True, type=button_type, key="admin_status_docs"
+        ):
+            st.session_state.wek_filter_status = "Dokumente geprüft"
+            st.rerun()
+
+    with status_col4:
+        button_type = "primary" if current_status_filter == "Vermessen" else "secondary"
+        if st.button(
+            "📏 Vermessen",
+            use_container_width=True,
+            type=button_type,
+            key="admin_status_measure",
+        ):
+            st.session_state.wek_filter_status = "Vermessen"
+            st.rerun()
+
+    with status_col5:
+        button_type = (
+            "primary" if current_status_filter == "Sichtkontrolle durchgeführt" else "secondary"
+        )
+        if st.button(
+            "👁️ Sichtkontrolle",
+            use_container_width=True,
+            type=button_type,
+            key="admin_status_visual",
+        ):
+            st.session_state.wek_filter_status = "Sichtkontrolle durchgeführt"
+            st.rerun()
+
+    with status_col6:
+        button_type = (
+            "primary" if current_status_filter == "Waren eingelagert" else "secondary"
+        )
+        if st.button(
+            "✅ Eingelagert",
+            use_container_width=True,
+            type=button_type,
+            key="admin_status_approved",
+        ):
+            st.session_state.wek_filter_status = "Waren eingelagert"
+            st.rerun()
+
+    # Convert None to "Alle" for display logic
+    filter_status = current_status_filter if current_status_filter else "Alle"
+
+    st.write("---")
+
+    # Load and display article data (matching original structure)
+    st.write("### 📋 Artikel zur Wareneingangskontrolle")
+
+    all_sample_data = []
+    try:
+        # Load real data from database (like original)
+        delivery_service = services.get("delivery")
+        item_service = services["item"]
+
+        # Get all deliveries and items
+        deliveries_data = (
+            delivery_service.get_all_deliveries()
+            if delivery_service and hasattr(delivery_service, "get_all_deliveries")
+            else []
+        )
+        items_data = (
+            item_service.get_all_items()
+            if hasattr(item_service, "get_all_items")
+            else []
+        )
+
+        # Combine delivery and item data for Wareneingangskontrolle (like original)
+        for item in items_data:
+            # Find matching delivery
+            matching_delivery = None
+            for delivery in deliveries_data:
+                if item.get("delivery_number") == delivery.get("delivery_number"):
+                    matching_delivery = delivery
+                    break
+
+            # Create Wareneingangskontrolle entry (matching original format)
+            article_key = f"{item.get('article_number', 'N/A')}_{item.get('batch_number', 'N/A')}_{item.get('delivery_number', 'N/A')}"
+
+            # FIXED: Use real status from database only (no session state override)
+            # Single Source of Truth = Database
+            updated_status = item.get("status", "Daten prüfen")
+
+            wek_entry = {
+                "delivery_number": item.get("delivery_number", "N/A"),
+                "article_number": item.get("article_number", "N/A"),
+                "batch_number": item.get("batch_number", "N/A"),
+                "quantity": str(item.get("quantity", "N/A")),
+                "status": updated_status,
+                "we_date": item.get("delivery_date", "2024-08-29"),
+                "supplier": (
+                    matching_delivery.get("supplier_name", "Unbekannt")
+                    if matching_delivery
+                    else "Unbekannt"
+                ),
+                "description": item.get(
+                    "description", f"Item {item.get('article_number', 'N/A')}"
+                ),
+                "order_number": item.get(
+                    "order_number", ""
+                ),  # Add order_number from database
+                "storage_location": item.get(
+                    "storage_location", ""
+                ),  # Add storage_location from database
+            }
+            all_sample_data.append(wek_entry)
+
+        st.success(f"✅ {len(all_sample_data)} Artikel aus der Datenbank geladen")
+
+    except Exception as e:
+        st.warning(f"⚠️ Konnte echte Daten nicht laden: {e}")
+        st.info("📋 Verwende Beispieldaten als Fallback")
+
+        # Fallback data (like original)
+        fallback_data = [
+            {
+                "delivery_number": "DEL-001",
+                "article_number": "A001",
+                "batch_number": "B123456",
+                "quantity": "10",
+                "status": "Artikel angelegt",
+                "we_date": "2024-08-29",
+                "supplier": "Primec",
+                "description": "Test Artikel",
+            }
+        ]
+        all_sample_data = fallback_data
+
+    # Apply filters (like original)
+    filtered_data = all_sample_data.copy()
+
+    if filter_delivery_number:
+        filtered_data = [
+            item
+            for item in filtered_data
+            if filter_delivery_number.upper() in item["delivery_number"].upper()
+        ]
+
+    if filter_status != "Alle":
+        filtered_data = [
+            item for item in filtered_data if item["status"] == filter_status
+        ]
+
+    if filter_article_number:
+        filtered_data = [
+            item
+            for item in filtered_data
+            if filter_article_number.upper() in item["article_number"].upper()
+        ]
+
+    if filter_batch_number:
+        filtered_data = [
+            item
+            for item in filtered_data
+            if filter_batch_number.upper() in item["batch_number"].upper()
+        ]
+
+    # Show results (like original)
+    if filtered_data:
+        # Filter status display
+        active_filters = []
+        if filter_delivery_number:
+            active_filters.append(f"LS: '{filter_delivery_number}'")
+        if filter_status != "Alle":
+            active_filters.append(f"Status: '{filter_status}'")
+        if filter_article_number:
+            active_filters.append(f"Artikel: '{filter_article_number}'")
+        if filter_batch_number:
+            active_filters.append(f"Charge: '{filter_batch_number}'")
+
+        if active_filters:
+            st.info(
+                f"📊 {len(filtered_data)} Artikel gefunden | Filter: {' | '.join(active_filters)}"
+            )
+        else:
+            st.info(f"📊 {len(filtered_data)} Artikel gefunden (keine Filter aktiv)")
+
+        # Table with integrated action column (matching original layout exactly)
+        st.write("### 📋 Artikel-Tabelle mit Zwei-Schritt-Workflow")
+
+        # Legend for new two-step workflow
+        with st.expander("💡 **Workflow-Legende**", expanded=False):
+            col_legend1, col_legend2 = st.columns(2)
+            with col_legend1:
+                st.write("**📋 Schritt 1: Daten bestätigen**")
+                st.write("• Artikeldaten validieren")
+                st.write("• Lagerplatz eingeben")
+                st.write("• Bestellnummer erfassen")
+                st.write("• ✅ Automatische Dokument-Erstellung")
+                st.write("  (Begleitschein, Label, Wareneingangskontrollschein)")
+
+            with col_legend2:
+                st.write("**📄 Schritt 2: Dokumente bestätigen**")
+                st.write("• Zertifikate prüfen")
+                st.write("• 🏷️ Label angebracht bestätigen")
+                st.write("• 📋 Begleitschein beigelegt bestätigen")
+                st.write("• ✅ Endstatus erreicht")
+
+            st.info(
+                "💡 **Button-Status:** 📋/📄 = Bereit | ✅ = Abgeschlossen | ⏸️ = Warten"
+            )
+
+        # Table header - optimized widths for single-line display (like original)
+        header_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0])
+        header_labels = [
+            "LS-Nr",
+            "Artikel-Nr",
+            "Chargen-Nr",
+            "Menge",
+            "Status",
+            "WE-Datum",
+            "Lieferant",
+            "Aktionen",
+        ]
+
+        for col, label in zip(header_cols, header_labels):
+            with col:
+                st.write(f"**{label}**")
+
+        st.write("---")
+
+        # Table rows with action buttons (matching original exactly)
+        for i, item_data in enumerate(filtered_data):
+            row_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0])
+
+            # Data columns - compact display (like original)
+            with row_cols[0]:
+                st.write(f"`{item_data['delivery_number']}`")
+            with row_cols[1]:
+                st.write(f"`{item_data['article_number']}`")
+            with row_cols[2]:
+                st.write(f"`{item_data['batch_number']}`")
+            with row_cols[3]:
+                st.write(f"**{item_data['quantity']}**")
+            with row_cols[4]:
+                st.write(item_data["status"])
+            with row_cols[5]:
+                st.write(item_data["we_date"])
+            with row_cols[6]:
+                st.write(item_data["supplier"])
+
+            # Action column - 6 buttons (harmonized with User View: ItemInfo + 5 Workflow)
+            with row_cols[7]:
+                action_col0, action_col1, action_col2, action_col3, action_col4, action_col5 = (
+                    st.columns(6)
+                )
+
+                # Get individual step completion status - independent of hierarchy
+                article_number = item_data.get("article_number")
+                batch_number = item_data.get("batch_number")
+                delivery_number = item_data.get("delivery_number")
+                current_status = item_data.get("status", "")
+
+                # FIXED: Check individual step completion - Fail Fast, no fallback
+                # Single Source of Truth = Domain Entity
+                try:
+                    from warehouse.domain.value_objects.article_number import (
+                        ArticleNumber,
+                    )
+                    from warehouse.domain.value_objects.batch_number import BatchNumber
+
+                    item_service = st.session_state.services["item"]
+                    article_vo = ArticleNumber(article_number)
+                    batch_vo = BatchNumber(batch_number)
+
+                    domain_item = item_service.item_repo.find_domain_by_composite_key(
+                        article_vo, batch_vo, delivery_number
+                    )
+
+                    if not domain_item:
+                        # Item not found - show error, skip row
+                        logger.error(f"Domain item not found: {article_number}/{batch_number}/{delivery_number}")
+                        st.error(f"⚠️ Item {article_number} konnte nicht geladen werden")
+                        continue  # Skip this row
+
+                    # Use domain entity as single source of truth (no fallback!)
+                    iteminfo_completed = domain_item.is_step_completed("Artikel angelegt")
+                    data_completed = domain_item.is_step_completed("Daten geprüft")
+                    docs_completed = domain_item.is_step_completed("Dokumente geprüft")
+                    visual_completed = domain_item.is_step_completed("Sichtkontrolle durchgeführt")
+                    measurement_completed = domain_item.is_step_completed("Vermessen")
+
+                except Exception as e:
+                    # FAIL FAST: Show error and skip row instead of guessing status
+                    logger.error(f"Failed to load domain item {article_number}: {e}")
+                    st.error(f"⚠️ Fehler beim Laden von {article_number} - bitte Seite neu laden")
+                    continue  # Skip this row
+
+                # Button 0: ItemInfo / Stammdaten
+                with action_col0:
+                    if iteminfo_completed:
+                        iteminfo_emoji = "✅"
+                        iteminfo_help = "Stammdaten vollständig ✓"
+                    else:
+                        iteminfo_emoji = "📝"
+                        iteminfo_help = "Stammdaten bearbeiten"
+
+                    if st.button(
+                        iteminfo_emoji,
+                        key=f"admin_iteminfo_{i}",
+                        help=iteminfo_help,
+                        use_container_width=True,
+                    ):
+                        # Hole Lieferantenname für den Dialog
+                        supplier_name = item_data.get("supplier", "")
+
+                        # Speichere Artikel-Daten für ItemInfo-Dialog
+                        st.session_state.edit_iteminfo_item_data = {
+                            "article_number": article_number,
+                            "description": item_data.get("description", ""),
+                            "manufacturer": supplier_name,
+                        }
+                        st.session_state.show_iteminfo_edit_dialog = True
+                        st.rerun()
+
+                # Button 1: Data confirmation
+                with action_col1:
+                    # Step 1 Button: Data confirmation - show completion status
+                    if data_completed:
+                        step1_emoji = "✅"
+                        step1_help = "Daten bestätigt ✓ (erneut bearbeiten)"
+                    else:
+                        step1_emoji = "📋"
+                        step1_help = "Daten bestätigen"
+
+                    if st.button(
+                        step1_emoji,
+                        key=f"step1_{i}",
+                        help=step1_help,
+                        use_container_width=True,
+                    ):
+                        # Fetch full item data including certificates from ItemService
+                        item_service = st.session_state.services["item"]
+                        full_item_data = item_service.get_item_by_composite_key(
+                            item_data["article_number"],
+                            item_data["batch_number"],
+                            item_data["delivery_number"],
+                        )
+                        # Use full data if available, otherwise fallback to basic item_data
+                        popup_data = full_item_data if full_item_data else item_data
+
+                        # Always start Step 1 (data confirmation) - SHARED POPUP!
+                        show_data_confirmation_popup(popup_data)
+
+                with action_col2:
+                    # Step 2 Button: Document confirmation - show completion status
+                    step2_enabled = (
+                        data_completed  # Only available if data is confirmed
+                    )
+
+                    # Dynamic button styling based on completion status
+                    if docs_completed:
+                        step2_emoji = "✅"
+                        step2_help = "Dokumente geprüft ✓ (erneut bearbeiten)"
+                        step2_disabled = False
+                    elif step2_enabled:
+                        step2_emoji = "📄"
+                        step2_help = "Dokumente prüfen"
+                        step2_disabled = False
+                    else:
+                        step2_emoji = "⏸️"
+                        step2_help = "Warten auf Datenprüfung"
+                        step2_disabled = True
+
+                    if st.button(
+                        step2_emoji,
+                        key=f"step2_{i}",
+                        help=step2_help,
+                        use_container_width=True,
+                        disabled=step2_disabled,
+                    ):
+                        # Fetch full item data including certificates from ItemService
+                        item_service = st.session_state.services["item"]
+                        full_item_data = item_service.get_item_by_composite_key(
+                            item_data["article_number"],
+                            item_data["batch_number"],
+                            item_data["delivery_number"],
+                        )
+                        # Use full data if available, otherwise fallback to basic item_data
+                        popup_data = full_item_data if full_item_data else item_data
+
+                        # Start Step 2 (document confirmation) - USE SHARED POPUP!
+                        show_document_check_popup(popup_data)
+
+                with action_col3:
+                    # Visual inspection button: Show completion status independent of hierarchy
+                    if visual_completed:
+                        visual_emoji = "✅"
+                        visual_help = "Sichtprüfung abgeschlossen ✓ (erneut bearbeiten)"
+                    else:
+                        visual_emoji = "👁️"
+                        visual_help = "Sichtprüfung durchführen"
+
+                    if st.button(
+                        visual_emoji,
+                        key=f"visual_check_{i}",
+                        help=visual_help,
+                        use_container_width=True,
+                    ):
+                        show_visual_inspection_popup(item_data)
+
+                with action_col4:
+                    # Measurement button: Show completion status independent of hierarchy
+                    if measurement_completed:
+                        measurement_emoji = "✅"
+                        measurement_help = (
+                            "Vermessung abgeschlossen ✓ (erneut bearbeiten)"
+                        )
+                    else:
+                        measurement_emoji = "📏"
+                        measurement_help = "Vermessung durchführen"
+
+                    if st.button(
+                        measurement_emoji,
+                        key=f"measurement_{i}",
+                        help=measurement_help,
+                        use_container_width=True,
+                    ):
+                        show_measurement_popup(item_data)
+
+                with action_col5:
+                    if st.button(
+                        "📁",
+                        key=f"doc_merge_{i}",
+                        help="Dokumente zusammenführen",
+                        use_container_width=True,
+                    ):
+                        show_merge_check_popup(item_data)
+
+            st.write("---")  # Separator between rows (like original)
+
+    else:
+        st.info("ℹ️ Keine Artikel entsprechen den Filterkriterien.")
+
+    # Status statistics (like original)
+    st.write("---")
+    st.write("### 📊 Status-Übersicht")
+    status_counts = {}
+    for item in all_sample_data:
+        status = item["status"]
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    if status_counts:
+        status_cols = st.columns(len(status_counts))
+        for i, (status, count) in enumerate(status_counts.items()):
+            with status_cols[i]:
+                st.metric(status, count)
+
+
+def render_inspection_item_row(item: Dict[str, Any], index: int, services):
+    """Render a single item row for inspection."""
+    col1, col2, col3, col4, col5 = st.columns([2, 3, 2, 2, 2])
+
+    with col1:
+        st.write(f"**{item.get('article_number', 'N/A')}**")
+
+    with col2:
+        batch = item.get("batch_number", "N/A")
+        if len(batch) > 20:
+            st.write(f"{batch[:17]}...")
+        else:
+            st.write(batch)
+
+    with col3:
+        st.write(item.get("delivery_number", "N/A"))
+
+    with col4:
+        status = item.get("status", "N/A")
+        if status == "Artikel angelegt":
+            st.warning(f"📋 {status}")
+        elif status.lower() == "pending":
+            st.warning(f"⏳ {status}")
+        elif status.lower() == "received":
+            st.info(f"📥 {status}")
+        elif status.lower() == "in_inspection":
+            st.info(f"🔍 {status}")
+        else:
+            st.write(status)
+
+    with col5:
+        if st.button("🔍 Prüfen", key=f"inspect_{index}", help="Artikel prüfen"):
+            st.session_state.inspect_item = item
+            st.rerun()
+
+
+def show_document_scan_tab(services):
+    """Show document scanning interface."""
+    st.subheader("📄 Lieferschein scannen")
+
+    # File upload
+    uploaded_file = st.file_uploader(
+        "Lieferschein-Datei hochladen:",
+        type=["pdf", "png", "jpg", "jpeg", "tiff"],
+        help="Unterstützte Formate: PDF, Bilder (PNG, JPG, TIFF)",
+    )
+
+    if uploaded_file:
+        st.success(f"✅ Datei ausgewählt: {uploaded_file.name}")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            ocr_language = st.selectbox(
+                "OCR Sprache:",
+                options=["deu", "eng", "deu+eng"],
+                index=0,
+                help="Deutsche OCR für beste Ergebnisse",
+            )
+
+        with col2:
+            ai_extraction = st.checkbox(
+                "AI-basierte Datenextraktion",
+                value=True,
+                help="Claude API für strukturierte Datenextraktion verwenden",
+            )
+
+        if st.button("🚀 Verarbeiten", type="primary"):
+            process_uploaded_document(
+                uploaded_file, ocr_language, ai_extraction, services
+            )
+
+
+def process_uploaded_document(
+    uploaded_file, ocr_language: str, ai_extraction: bool, services
+):
+    """Process uploaded document using existing workflow."""
+    try:
+        # Get processors from session state
+        processors = st.session_state.get("processors", {})
+
+        # OLD: delivery_workflow
+        # if "delivery_workflow" in processors:
+        #     workflow = processors["delivery_workflow"]
+        #     with st.spinner("Verarbeite Dokument..."):
+        #         result = workflow.process_uploaded_file(
+        #             uploaded_file,
+        #             ocr_language=ocr_language,
+        #             ai_extraction=ai_extraction,
+        #             quality_enhancement=True,
+        #         )
+
+        # NEW: hybrid system (System B → A) for delivery slip processing
+        if "document_processing_service" in processors:
+            document_processing_service = processors["document_processing_service"]
+
+            with st.spinner("Verarbeite und speichere Dokument..."):
+                # Read uploaded file data
+                uploaded_file.seek(0)  # Reset file pointer
+                document_data = uploaded_file.read()
+
+                # Process delivery slip using unified document processing
+                result = document_processing_service.process_document(
+                    document_data=document_data,
+                    document_type="delivery",
+                    context={
+                        'document_data': document_data,
+                        'filename': uploaded_file.name
+                    }
+                )
+
+            if result:
+                st.success("✅ Dokument erfolgreich verarbeitet!")
+
+                # Show storage success if available
+                if result.get('storage', {}).get('success'):
+                    storage_path = result['storage'].get('relative_path', 'Unbekannt')
+                    st.info(f"📁 Lieferschein gespeichert: {storage_path}")
+
+                st.session_state.extracted_delivery_data = result
+                st.session_state.show_extraction_popup = True
+                st.rerun()
+            else:
+                st.error("❌ Dokumentverarbeitung fehlgeschlagen")
+        else:
+            st.error("Document processing service nicht verfügbar")
+
+    except Exception as e:
+        logger.error(f"Document processing error: {e}")
+        st.error(f"Fehler bei der Dokumentverarbeitung: {e}")
+
+
+def show_quality_control_tab(services):
+    """Show quality control interface."""
+    st.subheader("✅ Qualitätsprüfung")
+
+    # Check if item is selected for inspection
+    if st.session_state.get("inspect_item"):
+        item = st.session_state.inspect_item
+        show_item_inspection_interface(item, services)
+    else:
+        st.info(
+            "👈 Wählen Sie einen Artikel aus der **Artikel-Übersicht** zur Prüfung aus."
+        )
+
+        # Show recent inspection results
+        show_recent_inspections(services)
+
+
+def show_item_inspection_interface(item: Dict[str, Any], services):
+    """Show inspection interface for a specific item."""
+    st.write(f"### 🔍 Prüfung: {item.get('article_number', 'N/A')}")
+    st.write(f"**Charge:** {item.get('batch_number', 'N/A')}")
+    st.write(f"**Lieferung:** {item.get('delivery_number', 'N/A')}")
+
+    # Inspection form
+    with st.form("inspection_form"):
+        st.write("#### ✅ Sichtkontrolle")
+
+        visual_check = st.radio(
+            "Sichtprüfung:",
+            options=["Bestanden", "Nicht bestanden", "Nachprüfung erforderlich"],
+            index=0,
+        )
+
+        st.write("#### 📏 Quantitätsprüfung")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            expected_qty = st.number_input(
+                "Erwartete Menge:", value=item.get("quantity", 1), min_value=0
+            )
+
+        with col2:
+            actual_qty = st.number_input(
+                "Tatsächliche Menge:", value=item.get("quantity", 1), min_value=0
+            )
+
+        # Quality notes
+        quality_notes = st.text_area(
+            "Prüfnotizen:", placeholder="Bemerkungen zur Qualitätsprüfung..."
+        )
+
+        # Submit inspection
+        if st.form_submit_button("✅ Prüfung abschließen", type="primary"):
+            complete_item_inspection(
+                item, visual_check, expected_qty, actual_qty, quality_notes, services
+            )
+
+    # Cancel inspection
+    if st.button("❌ Prüfung abbrechen"):
+        st.session_state.inspect_item = None
+        st.rerun()
+
+
+def complete_item_inspection(
+    item: Dict[str, Any],
+    visual_check: str,
+    expected_qty: int,
+    actual_qty: int,
+    quality_notes: str,
+    services,
+):
+    """Complete the inspection for an item using new workflow methods."""
+    try:
+        from warehouse.domain.entities.item import InspectionResult
+        from datetime import datetime
+
+        item_service = services["item"]
+        current_user = st.session_state.get('current_user', 'System')
+
+        # Use new workflow methods based on inspection results
+        if visual_check == "Bestanden" and expected_qty == actual_qty:
+            # Visual inspection passed - use complete_visual_inspection
+            inspection_result = InspectionResult(
+                performed_at=datetime.now(),
+                performed_by=current_user,
+                waste_quantity=0,
+                passed=True,
+                quality_notes=quality_notes
+            )
+
+            item_service.complete_visual_inspection(
+                article_number=item["article_number"],
+                batch_number=item["batch_number"],
+                delivery_number=item["delivery_number"],
+                performed_by=current_user,
+                waste_quantity=0,
+                quality_notes=quality_notes,
+                passed=True
+            )
+            status_emoji = "✅"
+            result_message = "Sichtkontrolle erfolgreich abgeschlossen"
+
+        elif visual_check == "Nicht bestanden":
+            # Quality failure - mark as waste
+            item_service.mark_item_as_waste(
+                article_number=item["article_number"],
+                batch_number=item["batch_number"],
+                delivery_number=item["delivery_number"],
+                reason=quality_notes or "Sichtkontrolle nicht bestanden",
+                employee=current_user
+            )
+            status_emoji = "❌"
+            result_message = "Artikel als Ausschuss markiert"
+
+        else:
+            # Needs review - create inspection with warning
+            item_service.complete_visual_inspection(
+                article_number=item["article_number"],
+                batch_number=item["batch_number"],
+                delivery_number=item["delivery_number"],
+                performed_by=current_user,
+                waste_quantity=expected_qty - actual_qty if expected_qty > actual_qty else 0,
+                quality_notes=quality_notes,
+                passed=False
+            )
+            status_emoji = "⚠️"
+            result_message = "Sichtkontrolle abgeschlossen - Nachprüfung erforderlich"
+
+        # Show success message
+        st.success(f"{status_emoji} {result_message}")
+
+        if quality_notes:
+            st.info(f"📝 Notizen: {quality_notes}")
+
+        # Clear inspection state
+        st.session_state.inspect_item = None
+        st.rerun()
+
+    except Exception as e:
+        logger.error(f"Inspection completion error: {e}")
+        st.error(f"Fehler beim Abschließen der Prüfung: {e}")
+
+
+# === POPUP FUNCTIONS NOW IMPORTED FROM inspection_popups.py ===
+
+
+def show_recent_inspections(services):
+    """Show recent inspection results."""
+    st.write("#### 📊 Letzte Prüfungen")
+
+    try:
+        item_service = services["item"]
+
+        if hasattr(item_service, "get_all_items"):
+            items = item_service.get_all_items()
+
+            # Filter recently inspected items
+            inspected_items = [
+                item
+                for item in items
+                if item.get("status", "").lower()
+                in ["approved", "rejected", "review_required"]
+            ]
+
+            if inspected_items:
+                # Show last 5 inspections
+                for item in inspected_items[-5:]:
+                    status = item.get("status", "unknown").lower()
+
+                    if status == "approved":
+                        st.success(
+                            f"✅ {item.get('article_number')} - {item.get('batch_number')} - Bestanden"
+                        )
+                    elif status == "rejected":
+                        st.error(
+                            f"❌ {item.get('article_number')} - {item.get('batch_number')} - Nicht bestanden"
+                        )
+                    else:
+                        st.warning(
+                            f"⚠️ {item.get('article_number')} - {item.get('batch_number')} - Nachprüfung"
+                        )
+            else:
+                st.info("Keine Prüfungen durchgeführt")
+
+    except Exception as e:
+        logger.error(f"Recent inspections error: {e}")
+        st.error(f"Fehler beim Laden der Prüfhistorie: {e}")

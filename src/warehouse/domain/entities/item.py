@@ -163,36 +163,44 @@ class Item:
         """
         Prüft ob ein Workflow-Schritt abgeschlossen ist.
 
-        Unterstützt sowohl alte ItemStatus Enum-Werte als auch neue String-Namen.
+        Unterstützt ItemStatus Enum-Werte und String-Namen (IST-Zustand).
 
         Args:
             step: Kann sein:
-                - ItemStatus Enum (z.B. ItemStatus.DATEN_GEPRUEFT) - für Backward Compatibility
-                - String (z.B. "Daten prüfen", "Dokumente prüfen")
+                - ItemStatus Enum (z.B. ItemStatus.DATEN_GEPRUEFT)
+                - String (z.B. "Daten geprüft", "Dokumente geprüft")
 
         Returns:
             True wenn der Schritt abgeschlossen ist
         """
         from warehouse.domain.enums.item_status import ItemStatus
 
-        # Mapping: Alte ItemStatus Enum → Neue Workflow-Step-Felder
+        # Mapping: ItemStatus Enum → Workflow-Step-Felder
         step_mapping = {
+            ItemStatus.ARTIKEL_ANGELEGT: True,  # Immer true wenn Item existiert
             ItemStatus.DATEN_GEPRUEFT: self.data_checked_by,
             ItemStatus.DOKUMENTE_GEPRUEFT: self.documents_checked_by,
             ItemStatus.VERMESSEN: self.measured_by,
-            ItemStatus.SICHT_GEPRUEFT: self.visually_inspected_by,
-            # DOKUMENTE_ZUSAMMENGEFUEHRT gibt es nicht im alten Enum, aber hier für Vollständigkeit:
-            "Dokumente zusammenführen": self.documents_merged_by,
+            ItemStatus.SICHTKONTROLLE_DURCHGEFUEHRT: self.visually_inspected_by,
+            ItemStatus.DOKUMENTE_ZUSAMMENGEFUEHRT: self.documents_merged_by,
+            ItemStatus.WAREN_EINGELAGERT: self.completed_by,
+            ItemStatus.AUSSCHUSS: self.rejected_by,
         }
 
-        # String-basierte Prüfung
+        # String-basierte Prüfung (IST-Zustand)
         string_mapping = {
-            "Artikeldetails vollständig": self.iteminfo_complete_by,
+            "Artikel angelegt": True,
+            "Daten geprüft": self.data_checked_by,
+            "Dokumente geprüft": self.documents_checked_by,
+            "Vermessen": self.measured_by,
+            "Sichtkontrolle durchgeführt": self.visually_inspected_by,
+            "Dokumente zusammengeführt": self.documents_merged_by,
+            "Waren eingelagert": self.completed_by,
+            "Ausschuss": self.rejected_by,
+            # Legacy-Support (SOLL-Zustand) - wird depreciert
             "Daten prüfen": self.data_checked_by,
             "Dokumente prüfen": self.documents_checked_by,
-            "Vermessen": self.measured_by,
             "Sichtkontrolle": self.visually_inspected_by,
-            "Dokumente zusammenführen": self.documents_merged_by,
         }
 
         # Prüfe ob step ein Enum ist
@@ -305,47 +313,45 @@ class Item:
 
     def get_current_status(self) -> str:
         """
-        Berechnet aktuellen Status = Erster nicht-erfüllter Schritt.
+        Berechnet aktuellen Status = Zuletzt abgeschlossener Schritt (IST-Zustand).
 
         Workflow-Reihenfolge (fest):
-        0. Artikeldetails vollständig
-        1. Daten prüfen
-        2. Dokumente prüfen
+        0. Artikel angelegt (Initial)
+        1. Daten geprüft
+        2. Dokumente geprüft
         3. Vermessen
-        4. Sichtkontrolle
-        5. Dokumente zusammenführen
-        6. Abschließen
+        4. Sichtkontrolle durchgeführt
+        5. Dokumente zusammengeführt
+        6. Waren eingelagert (Final)
 
         Returns:
-            Status als String für UI-Anzeige
+            Status als String für UI-Anzeige (IST-Zustand)
         """
         # Finale Status haben Vorrang
         if self.completed_by:
-            return "Abgeschlossen"
+            return "Waren eingelagert"
         if self.rejected_by:
             return "Ausschuss"
 
-        # Workflow-Reihenfolge (fest definiert)
-        if not self.iteminfo_complete_by:
-            return "Artikeldetails vollständig"
+        # Workflow-Reihenfolge (IST-Zustand: letzter abgeschlossener Schritt)
+        # Prüfe von hinten nach vorne: Welcher Schritt ist der letzte abgeschlossene?
+        if self.documents_merged_by:
+            return "Dokumente zusammengeführt"
 
-        if not self.data_checked_by:
-            return "Daten prüfen"
+        if self.visually_inspected_by:
+            return "Sichtkontrolle durchgeführt"
 
-        if not self.documents_checked_by:
-            return "Dokumente prüfen"
-
-        if not self.measured_by:
+        if self.measured_by:
             return "Vermessen"
 
-        if not self.visually_inspected_by:
-            return "Sichtkontrolle"
+        if self.documents_checked_by:
+            return "Dokumente geprüft"
 
-        if not self.documents_merged_by:
-            return "Dokumente zusammenführen"
+        if self.data_checked_by:
+            return "Daten geprüft"
 
-        # Alle Steps erledigt
-        return "Bereit zum Abschluss"
+        # Kein Schritt abgeschlossen (nur angelegt)
+        return "Artikel angelegt"
 
     @property
     def status(self) -> str:

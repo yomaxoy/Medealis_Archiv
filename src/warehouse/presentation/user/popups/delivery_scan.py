@@ -22,16 +22,13 @@ SESSION_KEY_SHOW_EXTRACTION_POPUP = "show_extraction_popup"
 SESSION_KEY_ITEMS_TO_REMOVE = "items_to_remove"
 
 
-@st.dialog("📄 Lieferschein scannen", width="large")
+@st.dialog("📄 Lieferschein auswerten", width="large")
 def show_delivery_scan_popup():
     """
     Zeigt das Popup zum Hochladen und Scannen von Lieferscheinen.
     Basiert auf der Admin-Implementierung aus delivery_management_view.py
     """
     st.write("### 📄 Lieferschein PDF hochladen und auswerten")
-    st.info(
-        "🔄 **OCR → Claude-API → JSON → DB Workflow** - Strukturierte Datenextraktion!"
-    )
 
     # System Status Check
     show_system_status_check()
@@ -39,26 +36,34 @@ def show_delivery_scan_popup():
     st.write("---")
 
     # File upload section
-    col1, col2 = st.columns([2, 1])
+    uploaded_pdf = st.file_uploader(
+        "📎 PDF-Datei oder Bild auswählen",
+        type=["pdf", "png", "jpg", "jpeg", "tiff"],
+        help="Laden Sie eine PDF-Datei oder Bild mit Lieferschein-Daten hoch",
+        key="user_scan_pdf_upload",
+    )
 
+    st.write("---")
+
+    # Action buttons
+    col1, col2 = st.columns(2)
     with col1:
-        uploaded_pdf = st.file_uploader(
-            "📎 PDF-Datei oder Bild auswählen",
-            type=["pdf", "png", "jpg", "jpeg", "tiff"],
-            help="Laden Sie eine PDF-Datei oder Bild mit Lieferschein-Daten hoch",
-            key="user_scan_pdf_upload",
-        )
+        if st.button("❌ Abbrechen", use_container_width=True, key="user_scan_cancel"):
+            st.session_state[SESSION_KEY_SHOW_SCAN_POPUP] = False
+            # Cleanup uploaded file data
+            _cleanup_uploaded_file_data()
+            st.rerun()
 
     with col2:
         if uploaded_pdf:
             if st.button(
-                "🤖 OCR + Claude Analyse",
+                "🚀 Lieferschein auswerten",
                 type="primary",
                 use_container_width=True,
                 key="user_scan_process_btn",
             ):
                 # ⚠️ NEU: Storage-Verfügbarkeits-Check VOR Dokumenten-Upload
-                from warehouse.presentation.user.popups.components.storage_warning_dialog import (
+                from warehouse.presentation.shared.components.storage_warning_dialog import (
                     check_and_show_storage_warning,
                 )
 
@@ -79,17 +84,6 @@ def show_delivery_scan_popup():
                     uploaded_pdf.seek(0)  # Reset for processing
                     process_uploaded_delivery_file(uploaded_pdf)
 
-    st.write("---")
-
-    # Action buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("❌ Abbrechen", use_container_width=True, key="user_scan_cancel"):
-            st.session_state[SESSION_KEY_SHOW_SCAN_POPUP] = False
-            # Cleanup uploaded file data
-            _cleanup_uploaded_file_data()
-            st.rerun()
-
 
 def _cleanup_uploaded_file_data() -> None:
     """Bereinigt hochgeladene Datei-Daten aus Session State."""
@@ -100,42 +94,44 @@ def _cleanup_uploaded_file_data() -> None:
 
 
 def show_system_status_check():
-    """Zeigt den System-Status für OCR und Claude API."""
+    """Zeigt den System-Status für OCR und Claude API mit charmanter Darstellung."""
     # API Key Check - use EnvironmentConfig to ensure .env is loaded
     from warehouse.shared.config.environment_config import env_config
     api_key_available = bool(env_config.get("ANTHROPIC_API_KEY"))
 
+    # Check OCR availability
+    processors = st.session_state.get("processors", {})
+    ocr_available = False
+    if "ocr" in processors:
+        ocr_available = processors["ocr"].is_ocr_available()
+
+    # Show status in a nice compact way
+    st.write("**🔧 System-Status:**")
     col1, col2 = st.columns(2)
 
     with col1:
         if api_key_available:
-            st.success("✅ Claude API-Key verfügbar")
+            st.markdown("🤖 **Claude API** · :green[Online ✓]")
         else:
-            st.error("❌ ANTHROPIC_API_KEY nicht gesetzt!")
-            with st.expander("🔧 API Key konfigurieren"):
-                st.code('$env:ANTHROPIC_API_KEY="sk-ant-api03-ihr-echter-key"')
-                st.write(
-                    "Setzen Sie den API-Key in Ihrer Umgebung und starten Sie die App neu."
-                )
+            st.markdown("🤖 **Claude API** · :red[Offline ✗]")
+            with st.expander("💡 API Key einrichten"):
+                st.info("Setzen Sie ANTHROPIC_API_KEY in Ihrer `.env` Datei:")
+                st.code('ANTHROPIC_API_KEY=sk-ant-api03-ihr-key', language="bash")
 
     with col2:
-        # Check OCR availability
-        processors = st.session_state.get("processors", {})
-        if "ocr" in processors:
-            ocr_available = processors["ocr"].is_ocr_available()
-            if ocr_available:
-                st.success("✅ Tesseract OCR verfügbar")
-            else:
-                st.warning("⚠️ Tesseract OCR nicht verfügbar")
-                with st.expander("🔧 Tesseract installieren"):
-                    st.markdown(
-                        """
-                    **Windows:**
-                    1. Download: [Tesseract Windows Installer](https://github.com/UB-Mannheim/tesseract/wiki)
-                    2. Mit German Language Pack installieren ✓
-                    3. Streamlit App neu starten
+        if ocr_available:
+            st.markdown("👁️ **Tesseract OCR** · :green[Installiert ✓]")
+        else:
+            st.markdown("👁️ **Tesseract OCR** · :orange[Nicht gefunden]")
+            with st.expander("💡 Tesseract installieren"):
+                st.info("**Windows Installation:**")
+                st.markdown(
                     """
-                    )
+                    1. [Tesseract Download](https://github.com/UB-Mannheim/tesseract/wiki)
+                    2. Mit German Language Pack installieren
+                    3. App neu starten
+                    """
+                )
 
 
 def process_uploaded_delivery_file(uploaded_file):

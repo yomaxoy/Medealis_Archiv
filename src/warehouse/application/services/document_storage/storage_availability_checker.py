@@ -117,7 +117,11 @@ class StorageAvailabilityChecker:
         """Prüft Server-Storage Verfügbarkeit."""
         server_enabled = env_config.is_server_storage_enabled()
         # Prüfe UNC-Pfad direkt (robuster als gemapptes Laufwerk)
-        server_available = path_resolver.server_storage_path.exists()
+        try:
+            server_available = path_resolver.server_storage_path.exists()
+        except (OSError, PermissionError) as e:
+            self.logger.warning(f"Server-Storage nicht erreichbar: {e}")
+            server_available = False
 
         # Basis-Pfad
         base_path = str(path_resolver.server_storage_path)
