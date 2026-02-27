@@ -439,4 +439,5 @@ def show_visual_inspection_popup(item_data: Dict[str, Any]):
         ```
     """
     popup = VisualInspectionPopup(item_data)
+    popup._apply_css()  # CSS anwenden für kompakte Abstände
     popup.render()

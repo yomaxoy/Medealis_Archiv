@@ -11,7 +11,7 @@ Version: 1.0.0
 # ===== KOMPAKTES LAYOUT (Standard für User & Admin) =====
 COMPACT_POPUP_CSS = """
 <style>
-/* Reduziere Abstände im Dialog - EXTREM MINIMAL */
+/* Reduziere Abstände im Dialog - ULTRA KOMPAKT (Hälfte der vorherigen Werte) */
 div[data-testid="stDialog"] section[data-testid="stVerticalBlock"] {
     gap: 0 !important;
 }
@@ -21,20 +21,20 @@ div[data-testid="stDialog"] section[data-testid="stVerticalBlock"] > div {
     padding: 0 !important;
 }
 
-/* Popup-Titel (h1) - kein Abstand */
+/* Popup-Titel (h1) - minimaler Abstand */
 div[data-testid="stDialog"] h1 {
     margin: 0 !important;
-    padding: 0 0 0.1rem 0 !important;
+    padding: 0 0 0.05rem 0 !important;
 }
 
-/* Alle Überschriften - MINIMAL */
+/* Alle Überschriften - ULTRA MINIMAL */
 div[data-testid="stDialog"] h2,
 div[data-testid="stDialog"] h3,
 div[data-testid="stDialog"] h4,
 div[data-testid="stDialog"] h5,
 div[data-testid="stDialog"] h6 {
     margin: 0 !important;
-    padding: 0.05rem 0 !important;
+    padding: 0.025rem 0 !important;
 }
 
 /* Kompakte Markdown/Text */
@@ -67,18 +67,19 @@ div[data-testid="stDialog"] .stDateInput > div {
 /* Kompakte Labels */
 div[data-testid="stDialog"] label {
     margin: 0 !important;
-    padding: 0 0 0.05rem 0 !important;
+    padding: 0 0 0.025rem 0 !important;
 }
 
-/* Kompakte Info-Boxen */
+/* Kompakte Info-Boxen - Hälfte der Abstände */
 div[data-testid="stDialog"] .stAlert {
-    padding: 0.2rem !important;
-    margin: 0.1rem 0 !important;
+    padding: 0.1rem !important;
+    margin: 0.05rem 0 !important;
 }
 
-/* Kompakte Divider - MINIMAL */
+/* Kompakte Divider - ULTRA MINIMAL (Hälfte) */
 div[data-testid="stDialog"] hr {
-    margin: 0.15rem 0 !important;
+    margin: 0.075rem 0 !important;
+    border-width: 0.5px !important;
 }
 
 /* Markdown-Container (enthält oft hr) */
@@ -95,7 +96,7 @@ div[data-testid="stDialog"] details {
 
 /* Expander Summary (Titel) */
 div[data-testid="stDialog"] details summary {
-    padding: 0.05rem 0 !important;
+    padding: 0.025rem 0 !important;
     margin: 0 !important;
 }
 
@@ -127,25 +128,25 @@ div[data-testid="stDialog"] .stButton > button {
     margin: 0 !important;
 }
 
-/* Expander kompakter */
+/* Expander kompakter - Hälfte der Werte */
 div[data-testid="stDialog"] .streamlit-expanderHeader {
-    padding: 0.2rem !important;
+    padding: 0.1rem !important;
 }
 
 div[data-testid="stDialog"] .streamlit-expanderContent {
-    padding: 0.2rem !important;
+    padding: 0.1rem !important;
 }
 
-/* Kompakte Selectbox */
+/* Kompakte Selectbox - Hälfte der Werte */
 div[data-testid="stDialog"] .stSelectbox > div {
-    margin-bottom: 0.1rem !important;
-    margin-top: 0.1rem !important;
+    margin-bottom: 0.05rem !important;
+    margin-top: 0.05rem !important;
 }
 
-/* Kompakte Date Input */
+/* Kompakte Date Input - Hälfte der Werte */
 div[data-testid="stDialog"] .stDateInput > div {
-    margin-bottom: 0.1rem !important;
-    margin-top: 0.1rem !important;
+    margin-bottom: 0.05rem !important;
+    margin-top: 0.05rem !important;
 }
 </style>
 """

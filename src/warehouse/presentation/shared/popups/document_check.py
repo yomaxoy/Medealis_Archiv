@@ -559,6 +559,7 @@ def show_document_check_popup(item_data: Dict[str, Any]) -> None:
         item_data: Dictionary mit Item-Informationen
     """
     popup = DocumentCheckPopup(item_data)
+    popup._apply_css()  # CSS anwenden für kompakte Abstände
 
     # Render Popup
     popup.render_header()

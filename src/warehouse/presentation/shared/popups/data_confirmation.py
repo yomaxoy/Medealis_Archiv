@@ -548,8 +548,7 @@ class DataConfirmationPopup(InspectionPopup):
                         employee_name=employee_name,
                         additional_data={
                             "we_date": datetime.now().strftime("%d.%m.%Y"),
-                            "artikel": confirmed_article,
-                            "charge": confirmed_batch,
+                            # artikel und charge werden automatisch aus generation_models.py generiert (Artikelnummer_Chargennummer)
                         },
                     )
                     if wareneingang_result.success:
@@ -677,6 +676,7 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     logger.info("🟡 show_data_confirmation_popup called - Rendering nur, KEINE Ordner-Erstellung")
 
     popup = DataConfirmationPopup(item_data)
+    popup._apply_css()  # CSS anwenden für kompakte Abstände
 
     # Render Popup
     popup.render_header()
