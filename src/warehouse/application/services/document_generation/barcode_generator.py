@@ -297,31 +297,31 @@ class BarcodeGenerator:
             # Load fonts
             try:
                 # Try to load fonts - Liberation Sans ist der Linux-Ersatz für Arial
-                # Optimierte Schriftgrößen: Artikel & Lager 20% reduziert (152), Lot ca. 60% kleiner
+                # Reduzierte Schriftgrößen: Artikel & Lager 30% kleiner (152 * 0.7 = 106), Header angepasst
                 try:
                     # Try Liberation Sans Bold (Linux standard)
                     bold_font_large = ImageFont.truetype(
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                        152,
-                    )  # Artikel & Lager (190 - 20% = 152)
+                        106,
+                    )  # Artikel & Lager (152 - 30% = 106)
                     bold_font_medium = ImageFont.truetype(
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
                         70,
-                    )  # Header-Text
+                    )  # Header-Text (unverändert)
                     normal_font = ImageFont.truetype(
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
                         55,
-                    )  # Charge-Text (60% von 90)
+                    )  # Charge-Text (unverändert)
                 except:
                     # Fallback to Arial (Windows)
                     try:
-                        bold_font_large = ImageFont.truetype("arialbd.ttf", 152)
+                        bold_font_large = ImageFont.truetype("arialbd.ttf", 106)
                         bold_font_medium = ImageFont.truetype("arialbd.ttf", 70)
                         normal_font = ImageFont.truetype("arial.ttf", 55)
                     except:
                         # Final fallback to DejaVu
                         bold_font_large = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 152
+                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 106
                         )
                         bold_font_medium = ImageFont.truetype(
                             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70
@@ -363,35 +363,17 @@ class BarcodeGenerator:
 
             margin_left = padding_left + 10
 
-            # ROW 1: Article Number (full width of text section)
-            # Header text "Artikelnummer:"
-            draw.text(
-                (margin_left, upper_y_start),
-                "Artikelnummer:",
-                fill="black",
-                font=bold_font_medium,
-            )
-            # Article number below header - BOLD
-            article_y = upper_y_start + 40
-            draw.text(
-                (margin_left, article_y),
-                article_number,
-                fill="black",
-                font=bold_font_large,
-            )
-
-            # ROW 2: Storage Location (below article number)
-            storage_header_y = article_y + 120  # Space below article number
+            # ROW 1: Storage Location (OBEN - getauscht mit Artikelnummer)
             # Header text "Lagernummer:"
             draw.text(
-                (margin_left, storage_header_y),
+                (margin_left, upper_y_start),
                 "Lagernummer:",
                 fill="black",
                 font=bold_font_medium,
             )
             # Storage location below header - BOLD
             if storage_location and storage_location.strip():
-                storage_y = storage_header_y + 40
+                storage_y = upper_y_start + 40
                 draw.text(
                     (margin_left, storage_y),
                     storage_location.strip(),
@@ -400,7 +382,7 @@ class BarcodeGenerator:
                 )
             else:
                 # Draw empty field for manual writing if no storage location
-                storage_y = storage_header_y + 40
+                storage_y = upper_y_start + 40
                 # Draw line for manual writing
                 line_end_x = margin_left + text_section_width - 20
                 draw.line(
@@ -408,6 +390,25 @@ class BarcodeGenerator:
                     fill="black",
                     width=2,
                 )
+
+            # ROW 2: Article Number (UNTEN - getauscht mit Lagernummer)
+            # Reduzierter Abstand zwischen Zeilen (von 120 auf 90)
+            article_header_y = storage_y + 90  # Space below storage location
+            # Header text "Artikelnummer:"
+            draw.text(
+                (margin_left, article_header_y),
+                "Artikelnummer:",
+                fill="black",
+                font=bold_font_medium,
+            )
+            # Article number below header - BOLD
+            article_y = article_header_y + 40
+            draw.text(
+                (margin_left, article_y),
+                article_number,
+                fill="black",
+                font=bold_font_large,
+            )
 
             # QR Code on the right side
             qr_section_x = padding_left + text_section_width + 20
