@@ -153,7 +153,7 @@ CHARGENNUMMER-OPTIMIERUNG (ERWEITERTE SUCHE):
 Suche nach Chargennummern mit folgenden Strategien:
 
 Standard-Formate:
-- Primec: P-YYYYMMDDHHMMSS-XXXX (z.B. "P-293520240528-1234")
+- Primec: P-[12 ZIFFERN]-[4-5 ZIFFERN] (z.B. "P-293520240528-1234")
 - Terrats Medical: 6-stellige Ziffern (z.B. "123456") - Spalte "Lot-Nummer" oder "Lot"
 - Standard: Buchstabe + Zahlen (z.B. "B123456", "CH789")
 - Nur Zahlen mit 6+ Stellen (z.B. "240417")
@@ -163,6 +163,57 @@ Erweiterte Suche bei fehlender Chargennummer:
 - Suche in Artikel-Beschreibung nach Mustern
 - Prüfe Datum-ähnliche Zahlenfolgen
 - Fallback: "BATCH-[ARTIKEL]-[DATUM]" wenn nichts gefunden
+
+═══════════════════════════════════════════════════════════════════
+🚨 PRIMEC CHARGENNUMMER - KRITISCHE OCR-KORREKTUR-REGELN 🚨
+═══════════════════════════════════════════════════════════════════
+⚠️ ABSOLUT WICHTIG: Primec-Chargennummern enthalten NUR ZIFFERN (0-9), NIEMALS Buchstaben!
+
+KORREKTES FORMAT: P-[12 ZIFFERN]-[4-5 ZIFFERN]
+
+Beispiele KORREKT:
+  ✅ P-293520240528-1234   (12 Ziffern - 4 Ziffern)
+  ✅ P-193420250115-12345  (12 Ziffern - 5 Ziffern)
+  ✅ P-000000000000-0000   (auch mit Nullen)
+
+Beispiele FALSCH (häufige OCR-Fehler):
+  ❌ P-29G520240528-1234   (G ist FALSCH - muss 6 sein)
+  ❌ P-193S20250115-12345  (S ist FALSCH - muss 5 sein)
+  ❌ P-OOOO00000000-0000   (O ist FALSCH - muss 0 sein)
+  ❌ P-I93420250115-12345  (I ist FALSCH - muss 1 sein)
+  ❌ P-29352024052B-1234   (B ist FALSCH - muss 8 sein)
+  ❌ P-Z93520240528-1234   (Z ist FALSCH - muss 2 sein)
+
+🔧 AUTOMATISCHE OCR-KORREKTUR für Primec-Chargennummern:
+Wenn du BUCHSTABEN in einer Primec-Chargennummer (beginnt mit "P-") erkennst,
+korrigiere sie SOFORT nach folgenden Regeln:
+
+Korrektur-Mapping (visuell ähnliche Zeichen):
+  G oder g → 6 (visuell ähnlich)
+  S oder s → 5 (visuell ähnlich)
+  O oder o → 0 (Null, NICHT Buchstabe O)
+  I oder l → 1 (Eins, NICHT Buchstabe I oder kleines L)
+  Z oder z → 2 (visuell ähnlich)
+  B oder b → 8 (visuell ähnlich)
+  T oder t → 7 (visuell ähnlich)
+  q oder Q → 9 (visuell ähnlich)
+
+VALIDIERUNGS-PROZESS für Primec-Chargennummern:
+1. Erkenne Format P-XXXX... → Primec-Chargennummer
+2. Prüfe JEDEN Zeichen nach dem "P-" auf Buchstaben
+3. Falls Buchstaben gefunden → Wende Korrektur-Mapping an
+4. Validiere finales Format: ^P-[0-9]{{12}}-[0-9]{{4,5}}$ (nur Ziffern!)
+5. Falls Format immer noch ungültig → Markiere als unsicher in "uncertain_extractions"
+
+BEISPIEL-KORREKTUR (Schritt für Schritt):
+Erkannt: "P-29G52024O528-I234"
+Schritt 1: G → 6
+Schritt 2: O → 0
+Schritt 3: I → 1
+Ergebnis: "P-293520240528-1234" ✅
+
+WICHTIG: Wende diese Korrektur NUR bei Primec-Chargennummern an (beginnen mit "P-")!
+Terrats Medical und andere Formate NICHT korrigieren!
 
 BESTELLNUMMERN-EXTRAKTION - LIEFERANTEN-SPEZIFISCH:
 🔥 WICHTIG: Erkenne AUTOMATISCH das Layout-Muster des Lieferanten!

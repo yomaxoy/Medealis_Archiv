@@ -113,7 +113,18 @@ BLOCK 3 (nach zweiter Bestellnummer)
 
 WICHTIGE PARSING-REGELN:
 ✓ Artikelnummer: Format CT#### (CT + 4 Ziffern)
-✓ Chargennummer: Format P-XXXXXXXXXXXX-XXXX (P- + 12 Ziffern + - + 4-5 Ziffern)
+✓ Chargennummer: Format P-[12 ZIFFERN]-[4-5 ZIFFERN]
+  KRITISCH: Chargennummern enthalten NUR ZIFFERN (0-9), NIEMALS Buchstaben!
+  Beispiel korrekt: P-293520240528-1234
+  Beispiel FALSCH: P-29G520240528-1234 (G muss 6 sein)
+
+  OCR-KORREKTUR für Chargennummern (automatisch anwenden):
+  - G/g → 6 (visuell ähnlich)
+  - S/s → 5 (visuell ähnlich)
+  - O/o → 0 (Null, nicht Buchstabe O)
+  - I/l → 1 (Eins, nicht Buchstabe I/l)
+  - Z/z → 2, B/b → 8, T/t → 7, Q/q → 9
+
 ✓ Bestellnummer: 5-stellig, erscheint als "Bestellnummer: XXXXX vom DD.MM.YYYY"
 ✓ Block-Logik: Artikel gehören zum BLOCK in dem sie stehen
 ✓ Forward-Looking: Erster Block ohne Bestellnummer nutzt die NÄCHSTE gefundene Bestellnummer
@@ -135,7 +146,7 @@ WICHTIGE PARSING-REGELN:
             "batch_number": {
                 "pattern": self.rules.BATCH_NUMBER_PATTERN,
                 "examples": self.rules.BATCH_NUMBER_EXAMPLES,
-                "description": "Format: P-XXXXXXXXXXXX-XXXX"
+                "description": "Format: P-[12 ZIFFERN]-[4-5 ZIFFERN] (nur Ziffern 0-9, keine Buchstaben!)"
             },
             "order_number": {
                 "pattern": self.rules.ORDER_NUMBER_PATTERN,
