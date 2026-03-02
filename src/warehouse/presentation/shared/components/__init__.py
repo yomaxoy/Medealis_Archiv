@@ -34,6 +34,12 @@ from .storage_warning_dialog import (
     check_and_show_storage_warning,
 )
 
+from .folder_button import (
+    render_open_folder_button,
+    render_compact_folder_button,
+    render_folder_action_with_status,
+)
+
 __all__ = [
     # Header
     "render_article_header",
@@ -44,6 +50,10 @@ __all__ = [
     # Documents
     "render_document_uploader",
     "render_folder_path",
+    # Folder Actions
+    "render_open_folder_button",
+    "render_compact_folder_button",
+    "render_folder_action_with_status",
     # Footer
     "render_action_buttons",
     "render_two_button_footer",

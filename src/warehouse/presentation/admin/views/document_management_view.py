@@ -10,6 +10,8 @@ from pathlib import Path
 import pandas as pd
 from datetime import date, datetime
 
+from warehouse.presentation.shared.components import render_open_folder_button
+
 logger = logging.getLogger(__name__)
 
 
@@ -152,14 +154,39 @@ def _show_item_documents_section(item_service):
             if selected_item_display:
                 selected_item = item_options[selected_item_display]
 
-                col1, col2 = st.columns(2)
+                # Artikel-Info Box
+                st.info(f"**Ausgewählter Artikel:** {selected_item['article_number']} | **Charge:** {selected_item['batch_number']} | **Lieferung:** {selected_item.get('delivery_number', 'N/A')}")
+
+                # Action-Buttons in 3 Spalten
+                col1, col2, col3 = st.columns(3)
 
                 with col1:
-                    st.info("👥 **Sichtkontrolle:** Verwende das Visual Inspection Popup im Sichtkontrolle-Tab für korrekte Ausschuss-Erfassung!")
+                    # Artikelordner öffnen Button
+                    # Bereite Item-Daten für folder_button vor
+                    folder_item_data = {
+                        "article_number": selected_item["article_number"],
+                        "batch_number": selected_item["batch_number"],
+                        "delivery_number": selected_item.get("delivery_number", ""),
+                        "supplier_name": selected_item.get("supplier_name", selected_item.get("supplier", "")),
+                        "manufacturer": selected_item.get("manufacturer", selected_item.get("supplier_name", selected_item.get("supplier", ""))),
+                    }
+                    render_open_folder_button(
+                        folder_item_data,
+                        label="🗂️ Artikelordner öffnen",
+                        button_type="primary",
+                        key_suffix="doc_mgmt"
+                    )
 
                 with col2:
                     if st.button("📊 Excel-Export erstellen", use_container_width=True):
                         _create_excel_export(selected_item)
+
+                with col3:
+                    st.caption("💡 **Tipp:** Nutze den Ordner-Button für direkten Zugriff auf alle Artikel-Dokumente!")
+
+                # Info-Box für Sichtkontrolle
+                st.write("")  # Spacing
+                st.info("👥 **Sichtkontrolle:** Verwende das Visual Inspection Popup im Sichtkontrolle-Tab für korrekte Ausschuss-Erfassung!")
 
         else:
             st.info("Keine Artikel in der Datenbank gefunden.")

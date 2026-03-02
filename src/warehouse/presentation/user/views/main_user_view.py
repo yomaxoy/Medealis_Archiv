@@ -15,6 +15,9 @@ from warehouse.presentation.shared.popups import (
     show_document_check_popup,
 )
 
+# Import shared components
+from warehouse.presentation.shared.components import render_compact_folder_button
+
 # Import User-spezifische Popups (nicht Teil der Inspection-Workflow)
 from warehouse.presentation.user.popups.document_merge import show_document_merge_popup
 from warehouse.presentation.user.popups.delivery_scan import (
@@ -540,6 +543,8 @@ def show_item_table(services):
                 "delivery_slip_quantity": item.get("delivery_slip_quantity") or 0,
                 "delivered_quantity": item.get("delivered_quantity") or 0,
                 "status": item.get("status") or "Pending",
+                # Manufacturer from item (wichtig für Ordner-Pfad!)
+                "manufacturer": item.get("manufacturer") or "",
             }
             all_items.append(item_entry)
 
@@ -593,7 +598,7 @@ def show_item_table(services):
     # Display table
     if filtered_items:
         # Table header with Status column after Chargen-Nr (harmonized with Admin View)
-        header_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0])
+        header_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0, 0.5])
         header_labels = [
             "LS-Nr",
             "Artikel-Nr",
@@ -603,6 +608,7 @@ def show_item_table(services):
             "WE-Datum",
             "Lieferant",
             "Aktionen",
+            "📁",
         ]
 
         for col, label in zip(header_cols, header_labels):
@@ -613,7 +619,7 @@ def show_item_table(services):
 
         # Table rows - oldest first, newest last (as requested)
         for i, item in enumerate(filtered_items):
-            row_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0])
+            row_cols = st.columns([1.2, 1.8, 2.2, 0.8, 2.0, 1.2, 1.5, 3.0, 0.5])
 
             with row_cols[0]:
                 st.markdown(f"`{item['delivery_number']}`")
@@ -642,99 +648,154 @@ def show_item_table(services):
                     action_col5,
                 ) = st.columns(6)
 
-                # Get individual step completion status from domain entity
-                article_number = item.get("article_number")
-                batch_number = item.get("batch_number")
-                delivery_number = item.get("delivery_number")
+            # Get individual step completion status from domain entity
+            article_number = item.get("article_number")
+            batch_number = item.get("batch_number")
+            delivery_number = item.get("delivery_number")
 
-                try:
-                    from warehouse.domain.value_objects.article_number import (
-                        ArticleNumber,
+            try:
+                from warehouse.domain.value_objects.article_number import (
+                    ArticleNumber,
+                )
+                from warehouse.domain.value_objects.batch_number import BatchNumber
+
+                item_service = st.session_state.services["item"]
+                article_vo = ArticleNumber(article_number)
+                batch_vo = BatchNumber(batch_number)
+
+                domain_item = item_service.item_repo.find_domain_by_composite_key(
+                    article_vo, batch_vo, delivery_number
+                )
+
+                if domain_item:
+                    iteminfo_completed = domain_item.is_step_completed(
+                        "Artikel angelegt"
                     )
-                    from warehouse.domain.value_objects.batch_number import BatchNumber
-
-                    item_service = st.session_state.services["item"]
-                    article_vo = ArticleNumber(article_number)
-                    batch_vo = BatchNumber(batch_number)
-
-                    domain_item = item_service.item_repo.find_domain_by_composite_key(
-                        article_vo, batch_vo, delivery_number
+                    data_completed = domain_item.is_step_completed("Daten geprüft")
+                    docs_completed = domain_item.is_step_completed(
+                        "Dokumente geprüft"
                     )
-
-                    if domain_item:
-                        iteminfo_completed = domain_item.is_step_completed(
-                            "Artikel angelegt"
-                        )
-                        data_completed = domain_item.is_step_completed("Daten geprüft")
-                        docs_completed = domain_item.is_step_completed(
-                            "Dokumente geprüft"
-                        )
-                        visual_completed = domain_item.is_step_completed(
-                            "Sichtkontrolle durchgeführt"
-                        )
-                        measurement_completed = domain_item.is_step_completed(
-                            "Vermessen"
-                        )
-                    else:
-                        # Fallback wenn Item nicht gefunden
-                        iteminfo_completed = False
-                        data_completed = False
-                        docs_completed = False
-                        visual_completed = False
-                        measurement_completed = False
-
-                except Exception as e:
-                    # Fallback bei Fehler
+                    visual_completed = domain_item.is_step_completed(
+                        "Sichtkontrolle durchgeführt"
+                    )
+                    measurement_completed = domain_item.is_step_completed(
+                        "Vermessen"
+                    )
+                else:
+                    # Fallback wenn Item nicht gefunden
                     iteminfo_completed = False
                     data_completed = False
                     docs_completed = False
                     visual_completed = False
                     measurement_completed = False
 
-                # Button 0: Stammdaten bearbeiten
-                with action_col0:
-                    if iteminfo_completed:
-                        iteminfo_emoji = "✅"
-                        iteminfo_help = "Stammdaten vollständig ✓"
-                    else:
-                        iteminfo_emoji = "📝"
-                        iteminfo_help = "Stammdaten bearbeiten"
+            except Exception as e:
+                # Fallback bei Fehler
+                iteminfo_completed = False
+                data_completed = False
+                docs_completed = False
+                visual_completed = False
+                measurement_completed = False
 
-                    if st.button(
-                        iteminfo_emoji,
-                        key=f"iteminfo_{i}",
-                        help=iteminfo_help,
-                        use_container_width=True,
-                    ):
-                        # Hole Lieferantenname für den Dialog
-                        supplier_name = item.get("supplier", "")
+            # Button 0: Stammdaten bearbeiten
+            with action_col0:
+                if iteminfo_completed:
+                    iteminfo_emoji = "✅"
+                    iteminfo_help = "Stammdaten vollständig ✓"
+                else:
+                    iteminfo_emoji = "📝"
+                    iteminfo_help = "Stammdaten bearbeiten"
 
-                        # Speichere Artikel-Daten für ItemInfo-Dialog
-                        st.session_state.edit_iteminfo_item_data = {
-                            "article_number": article_number,
-                            "description": item.get("description", ""),
-                            "manufacturer": supplier_name,
-                        }
-                        st.session_state.show_iteminfo_edit_dialog = True
-                        st.rerun()
+                if st.button(
+                    iteminfo_emoji,
+                    key=f"iteminfo_{i}",
+                    help=iteminfo_help,
+                    use_container_width=True,
+                ):
+                    # Hole Lieferantenname für den Dialog
+                    supplier_name = item.get("supplier", "")
 
-                # Button 1: Daten bestätigen
-                with action_col1:
-                    if data_completed:
-                        step1_emoji = "✅"
-                        step1_help = "Daten bestätigt ✓"
-                    else:
-                        step1_emoji = "📋"
-                        step1_help = "Daten bestätigen"
+                    # Speichere Artikel-Daten für ItemInfo-Dialog
+                    st.session_state.edit_iteminfo_item_data = {
+                        "article_number": article_number,
+                        "description": item.get("description", ""),
+                        "manufacturer": supplier_name,
+                    }
+                    st.session_state.show_iteminfo_edit_dialog = True
+                    st.rerun()
 
-                    if st.button(
-                        step1_emoji,
-                        key=f"step1_{i}",
-                        help=step1_help,
-                        use_container_width=True,
-                    ):
-                        # Prepare item data for popup - include all relevant fields
-                        item_data = {
+            # Button 1: Daten bestätigen
+            with action_col1:
+                if data_completed:
+                    step1_emoji = "✅"
+                    step1_help = "Daten bestätigt ✓"
+                else:
+                    step1_emoji = "📋"
+                    step1_help = "Daten bestätigen"
+
+                if st.button(
+                    step1_emoji,
+                    key=f"step1_{i}",
+                    help=step1_help,
+                    use_container_width=True,
+                ):
+                    # Prepare item data for popup - include all relevant fields
+                    item_data = {
+                        "article_number": item["article_number"],
+                        "batch_number": item["batch_number"],
+                        "delivery_number": item["delivery_number"],
+                        "quantity": int(item["quantity"])
+                        if item["quantity"] != "N/A"
+                        else 0,
+                        "status": item.get("status", "Pending"),
+                        "supplier_name": item["supplier"],
+                        "order_number": item.get("order_number", ""),
+                        "storage_location": item.get("storage_location", ""),
+                        "ordered_quantity": item.get("ordered_quantity", 0),
+                        "delivery_slip_quantity": item.get(
+                            "delivery_slip_quantity", 0
+                        ),
+                        "delivered_quantity": item.get("delivered_quantity", 0),
+                    }
+                    show_data_confirmation_popup(item_data)
+
+            # Button 2: Dokumente prüfen
+            with action_col2:
+                step2_enabled = data_completed
+
+                if docs_completed:
+                    step2_emoji = "✅"
+                    step2_help = "Dokumente geprüft ✓"
+                    step2_disabled = False
+                elif step2_enabled:
+                    step2_emoji = "📄"
+                    step2_help = "Dokumente prüfen"
+                    step2_disabled = False
+                else:
+                    step2_emoji = "⏸️"
+                    step2_help = "Warten auf Datenprüfung"
+                    step2_disabled = True
+
+                if st.button(
+                    step2_emoji,
+                    key=f"step2_{i}",
+                    help=step2_help,
+                    use_container_width=True,
+                    disabled=step2_disabled,
+                ):
+                    # Load complete item data with certificates from database
+                    item_service = services["item"]
+                    full_item_data = item_service.get_item(
+                        item["article_number"],
+                        item["batch_number"],
+                        item["delivery_number"],
+                    )
+
+                    # Prepare item data for popup with all fields including certificates
+                    item_data = (
+                        full_item_data
+                        if full_item_data
+                        else {
                             "article_number": item["article_number"],
                             "batch_number": item["batch_number"],
                             "delivery_number": item["delivery_number"],
@@ -743,146 +804,103 @@ def show_item_table(services):
                             else 0,
                             "status": item.get("status", "Pending"),
                             "supplier_name": item["supplier"],
-                            "order_number": item.get("order_number", ""),
-                            "storage_location": item.get("storage_location", ""),
-                            "ordered_quantity": item.get("ordered_quantity", 0),
-                            "delivery_slip_quantity": item.get(
-                                "delivery_slip_quantity", 0
-                            ),
-                            "delivered_quantity": item.get("delivered_quantity", 0),
+                            "certificates": {},
                         }
-                        show_data_confirmation_popup(item_data)
+                    )
+                    # Ensure supplier_name is included (might be missing from get_item)
+                    if "supplier_name" not in item_data:
+                        item_data["supplier_name"] = item["supplier"]
 
-                # Button 2: Dokumente prüfen
-                with action_col2:
-                    step2_enabled = data_completed
+                    show_document_check_popup(item_data)
 
-                    if docs_completed:
-                        step2_emoji = "✅"
-                        step2_help = "Dokumente geprüft ✓"
-                        step2_disabled = False
-                    elif step2_enabled:
-                        step2_emoji = "📄"
-                        step2_help = "Dokumente prüfen"
-                        step2_disabled = False
-                    else:
-                        step2_emoji = "⏸️"
-                        step2_help = "Warten auf Datenprüfung"
-                        step2_disabled = True
+            # Button 3: Vermessen
+            with action_col3:
+                if measurement_completed:
+                    measurement_emoji = "✅"
+                    measurement_help = "Vermessung abgeschlossen ✓"
+                else:
+                    measurement_emoji = "📏"
+                    measurement_help = "Vermessung durchführen"
 
-                    if st.button(
-                        step2_emoji,
-                        key=f"step2_{i}",
-                        help=step2_help,
-                        use_container_width=True,
-                        disabled=step2_disabled,
-                    ):
-                        # Load complete item data with certificates from database
-                        item_service = services["item"]
-                        full_item_data = item_service.get_item(
-                            item["article_number"],
-                            item["batch_number"],
-                            item["delivery_number"],
-                        )
+                if st.button(
+                    measurement_emoji,
+                    key=f"measurement_{i}",
+                    help=measurement_help,
+                    use_container_width=True,
+                ):
+                    # Prepare item data for popup
+                    item_data = {
+                        "article_number": item["article_number"],
+                        "batch_number": item["batch_number"],
+                        "delivery_number": item["delivery_number"],
+                        "quantity": int(item["quantity"])
+                        if item["quantity"] != "N/A"
+                        else 0,
+                        "status": item.get("status", "Pending"),
+                        "supplier_name": item["supplier"],
+                    }
+                    show_measurement_popup(item_data)
 
-                        # Prepare item data for popup with all fields including certificates
-                        item_data = (
-                            full_item_data
-                            if full_item_data
-                            else {
-                                "article_number": item["article_number"],
-                                "batch_number": item["batch_number"],
-                                "delivery_number": item["delivery_number"],
-                                "quantity": int(item["quantity"])
-                                if item["quantity"] != "N/A"
-                                else 0,
-                                "status": item.get("status", "Pending"),
-                                "supplier_name": item["supplier"],
-                                "certificates": {},
-                            }
-                        )
-                        # Ensure supplier_name is included (might be missing from get_item)
-                        if "supplier_name" not in item_data:
-                            item_data["supplier_name"] = item["supplier"]
+            # Button 4: Sichtkontrolle
+            with action_col4:
+                if visual_completed:
+                    visual_emoji = "✅"
+                    visual_help = "Sichtprüfung abgeschlossen ✓"
+                else:
+                    visual_emoji = "👁️"
+                    visual_help = "Sichtprüfung durchführen"
 
-                        show_document_check_popup(item_data)
+                if st.button(
+                    visual_emoji,
+                    key=f"visual_check_{i}",
+                    help=visual_help,
+                    use_container_width=True,
+                ):
+                    # Prepare item data for popup
+                    item_data = {
+                        "article_number": item["article_number"],
+                        "batch_number": item["batch_number"],
+                        "delivery_number": item["delivery_number"],
+                        "quantity": int(item["quantity"])
+                        if item["quantity"] != "N/A"
+                        else 0,
+                        "status": item.get("status", "Pending"),
+                        "supplier_name": item["supplier"],
+                    }
+                    show_visual_inspection_popup(item_data)
 
-                # Button 3: Vermessen
-                with action_col3:
-                    if measurement_completed:
-                        measurement_emoji = "✅"
-                        measurement_help = "Vermessung abgeschlossen ✓"
-                    else:
-                        measurement_emoji = "📏"
-                        measurement_help = "Vermessung durchführen"
+            # Button 5: Dokumente zusammenführen
+            with action_col5:
+                if st.button(
+                    "📄",
+                    key=f"doc_merge_{i}",
+                    help="Dokumente zusammenführen",
+                    use_container_width=True,
+                ):
+                    # Prepare item data for popup
+                    item_data = {
+                        "article_number": item["article_number"],
+                        "batch_number": item["batch_number"],
+                        "delivery_number": item["delivery_number"],
+                        "quantity": int(item["quantity"])
+                        if item["quantity"] != "N/A"
+                        else 0,
+                        "status": item.get("status", "Pending"),
+                        "supplier_name": item["supplier"],
+                    }
+                    show_document_merge_popup(item_data)
 
-                    if st.button(
-                        measurement_emoji,
-                        key=f"measurement_{i}",
-                        help=measurement_help,
-                        use_container_width=True,
-                    ):
-                        # Prepare item data for popup
-                        item_data = {
-                            "article_number": item["article_number"],
-                            "batch_number": item["batch_number"],
-                            "delivery_number": item["delivery_number"],
-                            "quantity": int(item["quantity"])
-                            if item["quantity"] != "N/A"
-                            else 0,
-                            "status": item.get("status", "Pending"),
-                            "supplier_name": item["supplier"],
-                        }
-                        show_measurement_popup(item_data)
-
-                # Button 4: Sichtkontrolle
-                with action_col4:
-                    if visual_completed:
-                        visual_emoji = "✅"
-                        visual_help = "Sichtprüfung abgeschlossen ✓"
-                    else:
-                        visual_emoji = "👁️"
-                        visual_help = "Sichtprüfung durchführen"
-
-                    if st.button(
-                        visual_emoji,
-                        key=f"visual_check_{i}",
-                        help=visual_help,
-                        use_container_width=True,
-                    ):
-                        # Prepare item data for popup
-                        item_data = {
-                            "article_number": item["article_number"],
-                            "batch_number": item["batch_number"],
-                            "delivery_number": item["delivery_number"],
-                            "quantity": int(item["quantity"])
-                            if item["quantity"] != "N/A"
-                            else 0,
-                            "status": item.get("status", "Pending"),
-                            "supplier_name": item["supplier"],
-                        }
-                        show_visual_inspection_popup(item_data)
-
-                # Button 5: Dokumente zusammenführen
-                with action_col5:
-                    if st.button(
-                        "📁",
-                        key=f"doc_merge_{i}",
-                        help="Dokumente zusammenführen",
-                        use_container_width=True,
-                    ):
-                        # Prepare item data for popup
-                        item_data = {
-                            "article_number": item["article_number"],
-                            "batch_number": item["batch_number"],
-                            "delivery_number": item["delivery_number"],
-                            "quantity": int(item["quantity"])
-                            if item["quantity"] != "N/A"
-                            else 0,
-                            "status": item.get("status", "Pending"),
-                            "supplier_name": item["supplier"],
-                        }
-                        show_document_merge_popup(item_data)
+            # Ordner-Button (jetzt in row_cols[8] - nach den Action-Buttons)
+            with row_cols[8]:
+                # Bereite Item-Daten vor (mit allen Pflichtfeldern)
+                folder_item_data = {
+                    "article_number": item["article_number"],
+                    "batch_number": item["batch_number"],
+                    "delivery_number": item["delivery_number"],
+                    "supplier_name": item["supplier"],
+                    "manufacturer": item.get("manufacturer", ""),  # Echter Manufacturer aus DB!
+                }
+                render_compact_folder_button(folder_item_data, key_suffix=f"user_{i}")
 
     else:
         st.info("ℹ️ Keine Artikel gefunden.")

@@ -7,6 +7,8 @@ import streamlit as st
 import logging
 from typing import Dict, Any, Optional
 
+from warehouse.presentation.shared.components import render_open_folder_button
+
 logger = logging.getLogger(__name__)
 
 
@@ -104,7 +106,16 @@ def show_item_confirmation_popup(item_data: Dict[str, Any]):
 def show_item_edit_popup(item_data: Dict[str, Any]):
     """Show item edit popup."""
     st.write("### ✏️ Item bearbeiten")
-    
+
+    # Artikelordner-Button oben rechts
+    col_header1, col_header2 = st.columns([3, 1])
+    with col_header2:
+        # Prüfe ob alle benötigten Felder vorhanden sind
+        if all(key in item_data for key in ['article_number', 'batch_number', 'delivery_number', 'supplier_name', 'manufacturer']):
+            render_open_folder_button(item_data, key_suffix="edit_popup", button_type="secondary")
+        elif item_data.get('article_number') and item_data.get('batch_number') and item_data.get('delivery_number'):
+            st.caption("📁 Ordner-Button benötigt Lieferanten- und Herstellerdaten")
+
     # Basic item info
     col1, col2 = st.columns(2)
     
