@@ -36,8 +36,72 @@ SESSION_KEY_EXTRACTION_CONFIRMED = "extraction_confirmed"
 SESSION_KEY_EXTRACTED_DELIVERY = "extracted_delivery_data"
 
 
+def _prepare_delivery_slip_for_article_folders(extraction_data: Dict[str, Any]) -> None:
+    """
+    Bereitet das Lieferschein-Dokument für spätere Speicherung in Artikelordnern vor.
+
+    WICHTIG: Diese Funktion speichert das Dokument NICHT sofort in Artikelordner!
+    Stattdessen werden die Daten im Session State gespeichert und erst beim Klick
+    auf "Daten bestätigen" im Popup in den jeweiligen Artikelordner kopiert.
+
+    Dies verhindert doppelte Ordnererstellung, wenn zwischen Upload und Bestätigung
+    Artikelnummern oder Chargennummern geändert werden.
+
+    Args:
+        extraction_data: Bestätigte Extraktionsdaten mit Items-Liste
+            - delivery_number: Lieferscheinnummer
+            - supplier_name: Lieferantenname
+            - items: Liste von Item-Dictionaries mit article_number und batch_number
+
+    Returns:
+        None. Speichert Daten in Session State für spätere Verwendung.
+    """
+    try:
+        # Get original extraction data with document storage info
+        original_data = st.session_state.get(SESSION_KEY_ORIGINAL_EXTRACTION, {})
+
+        # Extract delivery information
+        delivery_number = extraction_data.get("delivery_number", "")
+        supplier_name = extraction_data.get("supplier_name", "")
+        items = extraction_data.get("items", [])
+
+        if not items:
+            logger.warning("No items found in extraction data - skipping delivery slip preparation")
+            return
+
+        # Check if we have storage information from the original upload
+        storage_info = original_data.get("storage", {})
+        pdf_stored = original_data.get("pdf_stored", False)
+        pdf_path = original_data.get("pdf_path") or storage_info.get("file_path")
+
+        logger.info(f"Preparing delivery slip for later save to {len(items)} article folders")
+        logger.info(f"PDF stored centrally: {pdf_stored}, PDF path: {pdf_path}")
+
+        # Load document data from either stored file or session state
+        document_data = _load_delivery_document_data(pdf_path)
+        if not document_data:
+            logger.warning("Could not load delivery document data - skipping preparation")
+            return
+
+        # Store in session state for later use when "Daten bestätigen" is clicked
+        st.session_state['pending_delivery_slip_save'] = {
+            'document_data': document_data,
+            'delivery_number': delivery_number,
+            'supplier_name': supplier_name,
+            'filename': f"Lieferschein_{delivery_number}.pdf" if delivery_number else "Lieferschein.pdf"
+        }
+
+        logger.info("✅ Delivery slip prepared for later save to article folders (will be saved when user clicks 'Daten bestätigen')")
+
+    except Exception as e:
+        logger.error(f"Error preparing delivery slip for article folders: {e}", exc_info=True)
+        # Don't show warning to user - this is not critical, just a preparation step
+
+
 def _save_delivery_slip_to_article_folders(extraction_data: Dict[str, Any]) -> None:
     """
+    [DEPRECATED - Kept for reference, but no longer used directly after upload]
+
     Speichert das Lieferschein-Dokument in alle relevanten Artikelordner.
 
     Diese Funktion wird nach erfolgreicher Datenbank-Speicherung aufgerufen und
@@ -862,8 +926,10 @@ def handle_extraction_confirmation(services: Dict[str, Any]) -> None:
 
             st.success(success_message)
 
-            # Save delivery slip document to article folders
-            _save_delivery_slip_to_article_folders(extraction_data)
+            # CHANGED: Don't save delivery slip to article folders immediately!
+            # Instead, store document data in session state for later use when user clicks "Daten bestätigen"
+            # The delivery slip is already saved centrally in the "Lieferscheine" folder by the document processing service
+            _prepare_delivery_slip_for_article_folders(extraction_data)
 
             # Clean up session state
             _cleanup_delivery_session_state()

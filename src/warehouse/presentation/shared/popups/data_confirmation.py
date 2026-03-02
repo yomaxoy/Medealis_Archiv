@@ -412,8 +412,16 @@ class DataConfirmationPopup(InspectionPopup):
                 )
                 st.success("📋 Bestellnummer erfolgreich gespeichert!")
 
-            # 3. Bestelldokumente speichern (falls vorhanden)
-            # WICHTIG: Ordner werden HIER (beim Button-Klick) erstellt!
+            # 3. Lieferschein in Artikelordner kopieren (falls vorhanden)
+            # WICHTIG: Dies ist der zentrale Punkt wo der Artikelordner erstellt wird!
+            # Der Lieferschein wurde bereits zentral im "Lieferscheine" Ordner gespeichert
+            # und wird jetzt in den spezifischen Artikelordner kopiert
+            self._save_delivery_slip_to_article_folder(
+                confirmed_article, confirmed_batch, delivery_number
+            )
+
+            # 4. Bestelldokumente speichern (falls vorhanden)
+            # WICHTIG: Ordner existiert bereits (durch Lieferschein oder wird jetzt erstellt)!
             uploaded_docs = form_data.get("uploaded_documents")
             logger.info(f"DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}")
 
@@ -451,7 +459,7 @@ class DataConfirmationPopup(InspectionPopup):
                                 delivery_number=delivery_number,
                                 article_number=confirmed_article,
                                 supplier_name="",  # Will be auto-determined
-                                create_folders=True  # Explicitly create folders NOW
+                                create_folders=False  # Folder already exists from delivery slip save
                             )
 
                             if save_result.success:
@@ -502,7 +510,8 @@ class DataConfirmationPopup(InspectionPopup):
                 notes=f"Lagerplatz: {confirmed_storage_location}, Bestellnummer: {order_number}",
             )
 
-            # 5. Generate documents
+            # 5. Generate documents (Begleitschein, Wareneingangskontrolle, Barcode)
+            # Ordner existiert bereits, keine erneute Erstellung nötig
             st.info("📄 **Automatische Dokument-Erstellung läuft...**")
             try:
                 generation_service = DocumentGenerationService()
@@ -607,6 +616,8 @@ class DataConfirmationPopup(InspectionPopup):
             # Cleanup session state
             if 'uploaded_order_documents' in st.session_state:
                 del st.session_state['uploaded_order_documents']
+            if 'pending_delivery_slip_save' in st.session_state:
+                del st.session_state['pending_delivery_slip_save']
 
             st.rerun()
 
@@ -653,6 +664,78 @@ class DataConfirmationPopup(InspectionPopup):
             logger.error(f"Error in AI analysis: {e}", exc_info=True)
             st.error(f"❌ Fehler bei KI-Analyse: {str(e)}")
 
+    def _save_delivery_slip_to_article_folder(
+        self,
+        article_number: str,
+        batch_number: str,
+        delivery_number: str
+    ) -> None:
+        """
+        Speichert den Lieferschein in den Artikelordner.
+
+        Diese Methode wird beim Klick auf "Daten bestätigen" aufgerufen und kopiert
+        den Lieferschein vom zentralen "Lieferscheine" Ordner in den spezifischen
+        Artikelordner. Dies ist der zentrale Punkt wo der Artikelordner erstellt wird!
+
+        Args:
+            article_number: Bestätigte Artikelnummer
+            batch_number: Bestätigte Chargennummer
+            delivery_number: Lieferscheinnummer
+
+        Returns:
+            None. Zeigt Erfolgs-/Fehlermeldungen in der UI an.
+        """
+        import streamlit as st
+
+        try:
+            # Check if we have a pending delivery slip to save
+            pending_slip = st.session_state.get('pending_delivery_slip_save')
+
+            if not pending_slip:
+                logger.info("No pending delivery slip found - skipping save to article folder")
+                return
+
+            document_data = pending_slip.get('document_data')
+            filename = pending_slip.get('filename', 'Lieferschein.pdf')
+
+            if not document_data:
+                logger.warning("Pending delivery slip has no document data - skipping save")
+                return
+
+            logger.info(f"🟢 Saving delivery slip to article folder: {article_number} / {batch_number}")
+
+            # Get document storage service
+            from warehouse.application.services.service_registry import get_document_storage_service
+            storage_service = get_document_storage_service()
+
+            if not storage_service:
+                st.warning("⚠️ Document Storage Service nicht verfügbar")
+                return
+
+            # Save delivery slip to article folder
+            # WICHTIG: create_folders=True - Dies erstellt den Artikelordner!
+            save_result = storage_service.save_document(
+                document_data=document_data,
+                document_name=filename,
+                document_type="delivery_slip",
+                batch_number=batch_number,
+                delivery_number=delivery_number,
+                article_number=article_number,
+                supplier_name="",  # Will be auto-determined
+                create_folders=True  # Create article folder NOW (single creation point!)
+            )
+
+            if save_result.success:
+                st.success(f"✅ Lieferschein in Artikelordner gespeichert")
+                logger.info(f"✅ Delivery slip saved to article folder: {save_result.storage_folder}")
+            else:
+                st.warning(f"⚠️ Lieferschein konnte nicht im Artikelordner gespeichert werden: {save_result.error}")
+                logger.error(f"Failed to save delivery slip to article folder: {save_result.error}")
+
+        except Exception as e:
+            logger.error(f"Error saving delivery slip to article folder: {e}", exc_info=True)
+            st.warning(f"⚠️ Fehler beim Speichern des Lieferscheins im Artikelordner: {e}")
+
     def handle_secondary_action(self, form_data: Dict[str, Any]) -> None:
         """Zurückweisen - markiert Artikel als Ausschuss."""
         # Nicht verwendet für Data Confirmation
@@ -697,5 +780,7 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
         # Cleanup uploaded documents from session state
         if 'uploaded_order_documents' in st.session_state:
             del st.session_state['uploaded_order_documents']
+        # Keep pending_delivery_slip_save for next confirmation attempt
+        # (User might open popup again for same item)
         logger.info("⚪ 'Abbrechen' Button geklickt - keine Ordner erstellt")
         st.rerun()
