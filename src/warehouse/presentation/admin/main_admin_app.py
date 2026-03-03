@@ -69,6 +69,65 @@ def main():
             st.rerun()
 
 
+@st.cache_resource
+def get_services():
+    """
+    Initialize and cache Application Services.
+
+    Uses @st.cache_resource to keep service instances alive across page
+    navigations, significantly improving performance.
+
+    Returns:
+        dict: Service instances for delivery, item, supplier, order management
+    """
+    logger.info("Initializing cached services...")
+
+    # Lazy import - Services werden nur beim ersten Aufruf geladen
+    from warehouse.application.services import (
+        DeliveryService,
+        ItemService,
+        SupplierService,
+        OrderService,
+    )
+
+    return {
+        "delivery": DeliveryService(),
+        "item": ItemService(),
+        "supplier": SupplierService(),
+        "order": OrderService(),
+    }
+
+
+@st.cache_resource
+def get_processors():
+    """
+    Initialize and cache Processors (PDF, OCR, Claude).
+
+    Uses @st.cache_resource to lazy-load processors only when first needed
+    and keep them cached across sessions.
+
+    Returns:
+        dict: Processor instances
+    """
+    logger.info("Initializing cached processors...")
+
+    # Lazy import - Processors werden nur beim ersten Aufruf geladen
+    from warehouse.application.processors import (
+        pdf_processor, ocr_processor, claude_processor
+    )
+    from warehouse.application.services.document_processing import (
+        document_processing_service, process_document
+    )
+
+    return {
+        "pdf": pdf_processor,
+        "ocr": ocr_processor,
+        "claude": claude_processor,
+        "document_processing_service": document_processing_service,
+        "process_document": process_document,
+    }
+
+
 def initialize_admin_system():
     """Initialize admin system components."""
     try:
@@ -83,38 +142,9 @@ def initialize_admin_system():
             raise RuntimeError("System initialization failed")
         logger.info("Database infrastructure initialized successfully")
 
-        # Initialize Application Services (DB is now ready)
-        from warehouse.application.services import (
-            DeliveryService,
-            ItemService,
-            SupplierService,
-            OrderService,
-        )
-
-        st.session_state.services = {
-            "delivery": DeliveryService(),
-            "item": ItemService(),
-            "supplier": SupplierService(),
-            "order": OrderService(),
-        }
-
-        # Initialize processors - using new compatibility layer
-        from warehouse.application.processors import (
-            pdf_processor, ocr_processor, claude_processor
-        )
-
-        # NEW: Unified document processing service
-        from warehouse.application.services.document_processing import (
-            document_processing_service, process_document
-        )
-
-        st.session_state.processors = {
-            "pdf": pdf_processor,
-            "ocr": ocr_processor,
-            "claude": claude_processor,  # Now uses compatibility wrapper
-            "document_processing_service": document_processing_service,
-            "process_document": process_document,  # Convenience function
-        }
+        # NEW: Use cached services (Lazy Loading + Caching for fast page switches)
+        st.session_state.services = get_services()
+        st.session_state.processors = get_processors()
 
         # Initialize session state
         initialize_session_state()
@@ -258,6 +288,31 @@ def render_admin_sidebar():
     render_system_status()
 
 
+@st.cache_data(ttl=30)
+def check_database_status(_services: dict) -> bool:
+    """
+    Check database connection health with lightweight query.
+
+    Uses @st.cache_data with 30s TTL to avoid checking on every render.
+    Uses a simple COUNT query instead of loading all deliveries.
+
+    Args:
+        _services: Service dict (underscore prefix to exclude from cache key)
+
+    Returns:
+        bool: True if database is accessible, False otherwise
+    """
+    try:
+        # Lightweight health check - nur Connection testen, keine Daten laden
+        from warehouse.infrastructure.database.connection import get_session
+        with get_session() as session:
+            # Simple ping query
+            session.execute("SELECT 1")
+        return True
+    except:
+        return False
+
+
 def render_system_status():
     """Render system status in sidebar."""
     st.sidebar.write("---")
@@ -277,15 +332,11 @@ def render_system_status():
             claude_status = processors["claude"].is_available()
             st.sidebar.write(f"Claude API: {'✅' if claude_status else '❌'}")
 
-        # Database Status
-        try:
-            services = st.session_state.get("services", {})
-            if "delivery" in services:
-                # Test database connection
-                services["delivery"].get_all_deliveries()
-                st.sidebar.write("Database: ✅")
-        except:
-            st.sidebar.write("Database: ❌")
+        # Database Status (cached, lightweight check)
+        services = st.session_state.get("services", {})
+        if services:
+            db_status = check_database_status(services)
+            st.sidebar.write(f"Database: {'✅' if db_status else '❌'}")
 
     except Exception as e:
         st.sidebar.error(f"Status check failed: {e}")

@@ -1,6 +1,8 @@
 """
 Item Management View - Admin Presentation Layer
 Complete item management interface.
+
+Performance: Uses @st.cache_data for get_all_items() (60s TTL)
 """
 
 import streamlit as st
@@ -8,6 +10,22 @@ import logging
 from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# CACHED DATA LOADERS
+# =============================================================================
+
+@st.cache_data(ttl=60)
+def _load_all_items(_service, _cache_version: int) -> List[Dict[str, Any]]:
+    """Load all items with caching (60s TTL)."""
+    try:
+        if hasattr(_service, "get_all_items"):
+            return _service.get_all_items() or []
+        return []
+    except Exception as e:
+        logger.error(f"Error loading items: {e}")
+        return []
 
 
 def show_item_management_view():
@@ -54,10 +72,13 @@ def show_item_list_tab(item_service):
     st.subheader("📋 Item Liste")
 
     try:
-        # Get all items
-        items_data = []
-        if hasattr(item_service, "get_all_items"):
-            items_data = item_service.get_all_items() or []
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
+        # Get all items (cached)
+        items_data = _load_all_items(
+            item_service,
+            CacheManager.get_version("items")
+        )
 
         if items_data and len(items_data) > 0:
             # Search and filter controls
@@ -459,10 +480,13 @@ def show_item_statistics_tab(item_service):
     st.subheader("📊 Item Statistiken")
 
     try:
-        # Get all items
-        items = []
-        if hasattr(item_service, "get_all_items"):
-            items = item_service.get_all_items() or []
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
+        # Get all items (cached)
+        items = _load_all_items(
+            item_service,
+            CacheManager.get_version("items")
+        )
 
         if items and len(items) > 0:
             # Basic metrics
@@ -626,6 +650,7 @@ def handle_item_popup_actions(item_service, delivery_service):
 
             try:
                 # Use ItemService to update item
+                from warehouse.presentation.shared.cache_manager import CacheManager
                 success = item_service.update_item(
                     delivery_number=item_data.get("delivery_number"),
                     article_number=item_data.get("article_number"),
@@ -636,6 +661,7 @@ def handle_item_popup_actions(item_service, delivery_service):
                 )
 
                 if success:
+                    CacheManager.invalidate_related("items")
                     st.success(
                         f"✅ Item '{item_data.get('article_number')}' erfolgreich aktualisiert!"
                     )
@@ -682,6 +708,8 @@ def handle_item_popup_actions(item_service, delivery_service):
                 )
 
                 if success:
+                    from warehouse.presentation.shared.cache_manager import CacheManager
+                    CacheManager.invalidate_related("items")
                     st.success(f"✅ Item '{article_number}' erfolgreich gelöscht!")
                 else:
                     st.warning(

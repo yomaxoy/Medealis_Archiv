@@ -1,6 +1,10 @@
 """
 Dashboard View - Admin Presentation Layer
 Main dashboard interface with system overview and statistics.
+
+Performance Optimization:
+- Uses @st.cache_data for statistics queries (60s TTL)
+- Cache invalidation via CacheManager when entities change
 """
 
 import streamlit as st
@@ -9,6 +13,86 @@ import logging
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# CACHED DATA LOADERS
+# =============================================================================
+
+@st.cache_data(ttl=60)
+def _load_supplier_statistics(_service, _cache_version: int) -> Dict[str, Any]:
+    """
+    Load supplier statistics with caching.
+
+    Args:
+        _service: SupplierService (underscore = exclude from cache key)
+        _cache_version: Cache version from CacheManager
+
+    Returns:
+        Dict with supplier statistics
+    """
+    try:
+        return _service.get_supplier_statistics()
+    except Exception as e:
+        logger.warning(f"Error loading supplier statistics: {e}")
+        return {}
+
+
+@st.cache_data(ttl=60)
+def _load_delivery_statistics(_service, _cache_version: int) -> Dict[str, Any]:
+    """
+    Load delivery statistics with caching.
+
+    Args:
+        _service: DeliveryService (underscore = exclude from cache key)
+        _cache_version: Cache version from CacheManager
+
+    Returns:
+        Dict with delivery statistics
+    """
+    try:
+        return _service.get_delivery_statistics()
+    except Exception as e:
+        logger.warning(f"Error loading delivery statistics: {e}")
+        return {}
+
+
+@st.cache_data(ttl=60)
+def _load_item_statistics(_service, _cache_version: int) -> Dict[str, Any]:
+    """
+    Load item statistics with caching.
+
+    Args:
+        _service: ItemService (underscore = exclude from cache key)
+        _cache_version: Cache version from CacheManager
+
+    Returns:
+        Dict with item statistics
+    """
+    try:
+        return _service.get_item_statistics()
+    except Exception as e:
+        logger.warning(f"Error loading item statistics: {e}")
+        return {}
+
+
+@st.cache_data(ttl=60)
+def _load_order_statistics(_service, _cache_version: int) -> Dict[str, Any]:
+    """
+    Load order statistics with caching.
+
+    Args:
+        _service: OrderService (underscore = exclude from cache key)
+        _cache_version: Cache version from CacheManager
+
+    Returns:
+        Dict with order statistics
+    """
+    try:
+        return _service.get_order_statistics()
+    except Exception as e:
+        logger.warning(f"Error loading order statistics: {e}")
+        return {}
 
 
 def show_dashboard_view():
@@ -72,51 +156,50 @@ def show_system_status():
 
 
 def show_service_statistics(services: Dict[str, Any]):
-    """Display statistics from all services."""
+    """Display statistics from all services with caching."""
     try:
+        # Import CacheManager for versioned caching
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
             if 'supplier' in services and services['supplier']:
-                try:
-                    supplier_stats = services['supplier'].get_supplier_statistics()
-                    st.metric("Suppliers", supplier_stats.get('total_suppliers', 0))
-                except Exception as e:
-                    logger.warning(f"Supplier stats error: {e}")
-                    st.metric("Suppliers", "N/A")
+                supplier_stats = _load_supplier_statistics(
+                    services['supplier'],
+                    CacheManager.get_version("suppliers")
+                )
+                st.metric("Suppliers", supplier_stats.get('total_suppliers', 0))
             else:
                 st.metric("Suppliers", "N/A")
 
         with col2:
             if 'delivery' in services and services['delivery']:
-                try:
-                    delivery_stats = services['delivery'].get_delivery_statistics()
-                    st.metric("Deliveries", delivery_stats.get('total_deliveries', 0))
-                except Exception as e:
-                    logger.warning(f"Delivery stats error: {e}")
-                    st.metric("Deliveries", "N/A")
+                delivery_stats = _load_delivery_statistics(
+                    services['delivery'],
+                    CacheManager.get_version("deliveries")
+                )
+                st.metric("Deliveries", delivery_stats.get('total_deliveries', 0))
             else:
                 st.metric("Deliveries", "N/A")
 
         with col3:
             if 'item' in services and services['item']:
-                try:
-                    item_stats = services['item'].get_item_statistics()
-                    st.metric("Items", item_stats.get('total_items', 0))
-                except Exception as e:
-                    logger.warning(f"Item stats error: {e}")
-                    st.metric("Items", "N/A")
+                item_stats = _load_item_statistics(
+                    services['item'],
+                    CacheManager.get_version("items")
+                )
+                st.metric("Items", item_stats.get('total_items', 0))
             else:
                 st.metric("Items", "N/A")
 
         with col4:
             if 'order' in services and services['order']:
-                try:
-                    order_stats = services['order'].get_order_statistics()
-                    st.metric("Orders", order_stats.get('total_orders', 0))
-                except Exception as e:
-                    logger.warning(f"Order stats error: {e}")
-                    st.metric("Orders", "N/A")
+                order_stats = _load_order_statistics(
+                    services['order'],
+                    CacheManager.get_version("orders")
+                )
+                st.metric("Orders", order_stats.get('total_orders', 0))
             else:
                 st.metric("Orders", "N/A")
 
@@ -126,12 +209,18 @@ def show_service_statistics(services: Dict[str, Any]):
 
 
 def show_delivery_charts(services: Dict[str, Any]):
-    """Display delivery status charts."""
+    """Display delivery status charts with caching."""
     st.subheader("📈 Delivery Status Overview")
 
     try:
+        # Import CacheManager for versioned caching
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
         if 'delivery' in services and services['delivery']:
-            delivery_stats = services['delivery'].get_delivery_statistics()
+            delivery_stats = _load_delivery_statistics(
+                services['delivery'],
+                CacheManager.get_version("deliveries")
+            )
 
             if delivery_stats and 'status_distribution' in delivery_stats:
                 status_df = pd.DataFrame.from_dict(

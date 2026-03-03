@@ -1,6 +1,8 @@
 """
 Delivery Management View - Admin Presentation Layer
 Complete delivery management interface with all functionality.
+
+Performance: Uses @st.cache_data for get_all_deliveries() (60s TTL)
 """
 
 import streamlit as st
@@ -12,6 +14,22 @@ from datetime import datetime
 from warehouse.application.services.entity_services.delivery_service import DeliveryService
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# CACHED DATA LOADERS
+# =============================================================================
+
+@st.cache_data(ttl=60)
+def _load_all_deliveries(_service, _cache_version: int) -> List[Dict[str, Any]]:
+    """Load all deliveries with caching (60s TTL)."""
+    try:
+        if hasattr(_service, "get_all_deliveries"):
+            return _service.get_all_deliveries()
+        return []
+    except Exception as e:
+        logger.error(f"Error loading deliveries: {e}")
+        return []
 
 
 def show_delivery_management_view():
@@ -75,6 +93,8 @@ def show_delivery_management_view():
                 st.session_state.save_result = result
 
                 if result.get("success"):
+                    from warehouse.presentation.shared.cache_manager import CacheManager
+                    CacheManager.invalidate_related("deliveries")
                     success_message = f"Lieferung '{extraction_data.get('delivery_number')}' erfolgreich gespeichert!"
                     if result.get("items_created", 0) > 0:
                         success_message += (
@@ -123,6 +143,8 @@ def show_delivery_management_view():
                     if delivery_number:
                         success = delivery_service.delete_delivery(delivery_number)
                         if success:
+                            from warehouse.presentation.shared.cache_manager import CacheManager
+                            CacheManager.invalidate_related("deliveries")
                             st.success(
                                 f"✅ Delivery '{delivery_number}' erfolgreich gelöscht!"
                             )
@@ -211,10 +233,13 @@ def show_delivery_list_tab(delivery_service):
     st.subheader("📋 Delivery Liste")
 
     try:
-        # Get all deliveries
-        deliveries_data = []
-        if hasattr(delivery_service, "get_all_deliveries"):
-            deliveries_data = delivery_service.get_all_deliveries()
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
+        # Get all deliveries (cached)
+        deliveries_data = _load_all_deliveries(
+            delivery_service,
+            CacheManager.get_version("deliveries")
+        )
 
         if deliveries_data:
             # Display deliveries with action buttons
@@ -581,6 +606,8 @@ def create_manual_delivery(
             )
 
             if result:
+                from warehouse.presentation.shared.cache_manager import CacheManager
+                CacheManager.invalidate_related("deliveries")
                 st.success(f"✅ Delivery '{result}' erfolgreich erstellt!")
                 st.rerun()
             else:
@@ -598,11 +625,12 @@ def show_statistics_tab(delivery_service):
     st.subheader("📊 Statistiken")
 
     try:
-        # Get basic statistics
-        deliveries = (
-            delivery_service.get_all_deliveries()
-            if hasattr(delivery_service, "get_all_deliveries")
-            else []
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
+        # Get basic statistics (cached)
+        deliveries = _load_all_deliveries(
+            delivery_service,
+            CacheManager.get_version("deliveries")
         )
 
         if deliveries:
@@ -666,11 +694,12 @@ def show_documents_tab():
     delivery_service = services["delivery"]
 
     try:
-        # Delivery selection for document generation
-        deliveries_data = (
-            delivery_service.get_all_deliveries()
-            if hasattr(delivery_service, "get_all_deliveries")
-            else []
+        from warehouse.presentation.shared.cache_manager import CacheManager
+
+        # Delivery selection for document generation (cached)
+        deliveries_data = _load_all_deliveries(
+            delivery_service,
+            CacheManager.get_version("deliveries")
         )
 
         if deliveries_data:

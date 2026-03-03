@@ -122,12 +122,6 @@ def render_open_folder_button(
         st.warning(f"⚠️ Artikelordner kann nicht geöffnet werden. Fehlende Daten: {', '.join(missing_fields)}")
         return False
 
-    # Manufacturer automatisch von Artikelnummer ableiten, falls nicht vorhanden
-    manufacturer = item_data.get("manufacturer", "")
-    if not manufacturer:
-        manufacturer = _determine_manufacturer_from_article(item_data["article_number"])
-        logger.info(f"Manufacturer automatisch abgeleitet: {item_data['article_number']} → {manufacturer}")
-
     # Erstelle eindeutigen Key
     unique_key = f"open_folder_{item_data['article_number']}_{item_data['batch_number']}_{key_suffix}"
 
@@ -146,7 +140,13 @@ def render_open_folder_button(
     if not button_clicked:
         return False
 
-    # Button wurde geklickt - Ordner öffnen
+    # Button wurde geklickt - jetzt erst Manufacturer ableiten
+    manufacturer = item_data.get("manufacturer", "")
+    if not manufacturer:
+        manufacturer = _determine_manufacturer_from_article(item_data["article_number"])
+        logger.info(f"Manufacturer automatisch abgeleitet: {item_data['article_number']} → {manufacturer}")
+
+    # Ordner öffnen
     try:
         # Erstelle StorageContext aus item_data (mit abgeleitetem Manufacturer)
         context = StorageContextData(

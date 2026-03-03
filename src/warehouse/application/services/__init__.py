@@ -21,17 +21,51 @@ NEW CENTRALIZED SERVICES:
 - DocumentOperations: Dokument-Operationen (Öffnen, PDF-Merge)
 """
 
-# Core Domain Services
-from .entity_services.delivery_service import DeliveryService
-from .entity_services.item_service import ItemService
-from .entity_services.supplier_service import SupplierService
-from .entity_services.order_service import OrderService
+# ============================================================================
+# LAZY IMPORTS - Performance Optimization
+# Services werden erst geladen wenn sie tatsächlich gebraucht werden
+# ============================================================================
 
-# NEW: Centralized Document Services
-from .document_storage import DocumentStorageService, determine_manufacturer
-from .document_generation import DocumentGenerationService
-from .delivery_workflow_service import DeliveryWorkflowService
-from .document_operations import DocumentOpeningService, PDFMergeService, pdf_merge_service
+# Lazy Import Implementation
+_lazy_imports = {
+    # Core Domain Services
+    "DeliveryService": ("entity_services.delivery_service", "DeliveryService"),
+    "ItemService": ("entity_services.item_service", "ItemService"),
+    "SupplierService": ("entity_services.supplier_service", "SupplierService"),
+    "OrderService": ("entity_services.order_service", "OrderService"),
+    # Centralized Document Services
+    "DocumentStorageService": ("document_storage", "DocumentStorageService"),
+    "determine_manufacturer": ("document_storage", "determine_manufacturer"),
+    "DocumentGenerationService": ("document_generation", "DocumentGenerationService"),
+    "DeliveryWorkflowService": ("delivery_workflow_service", "DeliveryWorkflowService"),
+    "DocumentOpeningService": ("document_operations", "DocumentOpeningService"),
+    "PDFMergeService": ("document_operations", "PDFMergeService"),
+    "pdf_merge_service": ("document_operations", "pdf_merge_service"),
+}
+
+def __getattr__(name):
+    """
+    Lazy-load services on first access.
+
+    This significantly reduces app startup time by only importing services
+    when they are actually needed, instead of loading all ~8000+ lines of
+    service code upfront.
+
+    Example:
+        >>> from warehouse.application.services import DeliveryService
+        # DeliveryService is imported here, not at module load time
+    """
+    if name in _lazy_imports:
+        module_path, attr_name = _lazy_imports[name]
+        # Import from relative module
+        from importlib import import_module
+        module = import_module(f".{module_path}", package=__name__)
+        obj = getattr(module, attr_name)
+        # Cache in globals for subsequent access
+        globals()[name] = obj
+        return obj
+
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 # System Initialization Function
 def initialize_system() -> bool:
