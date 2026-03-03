@@ -68,85 +68,76 @@ Falls ihr das mal auf einem Remote-Server deployen wollt, braucht es einen ander
 
 ---
 
-## Phase 2: Drucker ansteuern
-**Aufwand: ~3-5 Tage | Risiko: Mittel**
+## Phase 2: Dokumente automatisch öffnen ~~Drucker ansteuern~~
+**Aufwand: ~1-2 Tage | Risiko: Niedrig**
+
+**⚠️ GEÄNDERT:** Statt direkter Drucker-Ansteuerung → Dokumente automatisch nach Erstellung öffnen, damit Mitarbeiter manuell drucken können.
 
 ### Ist-Zustand
 - Barcode-Generierung existiert (`barcode_generator.py`, 765 Zeilen) – erzeugt PNG-Dateien
-- Drucken nur über `os.startfile(path, "print")` → öffnet Windows-Druckdialog
-- Kein direktes Ansteuern von QuickLabel oder Konica
+- Dokumente werden erstellt, aber NICHT automatisch geöffnet
+- Mitarbeiter muss manuell zum Ordner navigieren und öffnen
 
 ### Maßnahmen
 
-#### 2.1 Neuer PrinterService
-**Neue Datei:** `src/warehouse/application/services/printing/printer_service.py`
+#### 2.1 DocumentOpeningService erweitern
+**Vorhandene Datei:** `src/warehouse/application/services/document_operations/document_opening_service.py`
 
-```
-printing/
-├── __init__.py
-├── printer_service.py          # Orchestrierung
-├── printer_registry.py         # Drucker-Erkennung & Konfiguration
-├── label_printer_adapter.py    # QuickLabel-spezifisch
-└── document_printer_adapter.py # Konica/Standard-Drucker
-```
-
-#### 2.2 QuickLabel-Integration (Etiketten)
-
-**Option A: Über QuickLabel SDK/CLI** (bevorzugt, falls vorhanden)
-- Prüfe ob QuickLabel eine API/CLI hat zum direkten Drucken
-- Viele QuickLabel-Drucker unterstützen Druck über Druckertreiber mit `win32print`
-
-**Option B: Über Windows-Druckertreiber (`win32print`)**
 ```python
-import win32print
-import win32api
+class DocumentOpeningService:
+    """
+    Service zum Öffnen von Dokumenten nach Erstellung.
+    BEREITS VORHANDEN - nur erweitern!
+    """
 
-class LabelPrinterAdapter:
-    def __init__(self, printer_name: str = None):
-        # Auto-detect QuickLabel-Drucker oder aus Config laden
-        self.printer_name = printer_name or self._find_quicklabel_printer()
-    
-    def print_label(self, image_path: Path, copies: int = 1):
-        """Druckt Barcode-Label direkt auf QuickLabel."""
-        # Setzt QuickLabel als Drucker, sendet PNG/PDF
+    def open_document_after_generation(self, file_path: Path, auto_open: bool = True):
+        """
+        Öffnet Dokument automatisch nach Generierung.
+
+        - DOCX/PDF: Öffnet mit Standard-App (Word/Acrobat)
+        - PNG (Barcodes): Öffnet mit Standard-Bildbetrachter
+        - Mitarbeiter kann dann manuell Strg+P drücken
+        """
+        if auto_open:
+            os.startfile(str(file_path))  # Windows - öffnet mit Standard-App
 ```
 
-**Option C: Über QuickLabel-Templating**
-- Falls QuickLabel eine eigene Template-Engine hat:
-  Labels dort als Template definieren, aus Python nur Daten übergeben
+#### 2.2 Integration in Dokument-Generierung
+**Dateien zu ändern:**
+- `document_generation_service.py` - Nach Dokument-Erstellung → öffnen
+- `barcode_generator.py` - Nach Barcode-Erstellung → öffnen
+- `delivery_workflow_service.py` - Nach Batch-Generierung → alle öffnen
 
-#### 2.3 Konica-Integration (Dokumente)
 ```python
-class DocumentPrinterAdapter:
-    def __init__(self, printer_name: str = None):
-        self.printer_name = printer_name or self._find_konica_printer()
-    
-    def print_document(self, document_path: Path, copies: int = 1):
-        """Druckt Dokument auf Konica."""
-        # Für DOCX/PDF: win32api.ShellExecute mit spezifischem Drucker
+# Beispiel:
+def generate_inspection_document(...):
+    # ... Dokument generieren
+    doc.save(file_path)
+
+    # NEU: Automatisch öffnen
+    DocumentOpeningService().open_document_after_generation(file_path)
+
+    return file_path
 ```
 
-#### 2.4 Drucker-Konfiguration
+#### 2.3 Konfiguration
 **Neue Config in `.env`:**
 ```env
-LABEL_PRINTER_NAME=QuickLabel Kiaro!
-DOCUMENT_PRINTER_NAME=KONICA MINOLTA bizhub
-LABEL_PRINTER_ENABLED=true
-AUTO_PRINT_LABELS=false
-AUTO_PRINT_DOCUMENTS=false
+AUTO_OPEN_DOCUMENTS=true       # Dokumente nach Erstellung öffnen
+AUTO_OPEN_BARCODES=true        # Barcodes nach Erstellung öffnen
+AUTO_OPEN_LIMIT=5              # Max. Anzahl gleichzeitig öffnen (verhindert 100 Fenster)
 ```
 
-#### 2.5 UI-Integration
-- **Barcode-Generierung:** Nach Erstellung → Button "🖨️ Etikett drucken" (direkt an QuickLabel)
-- **Dokumenterstellung:** Nach Erstellung → Button "🖨️ Drucken" mit Dropdown (Konica oder Standard)
-- **Einstellungen-Seite:** Drucker auswählen, Testdruck, Auto-Print konfigurieren
+#### 2.4 UI-Feedback
+- Nach Dokument-Generierung: "✅ Dokument erstellt und geöffnet - bitte drucken"
+- Bei Batch-Generierung: "✅ 5 Dokumente erstellt und geöffnet - bitte nacheinander drucken"
+- Warnung bei >5 Dokumenten: "⚠️ Zu viele Dokumente - bitte manuell öffnen"
 
-#### 2.6 Dependencies
-```
-pip install pywin32  # win32print, win32api (vermutlich schon installiert)
-```
-
-**Offene Frage:** Welches genaue QuickLabel-Modell nutzt ihr? (Kiaro!, QL-120, etc.) Das bestimmt ob ZPL, ESC/POS oder Druckertreiber der beste Ansatz ist.
+**Vorteil gegenüber Drucker-Ansteuerung:**
+- ✅ Einfacher (1-2 Tage statt 3-5 Tage)
+- ✅ Flexibler (Mitarbeiter kann Drucker wählen)
+- ✅ Kein Risiko (keine Drucker-Integration nötig)
+- ✅ Funktioniert mit allen Druckern (nicht nur QuickLabel/Konica)
 
 ---
 

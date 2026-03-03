@@ -496,7 +496,7 @@ class StorageContext:
         # Dictionary wird nach Prefix-Länge sortiert (längste zuerst)
         manufacturer_map = {
             # 2-character prefixes first (to avoid "M" matching "MG")
-            "AS": "Dentspy",
+            "AS": "Dentsply",
             "BR": "Bredent",
             "CT": "C-Tech",
             "DY": "Dyna",
