@@ -3,6 +3,8 @@ Template Manager - Zentrale Template-Verwaltung
 
 Übernimmt die Template-Loading und Verwaltungs-Logik aus WordTemplateService.
 SINGLE SOURCE OF TRUTH für alle Template-Operationen.
+
+PERFORMANCE: Nutzt optimierte TemplateCache aus shared/performance
 """
 
 import logging
@@ -23,18 +25,86 @@ except ImportError:
 from .document_types import DocumentType, TemplateInfo, TEMPLATE_REGISTRY, get_template_info
 from .generation_models import ValidationResult
 
-logger = logging.getLogger(__name__)
+# PERFORMANCE: Optimierte TemplateCache verwenden (Fallback auf lokale Implementation)
+try:
+    from warehouse.shared.performance.document_pipeline import TemplateCache as OptimizedTemplateCacheBase
+    USE_OPTIMIZED_CACHE = True
+    logger = logging.getLogger(__name__)
+    logger.info("✅ Using OPTIMIZED TemplateCache from shared/performance")
+except ImportError:
+    USE_OPTIMIZED_CACHE = False
+    OptimizedTemplateCacheBase = None
+    logger = logging.getLogger(__name__)
+    logger.warning("⚠️ Optimized TemplateCache not available - using FALLBACK cache")
+
+
+# Adapter für OptimizedTemplateCache um alte API zu unterstützen
+class OptimizedTemplateCacheAdapter:
+    """
+    Adapter für OptimizedTemplateCache aus shared/performance.
+
+    Macht die optimierte Cache-Implementation kompatibel mit der
+    bestehenden TemplateManager API (get/put statt get_template).
+    """
+
+    def __init__(self, max_size: int = 20):
+        self._optimized_cache = OptimizedTemplateCacheBase(max_size=max_size)
+        self._cache_key_to_path: Dict[str, tuple] = {}  # Maps cache_key -> (name, path)
+        logger.debug(f"Initialized OptimizedTemplateCacheAdapter (max_size={max_size})")
+
+    def get(self, cache_key: str) -> Optional[Document]:
+        """Holt Template aus optimiertem Cache (alte API)."""
+        try:
+            if cache_key in self._cache_key_to_path:
+                name, path = self._cache_key_to_path[cache_key]
+                return self._optimized_cache.get_template(name, path)
+            return None
+        except Exception as e:
+            logger.warning(f"Error getting template from optimized cache: {e}")
+            return None
+
+    def put(self, cache_key: str, template: Document, template_info: TemplateInfo):
+        """Speichert Template-Pfad für späteren Abruf (alte API)."""
+        try:
+            # Speichere Mapping für get()
+            template_path = self._resolve_template_path(template_info)
+            self._cache_key_to_path[cache_key] = (template_info.name, template_path)
+            # Template wird beim nächsten get() automatisch gecacht via @ttl_cache
+        except Exception as e:
+            logger.warning(f"Error putting template to optimized cache: {e}")
+
+    def _resolve_template_path(self, template_info: TemplateInfo) -> Path:
+        """Löst Template-Pfad auf."""
+        # Muss mit TemplateManager._get_template_path konsistent sein
+        return Path(__file__).parent.parent.parent.parent.parent.parent / "resources" / "templates" / template_info.filename
+
+    def clear(self):
+        """Leert Cache."""
+        self._cache_key_to_path.clear()
+        if hasattr(self._optimized_cache, 'clear_old_templates'):
+            self._optimized_cache.clear_old_templates(max_age_seconds=0)
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Gibt Cache-Statistiken zurück."""
+        return {
+            'cached_keys': len(self._cache_key_to_path),
+            'cache_type': 'optimized',
+            'max_size': self._optimized_cache.max_size
+        }
 
 
 class TemplateCache:
     """
     Cache für geladene Templates um Performance zu verbessern.
+
+    FALLBACK Implementation - wird nur genutzt wenn OptimizedTemplateCache nicht verfügbar.
     """
 
     def __init__(self, max_cache_size: int = 10):
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.max_cache_size = max_cache_size
         self.access_times: Dict[str, datetime] = {}
+        logger.debug("Using FALLBACK TemplateCache (basic implementation)")
 
     def get(self, cache_key: str) -> Optional[Document]:
         """Holt Template aus Cache."""
@@ -125,8 +195,13 @@ class TemplateManager:
         # Template Registry
         self.template_registry = TEMPLATE_REGISTRY
 
-        # Cache für Performance
-        self.template_cache = TemplateCache()
+        # Cache für Performance (optimiert wenn verfügbar)
+        if USE_OPTIMIZED_CACHE:
+            self.template_cache = OptimizedTemplateCacheAdapter(max_size=20)
+            logger.info("✅ TemplateManager using OPTIMIZED cache (TTL: 30min, max: 20 templates)")
+        else:
+            self.template_cache = TemplateCache(max_cache_size=10)
+            logger.info("⚠️ TemplateManager using FALLBACK cache (max: 10 templates)")
 
         # Statistics
         self.stats = {

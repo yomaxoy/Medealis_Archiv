@@ -4,6 +4,8 @@ Document Check Popup - Shared across User & Admin View.
 Popup for checking certificates and documents.
 Permission-ready: required_permission="check_documents"
 
+PERFORMANCE: Nutzt gecachten DocumentGenerationService
+
 Author: Medealis
 Version: 2.0.0 - Shared Implementation
 """
@@ -21,6 +23,19 @@ from warehouse.presentation.shared.popup_styles import apply_document_check_high
 from warehouse.domain.enums.certificate_type import CertificateType
 from warehouse.application.services.validation_service import validation_service
 from warehouse.application.services.audit_service import audit_service
+
+
+# PERFORMANCE: Cache DocumentGenerationService als Singleton
+@st.cache_resource
+def get_document_generation_service():
+    """
+    Get cached DocumentGenerationService singleton.
+
+    Uses @st.cache_resource to create service ONCE and reuse it.
+    This allows TemplateCache to persist across document generations.
+    """
+    from warehouse.application.services.document_generation import DocumentGenerationService
+    return DocumentGenerationService()
 
 
 class DocumentCheckPopup(InspectionPopup):
@@ -386,7 +401,8 @@ class DocumentCheckPopup(InspectionPopup):
                 st.write(
                     "✨ **Neue Generation Service**: Erstelle PDB mit Zertifikatsinformationen..."
                 )
-                generation_service = DocumentGenerationService()
+                # PERFORMANCE: Use cached service instead of creating new one
+                generation_service = get_document_generation_service()
 
                 # Prepare certificate data for PDB generation (ADMIN STYLE)
                 certificate_data = {

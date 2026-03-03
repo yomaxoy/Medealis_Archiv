@@ -533,6 +533,20 @@ class WordConverter:
 
                     logger.info(f"PDF generated successfully in same folder: {pdf_conversion.pdf_path.name}")
 
+                    # AUTO-OPEN: Öffne PDF automatisch für Druck
+                    try:
+                        from warehouse.application.services.document_operations import document_opening_service
+                        open_result = document_opening_service.open_after_generation(
+                            pdf_conversion.pdf_path,
+                            document_type="pdf"
+                        )
+                        if open_result["opened"] > 0:
+                            logger.info(f"📂 Auto-opened PDF: {pdf_conversion.pdf_path.name}")
+                        elif open_result["skipped"] > 0:
+                            logger.debug(f"Auto-open skipped: {open_result.get('reason', 'Unknown')}")
+                    except Exception as e:
+                        logger.warning(f"Auto-open failed (non-critical): {e}")
+
                     # Add PDF info to metadata
                     docx_result.metadata.update({
                         'pdf_generated': True,
