@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from contextlib import contextmanager
 
 # Base Class für alle Models
@@ -190,7 +190,66 @@ def create_tables() -> None:
         raise RuntimeError("Database nicht initialisiert.")
 
     Base.metadata.create_all(bind=_engine)
+    _run_auto_migrations()
     print("Database-Tabellen erstellt.")
+
+
+def _run_auto_migrations() -> None:
+    """
+    Fuegt fehlende Spalten zu bestehenden Tabellen hinzu.
+
+    SQLAlchemy create_all() erstellt nur neue Tabellen, fuegt aber keine
+    neuen Spalten zu bestehenden Tabellen hinzu. Diese Funktion prueft
+    und ergaenzt fehlende Spalten automatisch.
+    """
+    from sqlalchemy import text, inspect
+
+    migrations = [
+        # (tabelle, spaltenname, sql_typ)
+        # item_info: hersteller/kompatibilitaet (frueher: manufacturer)
+        ("item_info", "hersteller", "VARCHAR(100)"),
+        ("item_info", "kompatibilitaet", "VARCHAR(100)"),
+        ("item_info", "qr_code_image", "BLOB"),
+        ("item_info", "qr_code_filename", "VARCHAR(255)"),
+        ("item_info", "qr_code_uploaded_at", "DATETIME"),
+        # items: neuere Spalten
+        ("items", "ordered_quantity", "INTEGER"),
+        ("items", "delivery_slip_quantity", "INTEGER"),
+        ("items", "waste_quantity", "INTEGER DEFAULT 0"),
+        ("items", "visual_inspector", "TEXT"),
+        ("items", "label_present", "BOOLEAN DEFAULT 0"),
+        ("items", "accompanying_document", "BOOLEAN DEFAULT 0"),
+    ]
+
+    inspector = inspect(_engine)
+    migrated = []
+
+    for table, column, col_type in migrations:
+        # Pruefen ob Tabelle existiert
+        if not inspector.has_table(table):
+            continue
+
+        # Pruefen ob Spalte bereits existiert
+        existing = [c["name"] for c in inspector.get_columns(table)]
+        if column in existing:
+            continue
+
+        # Spalte hinzufuegen
+        try:
+            with _engine.connect() as conn:
+                conn.execute(
+                    text(f"ALTER TABLE {table}" f" ADD COLUMN {column} {col_type}")
+                )
+                conn.commit()
+            migrated.append(f"{table}.{column}")
+        except OperationalError:
+            pass  # Spalte existiert bereits (Race Condition)
+
+    if migrated:
+        print(
+            f"Auto-Migration: {len(migrated)} Spalte(n)"
+            f" hinzugefuegt: {', '.join(migrated)}"
+        )
 
 
 def drop_tables() -> None:
