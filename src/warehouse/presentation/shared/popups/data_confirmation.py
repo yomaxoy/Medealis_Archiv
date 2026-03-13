@@ -22,6 +22,32 @@ from warehouse.presentation.utils.user_context import get_current_username
 
 logger = logging.getLogger(__name__)
 
+# Session State Keys die vom DataConfirmation-Dialog verwendet werden.
+# Muessen beim Oeffnen/Schliessen bereinigt werden, damit keine stale
+# Werte vom vorherigen Dialog in den naechsten uebernommen werden.
+_DATA_CONFIRMATION_FORM_KEYS = [
+    "data_employee_name",
+    "data_article_number",
+    "data_batch_number",
+    "data_ordered_quantity",
+    "data_slip_quantity",
+    "data_delivered_quantity",
+    "data_storage_location",
+    "data_order_number",
+    "data_notes",
+    "data_order_doc_upload",
+    "uploaded_order_documents",
+    "pending_delivery_slip_save",
+    "data_confirmation_action_clicked",
+]
+
+
+def _cleanup_form_session_state() -> None:
+    """Entfernt alle Form-Widget-Keys aus dem Session State."""
+    for key in _DATA_CONFIRMATION_FORM_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state.pop("_dc_item_key", None)
+
 
 def _get_supplier_id(supplier_name: str) -> str:
     """
@@ -709,7 +735,7 @@ class DataConfirmationPopup(InspectionPopup):
                         additional_data={
                             "barcode_type": "CODE128",
                             "filename_prefix": "label",
-                            "open_after_creation": False,
+                            "open_after_creation": True,
                             "storage_location": confirmed_storage_location,
                         },
                     )
@@ -748,13 +774,9 @@ class DataConfirmationPopup(InspectionPopup):
                 " Dokumente erstellt"
             )
 
-            # Cleanup session state
-            if "uploaded_order_documents" in st.session_state:
-                del st.session_state["uploaded_order_documents"]
-            if "pending_delivery_slip_save" in st.session_state:
-                del st.session_state["pending_delivery_slip_save"]
-            # pending_save Flag löschen nach erfolgreicher Verarbeitung
-            pass  # cleanup placeholder
+            # Cleanup: Alle Form-Keys bereinigen damit der naechste Dialog
+            # frische Werte bekommt (verhindert stale data in PDFs)
+            _cleanup_form_session_state()
 
             # Erfolgs-Toast anzeigen (überlebt den Rerun)
             st.toast("🎉 Datenbestätigung abgeschlossen!", icon="✅")
@@ -932,10 +954,20 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     Args:
         item_data: Dictionary mit Item-Informationen
     """
-    # WICHTIG: Flag setzen, dass Popup nur am
-    # Rendern ist - KEINE Ordner erstellen!
-    if "data_confirmation_action_clicked" not in (st.session_state):
-        st.session_state["data_confirmation_action_clicked"] = False
+    # Stale Form-Keys vom vorherigen Dialog bereinigen, aber NUR wenn sich
+    # der Artikel geaendert hat (sonst wuerden User-Eingaben bei jedem
+    # Rerun innerhalb des Dialogs zurueckgesetzt)
+    _current_item_key = (
+        f"{item_data.get('article_number')}"
+        f"_{item_data.get('batch_number')}"
+        f"_{item_data.get('delivery_number')}"
+    )
+    if st.session_state.get("_dc_item_key") != _current_item_key:
+        _cleanup_form_session_state()
+        st.session_state["_dc_item_key"] = _current_item_key
+
+    # Flag setzen, dass Popup nur am Rendern ist - KEINE Ordner erstellen!
+    st.session_state["data_confirmation_action_clicked"] = False
 
     logger.info(
         "show_data_confirmation_popup called"
@@ -958,6 +990,5 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     elif action == "ai_save":
         popup.handle_ai_analysis_action(form_data)
     elif action == "cancel":
-        if "uploaded_order_documents" in st.session_state:
-            del st.session_state["uploaded_order_documents"]
+        _cleanup_form_session_state()
         st.rerun()

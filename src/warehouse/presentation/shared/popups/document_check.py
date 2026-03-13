@@ -13,7 +13,7 @@ Version: 2.0.0 - Shared Implementation
 import streamlit as st
 from typing import Dict, Any, Optional
 from warehouse.presentation.shared.inspection_popup import InspectionPopup
-from warehouse.presentation.shared.components import (
+from warehouse.presentation.shared.components import (  # noqa: F401
     render_article_header,
     FormBuilder,
     render_standard_footer,
@@ -23,6 +23,27 @@ from warehouse.presentation.shared.popup_styles import apply_document_check_high
 from warehouse.domain.enums.certificate_type import CertificateType
 from warehouse.application.services.validation_service import validation_service
 from warehouse.application.services.audit_service import audit_service
+
+# Session State Keys die vom DocumentCheck-Dialog verwendet werden.
+_DOC_CHECK_FORM_KEYS = [
+    "doc_inspector_name",
+    "doc_accompanying_documents",
+    "doc_materialzeugnis",
+    "doc_messprotokolle",
+    "doc_beschichtung",
+    "doc_haerte",
+    "doc_weitere",
+    "doc_label_attached",
+    "doc_slip_attached",
+    "doc_notes",
+]
+
+
+def _cleanup_doc_check_session_state() -> None:
+    """Entfernt alle Form-Widget-Keys aus dem Session State."""
+    for key in _DOC_CHECK_FORM_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state.pop("_dcc_item_key", None)
 
 
 # PERFORMANCE: Cache DocumentGenerationService als Singleton
@@ -34,7 +55,10 @@ def get_document_generation_service():
     Uses @st.cache_resource to create service ONCE and reuse it.
     This allows TemplateCache to persist across document generations.
     """
-    from warehouse.application.services.document_generation import DocumentGenerationService
+    from warehouse.application.services.document_generation import (
+        DocumentGenerationService,
+    )
+
     return DocumentGenerationService()
 
 
@@ -48,7 +72,7 @@ class DocumentCheckPopup(InspectionPopup):
             show_info_box=False,
             info_text=None,
             css_style="compact",  # ← Kompaktes CSS
-            required_permission="check_documents"  # ← Permission-Ready
+            required_permission="check_documents",  # ← Permission-Ready
         )
 
     def render_header(self) -> None:
@@ -87,7 +111,7 @@ class DocumentCheckPopup(InspectionPopup):
             key="doc_accompanying_documents",
             file_types=["pdf", "png", "jpg", "jpeg", "docx"],
             accept_multiple=True,
-            help_text="Laden Sie Begleitdokumente hoch (z.B. Materialzeugnis, Messprotokoll)",
+            help_text="Laden Sie Begleitdokumente hoch (z.B. Materialzeugnis, Messprotokoll)",  # noqa: E501
         )
 
         # Speichere hochgeladene Dokumente
@@ -149,7 +173,7 @@ class DocumentCheckPopup(InspectionPopup):
         # Sektion 4: Physische Dokumente - HERVORGEHOBEN
         st.markdown("**📋 Physische Dokumente und Label Verifikation**")
         st.caption(
-            "*Bestätigen Sie, dass die erstellten Dokumente korrekt angebracht bzw. beigelegt wurden:*"
+            "*Bestätigen Sie, dass die erstellten Dokumente korrekt angebracht bzw. beigelegt wurden:*"  # noqa: E501
         )
 
         col3, col4 = st.columns(2)
@@ -159,7 +183,7 @@ class DocumentCheckPopup(InspectionPopup):
                 "🏷️ Label geprüft und angebracht *",
                 key="doc_label_attached",
                 value=certificates.get("label_present", False),
-                help="Das gedruckte Label wurde überprüft und am Artikel angebracht (PFLICHTFELD)",
+                help="Das gedruckte Label wurde überprüft und am Artikel angebracht (PFLICHTFELD)",  # noqa: E501
             )
 
         with col4:
@@ -167,7 +191,7 @@ class DocumentCheckPopup(InspectionPopup):
                 "📋 Begleitschein beigelegt *",
                 key="doc_slip_attached",
                 value=certificates.get("accompanying_document", False),
-                help="Der gedruckte Begleitschein wurde überprüft und der Lieferung beigelegt (PFLICHTFELD)",
+                help="Der gedruckte Begleitschein wurde überprüft und der Lieferung beigelegt (PFLICHTFELD)",  # noqa: E501
             )
 
         # Speichere physische Dokument-Checkboxen
@@ -215,7 +239,7 @@ class DocumentCheckPopup(InspectionPopup):
         # Validierungshinweise
         if not label_attached or not slip_attached:
             st.warning(
-                "⚠️ Bitte bestätigen Sie, dass Label und Begleitschein angebracht/beigelegt wurden (Pflicht)."
+                "⚠️ Bitte bestätigen Sie, dass Label und Begleitschein angebracht/beigelegt wurden (Pflicht)."  # noqa: E501
             )
 
         return form_data
@@ -235,7 +259,7 @@ class DocumentCheckPopup(InspectionPopup):
         """
         import logging
         from datetime import datetime
-        from warehouse.application.services.document_generation.document_generation_service import (
+        from warehouse.application.services.document_generation.document_generation_service import (  # noqa: E501, F401
             DocumentGenerationService,
         )
 
@@ -290,7 +314,7 @@ class DocumentCheckPopup(InspectionPopup):
             # Log for debugging (ADMIN STYLE)
             logger.info(f"🔍 STEP 2 DEBUG: Documents found: {documents_found}")
             logger.info(
-                f"🔍 STEP 2 DEBUG: Physical documents: Label={label_attached}, Begleitschein={accompanying_document_attached}"
+                f"🔍 STEP 2 DEBUG: Physical documents: Label={label_attached}, Begleitschein={accompanying_document_attached}"  # noqa: E501
             )
 
             # 1. Save certificate and document flags (ADMIN STYLE)
@@ -303,7 +327,7 @@ class DocumentCheckPopup(InspectionPopup):
                     "article_number": article_number,
                     "batch_number": batch_number,
                     "delivery_number": delivery_number,
-                    "employee_name": employee_name,  # Already validated - no fallback to 'System'
+                    "employee_name": employee_name,  # Already validated - no fallback to 'System'  # noqa: E501
                     "measurement_protocol": documents_found.get(
                         "messprotokolle", False
                     ),
@@ -338,7 +362,9 @@ class DocumentCheckPopup(InspectionPopup):
 
             # 1.5 Save uploaded documents
             uploaded_docs = form_data.get("uploaded_documents", [])
-            logger.info(f"🔍 DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}")
+            logger.info(
+                f"🔍 DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}"  # noqa: E501
+            )
             if uploaded_docs:
                 st.write(
                     f"📤 Speichere {len(uploaded_docs)} hochgeladene Dokument(e)..."
@@ -374,11 +400,11 @@ class DocumentCheckPopup(InspectionPopup):
                             if save_result.success:
                                 st.success(f"✅ Dokument gespeichert: {doc.name}")
                                 logger.info(
-                                    f"✅ Document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}"
+                                    f"✅ Document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}"  # noqa: E501
                                 )
                             else:
                                 st.error(
-                                    f"❌ Fehler beim Speichern von {doc.name}: {save_result.error}"
+                                    f"❌ Fehler beim Speichern von {doc.name}: {save_result.error}"  # noqa: E501
                                 )
                                 logger.error(
                                     f"❌ Failed to save {doc.name}: {save_result.error}"
@@ -399,7 +425,7 @@ class DocumentCheckPopup(InspectionPopup):
             # 2. Generate PDB with certificate information (ADMIN STYLE)
             try:
                 st.write(
-                    "✨ **Neue Generation Service**: Erstelle PDB mit Zertifikatsinformationen..."
+                    "✨ **Neue Generation Service**: Erstelle PDB mit Zertifikatsinformationen..."  # noqa: E501
                 )
                 # PERFORMANCE: Use cached service instead of creating new one
                 generation_service = get_document_generation_service()
@@ -442,19 +468,19 @@ class DocumentCheckPopup(InspectionPopup):
                     ),
                 }
 
-                # CRITICAL FIX: Reload fresh item data from DB before PDB generation (ADMIN STYLE)
-                # Problem: item_data parameter may contain stale data from before Step1 updates
+                # CRITICAL FIX: Reload fresh item data from DB before PDB generation (ADMIN STYLE)  # noqa: E501
+                # Problem: item_data parameter may contain stale data from before Step1 updates  # noqa: E501
                 # Solution: Always get fresh data from database
                 fresh_item_data = item_service.get_item_by_composite_key(
                     article_number, batch_number, delivery_number
                 )
 
-                # Use fresh data if available, otherwise fall back to passed data (ADMIN STYLE)
+                # Use fresh data if available, otherwise fall back to passed data (ADMIN STYLE)  # noqa: E501
                 item_data_for_pdb = (
                     fresh_item_data if fresh_item_data else self.item_data
                 )
 
-                # Generate PDB document with certificate data (DOCX + PDF + SharePoint Upload) (ADMIN STYLE)
+                # Generate PDB document with certificate data (DOCX + PDF + SharePoint Upload) (ADMIN STYLE)  # noqa: E501
                 pdb_result = generation_service.generate_document(
                     document_type="pdb",
                     batch_number=batch_number,
@@ -485,7 +511,7 @@ class DocumentCheckPopup(InspectionPopup):
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 st.error(f"❌ PDB-Generierung fehlgeschlagen: {e}")
 
-            # 3. Complete workflow - WITH certificates parameter mapped to CertificateType enums
+            # 3. Complete workflow - WITH certificates parameter mapped to CertificateType enums  # noqa: E501
             try:
                 # Build certificates dictionary with CertificateType enum keys
                 certificates_dict = {
@@ -543,7 +569,7 @@ class DocumentCheckPopup(InspectionPopup):
                     batch_number=batch_number,
                     delivery_number=delivery_number,
                     certificates=certificates_for_audit,
-                    notes=None,  # Die Methode baut die Notes selbst aus den Zertifikaten
+                    notes=None,  # Die Methode baut die Notes selbst aus den Zertifikaten  # noqa: E501
                 )
 
             except Exception as e:
@@ -574,6 +600,17 @@ def show_document_check_popup(item_data: Dict[str, Any]) -> None:
     Args:
         item_data: Dictionary mit Item-Informationen
     """
+    # Stale Form-Keys vom vorherigen Dialog bereinigen, aber NUR wenn sich
+    # der Artikel geaendert hat (sonst wuerden User-Eingaben zurueckgesetzt)
+    _current_item_key = (
+        f"{item_data.get('article_number')}"
+        f"_{item_data.get('batch_number')}"
+        f"_{item_data.get('delivery_number')}"
+    )
+    if st.session_state.get("_dcc_item_key") != _current_item_key:
+        _cleanup_doc_check_session_state()
+        st.session_state["_dcc_item_key"] = _current_item_key
+
     popup = DocumentCheckPopup(item_data)
     popup._apply_css()  # CSS anwenden für kompakte Abstände
 
@@ -586,4 +623,5 @@ def show_document_check_popup(item_data: Dict[str, Any]) -> None:
     if action == "save":
         popup.handle_primary_action(form_data)
     elif action == "cancel":
+        _cleanup_doc_check_session_state()
         st.rerun()
