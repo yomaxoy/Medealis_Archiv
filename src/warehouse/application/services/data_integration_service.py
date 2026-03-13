@@ -8,8 +8,7 @@ für Document Generation gemäß Clean Architecture Principles.
 """
 
 import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+from typing import Dict, Any, Optional
 
 # Import Application Services (Clean Architecture konform)
 from .entity_services.supplier_service import SupplierService
@@ -104,7 +103,7 @@ class DataIntegrationService:
                         "quantity": item.get("quantity"),
                         "unit": item.get("unit"),
                         "description": item.get("description"),
-                        "manufacturer": item.get("manufacturer"),
+                        "kompatibilitaet": item.get("kompatibilitaet"),
                         "status": item.get("status"),
                     }
                 )
@@ -221,20 +220,22 @@ class DataIntegrationService:
         """
         cleared_methods = 0
 
-        if hasattr(self.get_complete_delivery_data, 'cache_clear'):
+        if hasattr(self.get_complete_delivery_data, "cache_clear"):
             self.get_complete_delivery_data.cache_clear()
             cleared_methods += 1
 
-        if hasattr(self.get_item_certificates, 'cache_clear'):
+        if hasattr(self.get_item_certificates, "cache_clear"):
             self.get_item_certificates.cache_clear()
             cleared_methods += 1
 
-        if hasattr(self.get_delivery_statistics, 'cache_clear'):
+        if hasattr(self.get_delivery_statistics, "cache_clear"):
             self.get_delivery_statistics.cache_clear()
             cleared_methods += 1
 
-        logger.info(f"Cleared {cleared_methods} method caches in DataIntegrationService")
-        return {'cleared_methods': cleared_methods}
+        logger.info(
+            f"Cleared {cleared_methods} method caches in DataIntegrationService"
+        )
+        return {"cleared_methods": cleared_methods}
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """
@@ -245,14 +246,14 @@ class DataIntegrationService:
         """
         stats = {}
 
-        if hasattr(self.get_complete_delivery_data, 'cache_stats'):
-            stats['delivery_data'] = self.get_complete_delivery_data.cache_stats()
+        if hasattr(self.get_complete_delivery_data, "cache_stats"):
+            stats["delivery_data"] = self.get_complete_delivery_data.cache_stats()
 
-        if hasattr(self.get_item_certificates, 'cache_stats'):
-            stats['item_certificates'] = self.get_item_certificates.cache_stats()
+        if hasattr(self.get_item_certificates, "cache_stats"):
+            stats["item_certificates"] = self.get_item_certificates.cache_stats()
 
-        if hasattr(self.get_delivery_statistics, 'cache_stats'):
-            stats['delivery_statistics'] = self.get_delivery_statistics.cache_stats()
+        if hasattr(self.get_delivery_statistics, "cache_stats"):
+            stats["delivery_statistics"] = self.get_delivery_statistics.cache_stats()
 
         return stats
 

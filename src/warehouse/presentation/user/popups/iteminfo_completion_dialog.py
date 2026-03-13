@@ -5,7 +5,8 @@ Ermöglicht die Vervollständigung von ItemInfo-Einträgen nach dem Lieferschein
 wenn Artikel noch nicht im System vorhanden sind.
 
 Integriert:
-- Vollständige ItemInfo-Felder (Designation, Manufacturer, Drawing, Storage Location, etc.)
+- Vollständige ItemInfo-Felder (Designation, Manufacturer,
+  Drawing, Storage Location, etc.)
 - QR-Code Upload (Binary Storage in PostgreSQL)
 - Multi-Artikel Workflow (Tabs oder Dropdown)
 - Artikel-Skip/Delete Funktion
@@ -14,8 +15,7 @@ Integriert:
 import streamlit as st
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from io import BytesIO
+from typing import List, Dict, Any
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -29,11 +29,15 @@ def show_iteminfo_completion_dialog(
     Zeigt Dialog zur Vervollständigung fehlender ItemInfo-Einträge.
 
     Args:
-        missing_articles: Liste von Artikeln ohne ItemInfo [{article_number, description, ...}, ...]
-        supplier_name: Lieferantenname vom Lieferschein (wird als Hersteller vorausgefüllt)
+        missing_articles: Liste von Artikeln ohne ItemInfo
+            [{article_number, description, ...}, ...]
+        supplier_name: Lieferantenname vom Lieferschein
+            (wird als Hersteller vorausgefüllt)
 
     Returns:
-        bool: True wenn alle ItemInfos vervollständigt/übersprungen wurden, False wenn noch in Bearbeitung
+        bool: True wenn alle ItemInfos vervollständigt/
+            übersprungen wurden, False wenn noch
+            in Bearbeitung
     """
 
     st.info(
@@ -84,9 +88,10 @@ def show_iteminfo_completion_dialog(
             with tabs[idx]:
                 _render_article_form(article, idx, supplier_name, active_articles)
     else:
-        # Dropdown für viele Artikel - verwende current_article_index für Auto-Navigation
+        # Dropdown für viele Artikel
         article_options = [
-            f"{art['article_number']} - {art.get('description', 'Keine Bezeichnung')}"
+            f"{art['article_number']} - "
+            f"{art.get('description', 'Keine Bezeichnung')}"
             for art in active_articles
         ]
 
@@ -96,7 +101,7 @@ def show_iteminfo_completion_dialog(
             options=range(len(article_options)),
             format_func=lambda i: article_options[i],
             index=st.session_state.current_article_index,
-            help="Wählen Sie den Artikel aus, den Sie bearbeiten möchten",
+            help="Wählen Sie den Artikel aus, den Sie " "bearbeiten möchten",
             key="article_selector",
         )
 
@@ -114,10 +119,14 @@ def show_iteminfo_completion_dialog(
     skipped_count = len(st.session_state.articles_to_skip)
     total_count = len(missing_articles)
 
+    remaining = total_count - completed_count - skipped_count
     st.progress(
         (completed_count + skipped_count) / total_count,
-        text=f"📊 Fortschritt: {completed_count} ausgefüllt, {skipped_count} übersprungen, "
-        f"{total_count - completed_count - skipped_count} verbleibend",
+        text=(
+            f"📊 Fortschritt: {completed_count} "
+            f"ausgefüllt, {skipped_count} "
+            f"übersprungen, {remaining} verbleibend"
+        ),
     )
 
     # Buttons
@@ -172,8 +181,10 @@ def _render_article_form(
     Args:
         article: Artikel-Daten {article_number, description, ...}
         form_index: Index für eindeutige Keys
-        supplier_name: Lieferantenname vom Lieferschein (wird als Hersteller vorausgefüllt)
-        active_articles: Liste aller aktiven Artikel (für Auto-Navigation zum nächsten)
+        supplier_name: Lieferantenname vom Lieferschein
+            (wird als Hersteller vorausgefüllt)
+        active_articles: Liste aller aktiven Artikel
+            (für Auto-Navigation zum nächsten)
     """
     article_number = article["article_number"]
 
@@ -182,7 +193,7 @@ def _render_article_form(
     # Prüfe ob Daten bereits vorhanden
     if article_number in st.session_state.iteminfo_form_data:
         st.info("✅ Artikel-Informationen bereits ausgefüllt")
-        if st.button(f"🔄 Erneut bearbeiten", key=f"edit_{form_index}"):
+        if st.button("🔄 Erneut bearbeiten", key=f"edit_{form_index}"):
             del st.session_state.iteminfo_form_data[article_number]
             st.rerun()
         return
@@ -198,16 +209,35 @@ def _render_article_form(
             "Bezeichnung",
             value=article.get("description", ""),
             key=f"designation_{form_index}",
-            help="Artikelbezeichnung (automatisch aus Lieferschein übernommen)",
+            help="Artikelbezeichnung (automatisch aus " "Lieferschein übernommen)",
         )
 
-        # Hersteller aus supplier_name vorausgefüllt (vom Lieferschein)
-        # Mehrere Hersteller können kommagetrennt eingegeben werden
-        manufacturer = st.text_input(
+        # Hersteller – verantwortlicher Hersteller des Abutments (i.d.R. Medealis GmbH)
+        hersteller = st.text_input(
             "Hersteller",
-            value=supplier_name or article.get("manufacturer", ""),
-            key=f"manufacturer_{form_index}",
-            help="Hersteller (automatisch aus Lieferschein übernommen). Mehrere Hersteller kommagetrennt möglich: z.B. 'Primec, Dentsply, Straumann'",
+            value=article.get("hersteller", "") or "Medealis GmbH",
+            key=f"hersteller_{form_index}",
+            help="Verantwortlicher Hersteller des "
+            "Abutments (i.d.R. Medealis GmbH, "
+            "ggf. Terrats Medical)",
+        )
+
+        # Kompatibilität – automatisch aus Artikelnummer abgeleitet, editierbar
+        from warehouse.application.services.document_storage.storage_context import (  # noqa: E501
+            determine_kompatibilitaet,
+        )
+
+        _default_komp = article.get("kompatibilitaet", "") or determine_kompatibilitaet(
+            article_number
+        )
+        kompatibilitaet = st.text_input(
+            "Kompatibilität",
+            value=_default_komp,
+            key=f"kompatibilitaet_{form_index}",
+            help="Implantatmarke, mit der das Abutment "
+            "kompatibel ist (z.B. Straumann, Camlog, "
+            "MegaGen) – wird automatisch aus der "
+            "Artikelnummer abgeleitet",
         )
 
         drawing_reference = st.text_input(
@@ -275,7 +305,7 @@ def _render_article_form(
 
     with col_btn1:
         if st.button(
-            f"⏭️ Artikel überspringen",
+            "⏭️ Artikel überspringen",
             key=f"skip_{form_index}",
             use_container_width=True,
         ):
@@ -287,12 +317,13 @@ def _render_article_form(
 
     with col_btn2:
         if st.button(
-            f"💾 Artikel speichern",
+            "💾 Artikel speichern",
             key=f"save_{form_index}",
             type="primary",
             use_container_width=True,
         ):
-            # Validierung - Bezeichnung ist nicht mehr Pflicht (wird automatisch aus Lieferschein übernommen)
+            # Validierung - Bezeichnung ist nicht mehr
+            # Pflicht (automatisch aus LS übernommen)
             # Fallback auf Artikelnummer falls leer
             final_designation = (
                 designation.strip()
@@ -304,7 +335,10 @@ def _render_article_form(
             st.session_state.iteminfo_form_data[article_number] = {
                 "article_number": article_number,
                 "designation": final_designation,
-                "manufacturer": manufacturer.strip() if manufacturer else None,
+                "hersteller": (hersteller.strip() if hersteller else "Medealis GmbH"),
+                "kompatibilitaet": (
+                    kompatibilitaet.strip() if kompatibilitaet else None
+                ),
                 "drawing_reference": drawing_reference.strip()
                 if drawing_reference
                 else None,
@@ -315,7 +349,8 @@ def _render_article_form(
                 "has_qr": article_number in st.session_state.qr_uploads,
             }
 
-            # NEU: Automatisch zum nächsten Artikel springen (nur bei Dropdown-Navigation)
+            # Auto-Navigation zum nächsten Artikel
+            # (nur bei Dropdown-Navigation)
             if active_articles and len(active_articles) > 3:
                 # Finde nächsten unbearbeiteten Artikel
                 next_index = form_index + 1
@@ -344,7 +379,7 @@ def _save_all_iteminfos() -> bool:
         bool: True bei Erfolg, False bei Fehler
     """
     try:
-        from warehouse.infrastructure.database.repositories.item_info_repository import (
+        from warehouse.infrastructure.database.repositories.item_info_repository import (  # noqa: E501
             item_info_repository,
         )
 
@@ -358,13 +393,14 @@ def _save_all_iteminfos() -> bool:
             iteminfo_data = {
                 "article_number": form_data["article_number"],
                 "designation": form_data["designation"],
-                "manufacturer": form_data.get("manufacturer"),
+                "hersteller": form_data.get("hersteller"),
+                "kompatibilitaet": form_data.get("kompatibilitaet"),
                 "drawing_reference": form_data.get("drawing_reference"),
                 "storage_location": form_data.get("storage_location"),
                 "description": form_data.get("description"),
                 "qr_code_image": qr_image,
                 "qr_code_filename": qr_filename,
-                "qr_code_uploaded_at": datetime.now() if qr_image else None,
+                "qr_code_uploaded_at": (datetime.now() if qr_image else None),
             }
 
             # Erstelle ItemInfo über Repository
@@ -372,12 +408,14 @@ def _save_all_iteminfos() -> bool:
 
             if result:
                 saved_count += 1
-                logger.info(f"ItemInfo created for article {article_number}")
+                logger.info("ItemInfo created for article " f"{article_number}")
             else:
-                logger.error(f"Failed to create ItemInfo for article {article_number}")
+                logger.error(
+                    "Failed to create ItemInfo for " f"article {article_number}"
+                )
                 return False
 
-        logger.info(f"Successfully saved {saved_count} ItemInfo entries")
+        logger.info(f"Successfully saved {saved_count} " "ItemInfo entries")
 
         # Cleanup Session State
         st.session_state.iteminfo_form_data = {}
@@ -400,13 +438,14 @@ def check_missing_iteminfos(
     Prüft welche Artikel noch keine ItemInfo haben.
 
     Args:
-        extracted_articles: Liste von extrahierten Artikeln aus AI [{article_number, ...}, ...]
+        extracted_articles: Liste von extrahierten Artikeln
+            aus AI [{article_number, ...}, ...]
 
     Returns:
         Liste der Artikel ohne ItemInfo
     """
     try:
-        from warehouse.infrastructure.database.repositories.item_info_repository import (
+        from warehouse.infrastructure.database.repositories.item_info_repository import (  # noqa: E501
             item_info_repository,
         )
 
@@ -427,10 +466,10 @@ def check_missing_iteminfos(
                 missing_articles.append(article)
                 logger.info(f"Article {article_number} missing ItemInfo")
 
-        logger.info(f"Found {len(missing_articles)} articles without ItemInfo")
+        logger.info(f"Found {len(missing_articles)} " "articles without ItemInfo")
         return missing_articles
 
     except Exception as e:
-        logger.error(f"Error checking missing ItemInfos: {str(e)}")
+        logger.error(f"Error checking missing ItemInfos: {e}")
         logger.exception("Full traceback:")
         return []

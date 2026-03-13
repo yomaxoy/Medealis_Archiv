@@ -27,14 +27,14 @@ echo.
 
 REM Admin App starten (Port 8501)
 echo [1/2] Starte Admin App auf Port 8501...
-start "Medealis Admin" /MIN cmd /c ".venv\Scripts\streamlit.exe run src\warehouse\presentation\admin\main_admin_app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false"
+start "Medealis Admin" cmd /k ".venv\Scripts\streamlit.exe run src\warehouse\presentation\admin\main_admin_app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false"
 
 REM Kurz warten
 timeout /t 3 /nobreak >nul
 
 REM User App starten (Port 8502)
 echo [2/2] Starte User App auf Port 8502...
-start "Medealis User" /MIN cmd /c ".venv\Scripts\streamlit.exe run src\warehouse\presentation\user\main_user_app.py --server.port=8502 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false"
+start "Medealis User" cmd /k ".venv\Scripts\streamlit.exe run src\warehouse\presentation\user\main_user_app.py --server.port=8502 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false"
 
 echo.
 echo ========================================

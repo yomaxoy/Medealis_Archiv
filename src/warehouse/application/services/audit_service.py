@@ -60,7 +60,8 @@ class AuditService:
             user: Benutzername
             entity_type: Typ der Entity ("Delivery", "Item", "ItemInfo", "Order", etc.)
             entity_id: Eindeutige ID der Entity
-            data: Zusätzliche Daten (wird als JSONB gespeichert + in Log-Zeile formatiert)
+            data: Zusätzliche Daten (wird als JSONB gespeichert
+                + in Log-Zeile formatiert)
             notes: Optionale Freitext-Notizen
 
         Returns:
@@ -140,7 +141,9 @@ class AuditService:
         user: str,
         article_number: str,
         designation: str,
-        manufacturer: Optional[str] = None,
+        hersteller: Optional[str] = None,
+        kompatibilitaet: Optional[str] = None,
+        manufacturer: Optional[str] = None,  # Backward-Compat-Alias
         notes: Optional[str] = None,
     ) -> bool:
         """
@@ -150,15 +153,20 @@ class AuditService:
             user: Benutzername
             article_number: Artikelnummer
             designation: Artikelbezeichnung
-            manufacturer: Hersteller (optional)
+            hersteller: Verantwortlicher Hersteller (optional)
+            kompatibilitaet: Kompatible Implantatmarke (optional)
             notes: Optionale Notizen
 
         Returns:
             True bei Erfolg
         """
         data = {"Artikel": article_number, "Bezeichnung": designation}
-        if manufacturer:
-            data["Hersteller"] = manufacturer
+        if hersteller:
+            data["Hersteller"] = hersteller
+        elif manufacturer:
+            data["Hersteller"] = manufacturer  # Backward-Compat
+        if kompatibilitaet:
+            data["Kompatibilität"] = kompatibilitaet
 
         return self.log_action(
             action=AuditAction.ITEMINFO_CREATED,
@@ -174,13 +182,19 @@ class AuditService:
         user: str,
         article_number: str,
         designation: str,
-        manufacturer: Optional[str] = None,
+        hersteller: Optional[str] = None,
+        kompatibilitaet: Optional[str] = None,
+        manufacturer: Optional[str] = None,  # Backward-Compat-Alias
         notes: Optional[str] = None,
     ) -> bool:
         """Loggt ItemInfo-Aktualisierung."""
         data = {"Artikel": article_number, "Bezeichnung": designation}
-        if manufacturer:
-            data["Hersteller"] = manufacturer
+        if hersteller:
+            data["Hersteller"] = hersteller
+        elif manufacturer:
+            data["Hersteller"] = manufacturer  # Backward-Compat
+        if kompatibilitaet:
+            data["Kompatibilität"] = kompatibilitaet
 
         return self.log_action(
             action=AuditAction.ITEMINFO_UPDATED,
@@ -455,7 +469,11 @@ class AuditService:
         )
 
     def log_user_role_changed(
-        self, actor: str, username: str, old_role: str, new_role: str,
+        self,
+        actor: str,
+        username: str,
+        old_role: str,
+        new_role: str,
         notes: Optional[str] = None,
     ) -> bool:
         """Loggt Rollenänderung."""
@@ -464,7 +482,11 @@ class AuditService:
             user=actor,
             entity_type="User",
             entity_id=username,
-            data={"Benutzer": username, "Alte Rolle": old_role, "Neue Rolle": new_role},
+            data={
+                "Benutzer": username,
+                "Alte Rolle": old_role,
+                "Neue Rolle": new_role,
+            },
             notes=notes,
         )
 
@@ -481,9 +503,7 @@ class AuditService:
             notes=notes,
         )
 
-    def log_user_password_changed(
-        self, user: str, notes: Optional[str] = None
-    ) -> bool:
+    def log_user_password_changed(self, user: str, notes: Optional[str] = None) -> bool:
         """Loggt Passwort-Änderung durch den User selbst (NICHT das Passwort!)."""
         return self.log_action(
             action=AuditAction.USER_PASSWORD_CHANGED,

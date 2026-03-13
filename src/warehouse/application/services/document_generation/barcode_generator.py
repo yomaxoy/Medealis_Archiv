@@ -3,8 +3,9 @@
 """
 Barcode Generator Service - Integrated PNG Barcode Generation
 
-Migrated from domain/services/barcode_service.py to application layer for clean architecture.
-Provides PNG barcode generation with DocumentStorageService integration for consistent file storage.
+Migrated from domain/services/barcode_service.py to application
+layer for clean architecture. Provides PNG barcode generation with
+DocumentStorageService integration for consistent file storage.
 """
 
 import logging
@@ -51,7 +52,8 @@ class BarcodeGenerator:
     """
     Barcode generation service integrated with document generation architecture.
 
-    Migrated from domain layer BarcodeService to application layer for proper Clean Architecture.
+    Migrated from domain layer BarcodeService to application
+    layer for proper Clean Architecture.
     Uses DocumentStorageService for consistent file paths with other documents.
     """
 
@@ -67,20 +69,22 @@ class BarcodeGenerator:
         # Check barcode library availability
         self.barcode_available = self._check_barcode_library()
 
+        lib_status = "available" if self.barcode_available else "not available"
         logger.info(
-            f"BarcodeGenerator initialized (barcode library: {'available' if self.barcode_available else 'not available'})"
+            "BarcodeGenerator initialized" " (barcode library: %s)",
+            lib_status,
         )
 
     def _check_barcode_library(self) -> bool:
         """Check if python-barcode library is available."""
         try:
-            import barcode
-            from barcode.writer import ImageWriter
+            import barcode  # noqa: F401
+            from barcode.writer import ImageWriter  # noqa: F401
 
             return True
         except ImportError:
             logger.warning(
-                "python-barcode library not available - using fallback generation"
+                "python-barcode library not" " available - using fallback" " generation"
             )
             return False
 
@@ -112,12 +116,13 @@ class BarcodeGenerator:
         try:
             # Validate input
             if not value or not value.strip():
-                result.set_error(f"Empty value provided for barcode generation")
+                result.set_error("Empty value provided for barcode generation")
                 return result
 
             # Generate output path if not provided (fallback only)
             if output_path is None:
-                # Fallback: temp directory (should normally be provided by DocumentGenerationService)
+                # Fallback: temp directory (should normally be
+                # provided by DocumentGenerationService)
                 from tempfile import gettempdir
 
                 temp_dir = Path(gettempdir()) / "medealis_barcodes"
@@ -129,7 +134,12 @@ class BarcodeGenerator:
                 output_path = temp_dir / filename
 
                 logger.warning(
-                    f"BarcodeGenerator using fallback temp path - DocumentGenerationService should provide correct path: {output_path}"
+                    "BarcodeGenerator using fallback"
+                    " temp path -"
+                    " DocumentGenerationService"
+                    " should provide correct"
+                    " path: %s",
+                    output_path,
                 )
 
             # Generate barcode
@@ -160,7 +170,9 @@ class BarcodeGenerator:
                 )
             else:
                 result.set_error(
-                    f"Barcode generation failed - file not created at {output_path}"
+                    "Barcode generation failed"
+                    " - file not created"
+                    f" at {output_path}"
                 )
                 self.stats["failed_generations"] += 1
 
@@ -229,7 +241,7 @@ class BarcodeGenerator:
                 and (not storage_location or storage_location == "LAGER-001")
             ):
                 try:
-                    from warehouse.infrastructure.database.repositories.sql_item_rep_domain import (
+                    from warehouse.infrastructure.database.repositories.sql_item_rep_domain import (  # noqa: E501
                         SQLAlchemyItemRepositoryDomain,
                     )
 
@@ -240,19 +252,31 @@ class BarcodeGenerator:
                     if item_info and item_info.get("storage_location"):
                         storage_location = item_info["storage_location"]
                         logger.info(
-                            f"Storage location loaded from database for {article_number}: '{storage_location}'"
+                            "Storage location loaded" " from database for" " %s: '%s'",
+                            article_number,
+                            storage_location,
                         )
                     else:
                         logger.warning(
-                            f"No storage location found in database for {article_number}, using default"
+                            "No storage location found"
+                            " in database for %s,"
+                            " using default",
+                            article_number,
                         )
                 except Exception as e:
                     logger.warning(
-                        f"Could not load storage location from database for {article_number}: {e}"
+                        "Could not load storage"
+                        " location from database"
+                        " for %s: %s",
+                        article_number,
+                        e,
                     )
 
             logger.info(
-                f"Generating label with: Article={article_number}, Batch={batch_number}, Storage={storage_location}"
+                "Generating label with:" " Article=%s, Batch=%s," " Storage=%s",
+                article_number,
+                batch_number,
+                storage_location,
             )
 
             # Validate barcode type
@@ -296,46 +320,66 @@ class BarcodeGenerator:
 
             # Load fonts
             try:
-                # Try to load fonts - Liberation Sans ist der Linux-Ersatz für Arial
-                # Reduzierte Schriftgrößen: Artikel & Lager 30% kleiner (152 * 0.7 = 106), Header angepasst
+                # Liberation Sans = Linux-Ersatz fuer Arial
+                # Reduzierte Schriftgroessen
+                _lib_bold = (
+                    "/usr/share/fonts/truetype/" "liberation/LiberationSans-Bold.ttf"
+                )
+                _lib_regular = (
+                    "/usr/share/fonts/truetype/"
+                    "liberation/"
+                    "LiberationSans-Regular.ttf"
+                )
                 try:
-                    # Try Liberation Sans Bold (Linux standard)
+                    # Try Liberation Sans Bold
                     bold_font_large = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                        _lib_bold,
                         106,
-                    )  # Artikel & Lager (152 - 30% = 106)
+                    )
                     bold_font_medium = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                        _lib_bold,
                         70,
-                    )  # Header-Text (unverändert)
+                    )
                     normal_font = ImageFont.truetype(
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        _lib_regular,
                         55,
-                    )  # Charge-Text (unverändert)
-                except:
+                    )
+                except Exception:
                     # Fallback to Arial (Windows)
                     try:
-                        bold_font_large = ImageFont.truetype("arialbd.ttf", 106)
-                        bold_font_medium = ImageFont.truetype("arialbd.ttf", 70)
-                        normal_font = ImageFont.truetype("arial.ttf", 55)
-                    except:
-                        # Final fallback to DejaVu
                         bold_font_large = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 106
+                            "arialbd.ttf",
+                            106,
                         )
                         bold_font_medium = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70
+                            "arialbd.ttf",
+                            70,
                         )
                         normal_font = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 55
+                            "arial.ttf",
+                            55,
                         )
-            except:
+                    except Exception:
+                        # Final fallback to DejaVu
+                        bold_font_large = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/" "dejavu/DejaVuSans-Bold.ttf",
+                            106,
+                        )
+                        bold_font_medium = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/" "dejavu/DejaVuSans-Bold.ttf",
+                            70,
+                        )
+                        normal_font = ImageFont.truetype(
+                            "/usr/share/fonts/truetype/" "dejavu/DejaVuSans.ttf",
+                            55,
+                        )
+            except Exception:
                 # Ultimate fallback to default fonts
                 try:
                     bold_font_large = ImageFont.load_default()
                     bold_font_medium = ImageFont.load_default()
                     normal_font = ImageFont.load_default()
-                except:
+                except Exception:
                     bold_font_large = None
                     bold_font_medium = None
                     normal_font = None
@@ -392,8 +436,8 @@ class BarcodeGenerator:
                 )
 
             # ROW 2: Article Number (UNTEN - getauscht mit Lagernummer)
-            # Reduzierter Abstand zwischen Zeilen (von 120 auf 90)
-            article_header_y = storage_y + 90  # Space below storage location
+            # Kleiner Zeilenabstand zwischen Lagernummer und Artikelnummer
+            article_header_y = storage_y + 150  # Space below storage location
             # Header text "Artikelnummer:"
             draw.text(
                 (margin_left, article_header_y),
@@ -423,7 +467,11 @@ class BarcodeGenerator:
                     available_height = (
                         upper_half_height - 60
                     )  # Platz für Header + Margin
-                    qr_size = min(available_width, available_height, 200)  # Max 200px
+                    qr_size = min(
+                        available_width,
+                        available_height,
+                        200,
+                    )
 
                     # QR-Code auf optimale Größe skalieren
                     qr_resized = qr_img.resize(
@@ -432,16 +480,25 @@ class BarcodeGenerator:
 
                     # Position: Rechts oben, zentriert in der Sektion
                     qr_x = qr_section_x + (available_width - qr_size) // 2
-                    qr_y = upper_y_start + 10  # Kleiner Abstand vom oberen Rand
+                    qr_y = upper_y_start + 10
 
                     # QR-Code ins Label einfügen
                     label.paste(qr_resized, (qr_x, qr_y))
 
-                    logger.info(f"QR-Code erfolgreich eingefügt: {qr_code_path.name}")
+                    logger.info(
+                        "QR-Code erfolgreich eingefuegt:" " %s",
+                        qr_code_path.name,
+                    )
                 except Exception as e:
-                    logger.warning(f"QR-Code konnte nicht geladen werden: {e}")
+                    logger.warning(
+                        "QR-Code konnte nicht geladen" " werden: %s",
+                        e,
+                    )
             else:
-                logger.info(f"Kein QR-Code gefunden für Artikel {article_number}")
+                logger.info(
+                    "Kein QR-Code gefunden fuer" " Artikel %s",
+                    article_number,
+                )
 
             # Add a subtle separator line
             separator_y = padding_top + upper_half_height - 10
@@ -463,7 +520,8 @@ class BarcodeGenerator:
 
             # Resize barcode maintaining aspect ratio
             barcode_resized = barcode_img.resize(
-                (barcode_target_width, barcode_target_height), Image.Resampling.LANCZOS
+                (barcode_target_width, barcode_target_height),
+                Image.Resampling.LANCZOS,
             )
 
             # Center the barcode horizontally within usable area
@@ -481,11 +539,16 @@ class BarcodeGenerator:
             try:
                 bbox = draw.textbbox((0, 0), batch_text, font=normal_font)
                 text_width = bbox[2] - bbox[0]
-            except:
-                text_width = len(batch_text) * 12  # Rough estimate
+            except Exception:
+                text_width = len(batch_text) * 12
 
             batch_x = padding_left + (usable_width - text_width) // 2
-            draw.text((batch_x, batch_y), batch_text, fill="black", font=normal_font)
+            draw.text(
+                (batch_x, batch_y),
+                batch_text,
+                fill="black",
+                font=normal_font,
+            )
 
             # Add border around the entire label
             border_color = "black"
@@ -542,7 +605,7 @@ class BarcodeGenerator:
             # Add text below
             try:
                 font = ImageFont.load_default()
-            except:
+            except Exception:
                 font = None
 
             text_y = 90
@@ -564,27 +627,6 @@ class BarcodeGenerator:
         except Exception as e:
             logger.error(f"Fallback barcode generation failed: {e}")
             return None
-
-    def _resize_barcode_to_target_size(self, image_path: Path):
-        """Resize barcode to target size (11cm x 7.5cm at 300 DPI)."""
-        try:
-            from PIL import Image
-
-            # Target size: 11cm x 7.5cm at 300 DPI
-            target_width = int(11 * 300 / 2.54)  # ~1299px
-            target_height = int(7.5 * 300 / 2.54)  # ~886px
-
-            with Image.open(image_path) as img:
-                # Resize maintaining aspect ratio
-                img_resized = img.resize(
-                    (target_width, target_height), Image.Resampling.LANCZOS
-                )
-                img_resized.save(image_path, "PNG", dpi=(300, 300))
-
-        except ImportError:
-            logger.warning("PIL not available for barcode resizing")
-        except Exception as e:
-            logger.warning(f"Barcode resizing failed: {e}")
 
     def _sanitize_filename(self, value: str) -> str:
         """Sanitize value for use in filename."""
@@ -640,7 +682,7 @@ class BarcodeGenerator:
         try:
             validation_result = {
                 "barcode_generation_ready": True,
-                "barcode_library_available": self.barcode_available,
+                "barcode_library_available": (self.barcode_available),
                 "fallback_available": True,  # PIL-based fallback
                 "platform": platform.system(),
                 "recommendations": [],
@@ -648,19 +690,24 @@ class BarcodeGenerator:
 
             if not self.barcode_available:
                 validation_result["recommendations"].append(
-                    "Install python-barcode library for best barcode quality: pip install python-barcode[images]"
+                    "Install python-barcode library"
+                    " for best barcode quality:"
+                    " pip install"
+                    " python-barcode[images]"
                 )
 
             # Test PIL availability for fallback
             try:
-                from PIL import Image
+                from PIL import Image  # noqa: F401
 
                 validation_result["pil_available"] = True
             except ImportError:
                 validation_result["pil_available"] = False
                 validation_result["fallback_available"] = False
                 validation_result["recommendations"].append(
-                    "Install Pillow for fallback barcode generation: pip install Pillow"
+                    "Install Pillow for fallback"
+                    " barcode generation:"
+                    " pip install Pillow"
                 )
 
             if (
@@ -683,8 +730,12 @@ class BarcodeGenerator:
         r"""
         Suche QR-Code PNG basierend auf Artikelnummer.
 
-        PRIMÄR: Server-Pfad (\\10.190.140.10\Allgemein - Keyence Messprogramme Ordner)
-        FALLBACK: Lokaler Pfad (~/Medealis/Wareneingang/QR-Codes Messprogramme)
+        PRIMAER: Server-Pfad
+        (\\10.190.140.10\Allgemein -
+        Keyence Messprogramme Ordner)
+        FALLBACK: Lokaler Pfad
+        (~/Medealis/Wareneingang/
+        QR-Codes Messprogramme)
 
         Args:
             article_number: Artikelnummer für QR-Code-Suche
@@ -702,10 +753,14 @@ class BarcodeGenerator:
             server_qr_path = path_resolver.server_qr_code_path
             if server_qr_path.exists():
                 search_paths.append(("Server", server_qr_path))
-                logger.info(f"QR-Code Suche: Server-Pfad verfügbar: {server_qr_path}")
+                logger.info(
+                    "QR-Code Suche: Server-Pfad" " verfuegbar: %s",
+                    server_qr_path,
+                )
             else:
                 logger.warning(
-                    f"QR-Code Suche: Server-Pfad nicht verfügbar: {server_qr_path}"
+                    "QR-Code Suche: Server-Pfad" " nicht verfuegbar: %s",
+                    server_qr_path,
                 )
 
             # FALLBACK: Lokaler Pfad
@@ -713,44 +768,60 @@ class BarcodeGenerator:
             if local_qr_path.exists():
                 search_paths.append(("Lokal", local_qr_path))
                 logger.info(
-                    f"QR-Code Suche: Lokaler Fallback-Pfad verfügbar: {local_qr_path}"
+                    "QR-Code Suche: Lokaler" " Fallback-Pfad verfuegbar: %s",
+                    local_qr_path,
                 )
             else:
                 logger.warning(
-                    f"QR-Code Suche: Lokaler Pfad nicht verfügbar: {local_qr_path}"
+                    "QR-Code Suche: Lokaler Pfad" " nicht verfuegbar: %s",
+                    local_qr_path,
                 )
 
             # Prüfe ob überhaupt ein Pfad verfügbar ist
             if not search_paths:
-                logger.error("QR-Code Suche: Weder Server noch lokaler Pfad verfügbar!")
+                logger.error(
+                    "QR-Code Suche: Weder Server" " noch lokaler Pfad verfuegbar!"
+                )
                 return None
 
             # Durchsuche Pfade in Prioritätsreihenfolge
             for source_name, qr_base_path in search_paths:
                 logger.info(
-                    f"QR-Code Suche: Durchsuche {source_name}-Pfad: {qr_base_path}"
+                    "QR-Code Suche: Durchsuche" " %s-Pfad: %s",
+                    source_name,
+                    qr_base_path,
                 )
 
                 # Suche nach Datei die mit Artikelnummer beginnt
                 for qr_file in qr_base_path.glob(f"{article_number}*.png"):
-                    logger.info(f"✅ QR-Code gefunden ({source_name}): {qr_file}")
+                    logger.info(
+                        "QR-Code gefunden (%s): %s",
+                        source_name,
+                        qr_file,
+                    )
                     return qr_file
 
                 # Fallback: Exakte Suche
                 exact_match = qr_base_path / f"{article_number}.png"
                 if exact_match.exists():
                     logger.info(
-                        f"✅ QR-Code gefunden (exakt, {source_name}): {exact_match}"
+                        "QR-Code gefunden" " (exakt, %s): %s",
+                        source_name,
+                        exact_match,
                     )
                     return exact_match
 
                 logger.debug(
-                    f"Kein QR-Code in {source_name}-Pfad gefunden für: {article_number}"
+                    "Kein QR-Code in %s-Pfad" " gefunden fuer: %s",
+                    source_name,
+                    article_number,
                 )
 
             # Kein QR-Code in allen Pfaden gefunden
             logger.info(
-                f"❌ Kein QR-Code gefunden für Artikel: {article_number} (durchsuchte Pfade: {len(search_paths)})"
+                "Kein QR-Code gefunden fuer" " Artikel: %s (durchsuchte" " Pfade: %s)",
+                article_number,
+                len(search_paths),
             )
             return None
 

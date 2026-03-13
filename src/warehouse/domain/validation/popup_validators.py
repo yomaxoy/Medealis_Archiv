@@ -6,7 +6,7 @@ Popup Validators - Domain Layer.
 Spezifische Validatoren für die verschiedenen Popups.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from .validation_result import ValidationResult
 from .field_validators import FieldValidator
 
@@ -31,7 +31,8 @@ class ItemInfoValidator:
             data: {
                 designation: str,
                 storage_location: str,
-                manufacturer: str,
+                hersteller: str,
+                kompatibilitaet: str,
                 revision_number: int
             }
 
@@ -64,16 +65,26 @@ class ItemInfoValidator:
             )
         )
 
-        # Hersteller (Pflicht, max 50 Zeichen)
-        manufacturer = data.get("manufacturer")
+        # Hersteller (Pflicht, max 100 Zeichen)
+        # verantwortlicher Hersteller des Abutments
+        hersteller = data.get("hersteller")
         result.merge(
-            FieldValidator.validate_required(manufacturer, "manufacturer", "Hersteller")
+            FieldValidator.validate_required(hersteller, "hersteller", "Hersteller")
         )
         result.merge(
             FieldValidator.validate_string_length(
-                manufacturer, "manufacturer", 50, "Hersteller"
+                hersteller, "hersteller", 100, "Hersteller"
             )
         )
+
+        # Kompatibilität (optional, max 100 Zeichen) – kompatible Implantatmarke
+        kompatibilitaet = data.get("kompatibilitaet")
+        if kompatibilitaet:
+            result.merge(
+                FieldValidator.validate_string_length(
+                    kompatibilitaet, "kompatibilitaet", 100, "Kompatibilität"
+                )
+            )
 
         # Ref / Revision Number (Pflicht, Integer)
         revision_number = data.get("revision_number")
@@ -159,21 +170,32 @@ class DataConfirmationValidator:
         # Format-Validierung abhängig von Lieferant
         if batch_number:
             if supplier_id == "PRIMEC":
+                lot_msg = (
+                    "Format muss P-xxxxxxxxxxxx, "
+                    "P-xxxxxxxxxxxx-xxxx oder "
+                    "P-xxxxxxxxxxxx-xxxxx sein "
+                    "(z.B. P-123456789012, "
+                    "P-123456789012-1234 oder "
+                    "P-123456789012-12345)"
+                )
                 lot_result = FieldValidator.validate_regex(
                     batch_number,
                     "batch_number",
                     DataConfirmationValidator.PRIMEC_LOT_PATTERN,
-                    "Format muss P-xxxxxxxxxxxx, P-xxxxxxxxxxxx-xxxx oder P-xxxxxxxxxxxx-xxxxx sein (z.B. P-123456789012, P-123456789012-1234 oder P-123456789012-12345)",
+                    lot_msg,
                     "Lot-Nummer",
                 )
                 result.merge(lot_result)
             elif supplier_id == "TERRATS":
-                # Beliebiger String erlaubt, aber nicht leer (already checked by required)
+                # Beliebiger String erlaubt, aber
+                # nicht leer (already checked)
                 pass
             else:
                 # Unbekannter Lieferant - Warning
                 result.add_warning(
-                    f"Unbekannter Lieferant '{supplier_id}' - Lot-Format wird nicht validiert"
+                    f"Unbekannter Lieferant "
+                    f"'{supplier_id}' - Lot-Format "
+                    f"wird nicht validiert"
                 )
 
         # Bestellnummer (Pflicht, Int)
@@ -421,7 +443,10 @@ class VisualInspectionValidator:
             if waste_quantity > total_quantity:
                 result.add_error(
                     "waste_quantity",
-                    f"Ausschussmenge ({waste_quantity}) kann nicht größer als Gesamtmenge ({total_quantity}) sein",
+                    f"Ausschussmenge ({waste_quantity})"
+                    f" kann nicht größer als "
+                    f"Gesamtmenge ({total_quantity})"
+                    f" sein",
                 )
 
         # Bei Zurückweisung: Qualitätsnotizen sind Pflicht (mind. 10 Zeichen)
@@ -432,7 +457,9 @@ class VisualInspectionValidator:
             if not quality_notes or len(quality_notes.strip()) < 10:
                 result.add_error(
                     "quality_notes",
-                    "Bei Zurückweisung ist eine ausführliche Begründung erforderlich (mind. 10 Zeichen)",
+                    "Bei Zurückweisung ist eine "
+                    "ausführliche Begründung "
+                    "erforderlich (mind. 10 Zeichen)",
                 )
 
         return result

@@ -15,8 +15,6 @@ from warehouse.presentation.shared.inspection_popup import InspectionPopup
 from warehouse.presentation.shared.components import (
     render_article_header,
     FormBuilder,
-    render_standard_footer,
-    render_document_uploader,
 )
 from warehouse.application.services.validation_service import validation_service
 from warehouse.application.services.audit_service import audit_service
@@ -63,11 +61,17 @@ class DataConfirmationPopup(InspectionPopup):
             show_info_box=False,
             info_text=None,
             css_style="compact",  # ← Kompaktes CSS
-            required_permission="confirm_data"  # ← Permission-Ready
+            required_permission="confirm_data",  # ← Permission-Ready
         )
 
         # WICHTIG: Beim Initialisieren werden KEINE Ordner erstellt!
-        logger.info(f"DataConfirmationPopup initialized for article {self.article_number}, batch {self.batch_number} - NO folders created yet")
+        logger.info(
+            "DataConfirmationPopup initialized for"
+            " article %s, batch %s"
+            " - NO folders created yet",
+            self.article_number,
+            self.batch_number,
+        )
 
     def render_header(self) -> None:
         """Rendert kompakten Artikel-Header."""
@@ -95,7 +99,11 @@ class DataConfirmationPopup(InspectionPopup):
             key="data_employee_name",
             value=current_user if current_user != "System" else "",
             placeholder="Ihr Name",
-            help="Name des Mitarbeiters der die Datenbestätigung durchführt (Pflichtfeld)",
+            help=(
+                "Name des Mitarbeiters der die"
+                " Datenbestaetigung durchfuehrt"
+                " (Pflichtfeld)"
+            ),
         )
 
         # Sektion 1: Artikeldaten bestätigen
@@ -108,12 +116,44 @@ class DataConfirmationPopup(InspectionPopup):
             help="Artikelnummer vom Lieferschein (Pflichtfeld)",
         )
 
+        _batch_override_key = f"batch_override_{self.delivery_number}"
+        _batch_override = st.session_state.pop(_batch_override_key, None)
+        if _batch_override is not None:
+            # Widget-State löschen BEVOR Widget gerendert wird,
+            # damit der neue value-Parameter übernommen wird
+            st.session_state.pop("data_batch_number", None)
+            _batch_prefill = _batch_override
+        else:
+            _batch_prefill = self.batch_number
         form.add_text_input(
             "Chargennummer: *",
             key="data_batch_number",
-            value=self.batch_number,
+            value=_batch_prefill,
             help="Chargennummer vom Lieferschein (Pflichtfeld)",
         )
+
+        # Batch-Abgleich: Eingabe vs. DB-Wert anzeigen
+        _current_batch = st.session_state.get("data_batch_number", "")
+        if (
+            self.batch_number
+            and _current_batch
+            and str(_current_batch).strip() != str(self.batch_number).strip()
+        ):
+            st.warning(
+                "⚠️ **Chargen-Abweichung erkannt:**"
+                "\n\n"
+                f"- **Eingabe:** `{_current_batch}`"
+                "\n"
+                "- **DB-Wert:**"
+                f" `{self.batch_number}`\n\n"
+                "Beim Bestaetigen wird die"
+                " eingegebene Chargennummer"
+                " uebernommen."
+            )
+        elif self.batch_number and _current_batch:
+            st.success(
+                "✅ Chargennummer stimmt mit DB" f" ueberein: `{self.batch_number}`"
+            )
 
         # Sektion 2: Mengenerfassung
         form.add_section("📊 Mengenerfassung", expanded=True, use_expander=False)
@@ -229,16 +269,34 @@ class DataConfirmationPopup(InspectionPopup):
         # File uploader for order document
         uploaded_order_doc = st.file_uploader(
             "Bestelldokument auswählen:",
-            type=['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
+            type=[
+                "pdf",
+                "doc",
+                "docx",
+                "txt",
+                "jpg",
+                "jpeg",
+                "png",
+            ],
             key="data_order_doc_upload",
-            help="Bestelldokument wird beim Bestätigen in den Artikelordner gespeichert",
-            accept_multiple_files=True
+            help=(
+                "Bestelldokument wird beim"
+                " Bestaetigen in den"
+                " Artikelordner gespeichert"
+            ),
+            accept_multiple_files=True,
         )
 
         if uploaded_order_doc:
             # Show uploaded document info
-            num_files = len(uploaded_order_doc) if isinstance(uploaded_order_doc, list) else 1
-            files_list = uploaded_order_doc if isinstance(uploaded_order_doc, list) else [uploaded_order_doc]
+            num_files = (
+                len(uploaded_order_doc) if isinstance(uploaded_order_doc, list) else 1
+            )
+            files_list = (
+                uploaded_order_doc
+                if isinstance(uploaded_order_doc, list)
+                else [uploaded_order_doc]
+            )
 
             st.success(f"📄 {num_files} Bestelldokument(e) hochgeladen")
 
@@ -248,10 +306,12 @@ class DataConfirmationPopup(InspectionPopup):
                     st.write(f"📋 Dateityp: {doc.type}")
 
             # Store in session state to preserve across reruns
-            st.session_state['uploaded_order_documents'] = files_list
+            st.session_state["uploaded_order_documents"] = files_list
 
         # Speichere hochgeladene Dokumente in form_data
-        form_data["uploaded_documents"] = st.session_state.get('uploaded_order_documents', None)
+        form_data["uploaded_documents"] = st.session_state.get(
+            "uploaded_order_documents", None
+        )
 
         return form_data
 
@@ -262,7 +322,9 @@ class DataConfirmationPopup(InspectionPopup):
         action = None
 
         with col1:
-            if st.button("✅ Daten bestätigen", type="primary", use_container_width=True):
+            if st.button(
+                "✅ Daten bestätigen", type="primary", use_container_width=True
+            ):
                 action = "save"
 
         with col2:
@@ -282,31 +344,42 @@ class DataConfirmationPopup(InspectionPopup):
         """
         import logging
         from datetime import datetime
-        from warehouse.application.services.document_generation.document_generation_service import (
+        from warehouse.application.services.document_generation.document_generation_service import (  # noqa: E501
             DocumentGenerationService,
         )
 
         logger = logging.getLogger(__name__)
 
-        logger.info("🔵 handle_primary_action called - Artikelordner werden JETZT erstellt!")
+        logger.info("handle_primary_action called - Daten werden gespeichert")
 
         try:
-            # Extract data
-            employee_name = form_data.get("data_employee_name", "").strip()
-            confirmed_article = form_data.get("data_article_number", "").strip()
-            confirmed_batch = form_data.get("data_batch_number", "").strip()
-            confirmed_storage_location = form_data.get(
-                "data_storage_location", ""
+            # Extract data - mit None-Safety
+            employee_name = (form_data.get("data_employee_name") or "").strip()
+            confirmed_article = (form_data.get("data_article_number") or "").strip()
+            confirmed_batch = (form_data.get("data_batch_number") or "").strip()
+            confirmed_storage_location = (
+                form_data.get("data_storage_location") or ""
             ).strip()
-            ordered_quantity = form_data.get("data_ordered_quantity", 0)
-            delivery_slip_quantity = form_data.get(
-                "data_slip_quantity", 0
-            )  # FIXED: Correct key!
-            delivered_quantity = form_data.get("data_delivered_quantity", 0)
-            order_number = form_data.get("data_order_number", "").strip()
+            ordered_quantity = form_data.get("data_ordered_quantity", 0) or 0
+            delivery_slip_quantity = form_data.get("data_slip_quantity", 0) or 0
+            delivered_quantity = form_data.get("data_delivered_quantity", 0) or 0
+            order_number = (form_data.get("data_order_number") or "").strip()
             delivery_number = self.item_data.get("delivery_number", "")
 
-            # ===== VALIDATION FIRST =====
+            # Batch-Mismatch: Nur loggen, NICHT blockieren
+            original_batch = self.batch_number
+            if (
+                original_batch
+                and confirmed_batch
+                and confirmed_batch.strip() != original_batch.strip()
+            ):
+                logger.info(
+                    "Batch abweichend - Form: '%s'," " DB: '%s'",
+                    confirmed_batch,
+                    original_batch,
+                )
+
+            # ===== VALIDATION =====
             supplier_id = _get_supplier_id(self.supplier_name)
 
             validation_data = {
@@ -320,14 +393,25 @@ class DataConfirmationPopup(InspectionPopup):
                 "ordered_quantity": ordered_quantity,
             }
 
+            logger.info(
+                "Running validation with" " supplier_id=%s",
+                supplier_id,
+            )
+
             validation_result = validation_service.validate_data_confirmation(
                 validation_data, supplier_id
             )
 
             if not validation_result.is_valid:
+                logger.warning(
+                    "Validation failed: %s",
+                    validation_result.get_formatted_errors(),
+                )
                 st.error("❌ **Validierungsfehler:**")
                 st.error(validation_result.get_formatted_errors())
                 return  # Stop execution
+
+            logger.info("Validation passed - starting saves...")
 
             # Get services
             item_service = st.session_state.services["item"]
@@ -345,9 +429,9 @@ class DataConfirmationPopup(InspectionPopup):
                     material_specification="",
                     description="",
                 )
-                st.success(f"✅ Lagerplatz für {confirmed_article} gespeichert")
+                st.success("✅ Lagerplatz fuer" f" {confirmed_article}" " gespeichert")
             except Exception as e:
-                st.error(f"❌ Fehler beim Speichern der Lagerplatz-Information: {e}")
+                st.error("❌ Fehler beim Speichern der" f" Lagerplatz-Information: {e}")
 
             # 2. Update item with all data
             original_article = self.item_data.get("article_number", "")
@@ -370,7 +454,10 @@ class DataConfirmationPopup(InspectionPopup):
                     ordered_quantity=ordered_quantity,
                 )
                 st.success(
-                    f"✅ Artikelnummer erfolgreich geändert: '{original_article}' → '{confirmed_article}'"
+                    "✅ Artikelnummer erfolgreich"
+                    " geaendert:"
+                    f" '{original_article}'"
+                    f" -> '{confirmed_article}'"
                 )
 
             elif original_batch and original_batch != confirmed_batch:
@@ -386,7 +473,10 @@ class DataConfirmationPopup(InspectionPopup):
                     ordered_quantity=ordered_quantity,
                 )
                 st.success(
-                    f"✅ Chargennummer erfolgreich geändert: '{original_batch}' → '{confirmed_batch}'"
+                    "✅ Chargennummer erfolgreich"
+                    " geaendert:"
+                    f" '{original_batch}'"
+                    f" -> '{confirmed_batch}'"
                 )
 
             elif delivered_quantity > 0:
@@ -400,7 +490,9 @@ class DataConfirmationPopup(InspectionPopup):
                     delivery_slip_quantity=delivery_slip_quantity,
                     ordered_quantity=ordered_quantity,
                 )
-                st.success(f"✅ Liefermenge auf {delivered_quantity} aktualisiert!")
+                st.success(
+                    "✅ Liefermenge auf" f" {delivered_quantity}" " aktualisiert!"
+                )
 
             elif order_number:
                 item_service.update_item(
@@ -410,24 +502,30 @@ class DataConfirmationPopup(InspectionPopup):
                     employee_name=employee_name,
                     order_number=order_number,
                 )
-                st.success("📋 Bestellnummer erfolgreich gespeichert!")
+                st.success("📋 Bestellnummer erfolgreich" " gespeichert!")
 
             # 3. Lieferschein in Artikelordner kopieren (falls vorhanden)
-            # WICHTIG: Dies ist der zentrale Punkt wo der Artikelordner erstellt wird!
-            # Der Lieferschein wurde bereits zentral im "Lieferscheine" Ordner gespeichert
+            # WICHTIG: Hier wird der Artikelordner erstellt!
+            # Der Lieferschein wurde bereits im "Lieferscheine" Ordner gespeichert
             # und wird jetzt in den spezifischen Artikelordner kopiert
             self._save_delivery_slip_to_article_folder(
                 confirmed_article, confirmed_batch, delivery_number
             )
 
             # 4. Bestelldokumente speichern (falls vorhanden)
-            # WICHTIG: Ordner existiert bereits (durch Lieferschein oder wird jetzt erstellt)!
             uploaded_docs = form_data.get("uploaded_documents")
-            logger.info(f"DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}")
+            logger.info(
+                "DEBUG: uploaded_docs = %s," " type = %s",
+                uploaded_docs,
+                type(uploaded_docs),
+            )
 
             if uploaded_docs and len(uploaded_docs) > 0:
-                st.write(f"📤 Speichere {len(uploaded_docs)} Bestelldokument(e)...")
-                logger.info(f"🟢 Speichere {len(uploaded_docs)} Bestelldokumente - Ordner wird JETZT erstellt!")
+                st.write(f"📤 Speichere {len(uploaded_docs)}" " Bestelldokument(e)...")
+                logger.info(
+                    "Speichere %s Bestelldokumente" " - Ordner wird JETZT erstellt!",
+                    len(uploaded_docs),
+                )
                 try:
                     from warehouse.application.services.service_registry import (
                         get_document_storage_service,
@@ -450,7 +548,7 @@ class DataConfirmationPopup(InspectionPopup):
                                 f"Bestellung_{safe_order_number}_{doc.name}"
                             )
 
-                            # Save document to article folder (creates folder if needed)
+                            # Save doc to article folder
                             save_result = storage_service.save_document(
                                 document_data=document_data,
                                 document_name=order_doc_filename,
@@ -459,35 +557,54 @@ class DataConfirmationPopup(InspectionPopup):
                                 delivery_number=delivery_number,
                                 article_number=confirmed_article,
                                 supplier_name="",  # Will be auto-determined
-                                create_folders=False  # Folder already exists from delivery slip save
+                                create_folders=True,
                             )
 
                             if save_result.success:
-                                st.success(f"✅ Bestelldokument gespeichert: {doc.name}")
+                                st.success(
+                                    "✅ Bestelldokument" f" gespeichert: {doc.name}"
+                                )
                                 logger.info(
-                                    f"✅ Order document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}"
+                                    "Order document saved:" " %s to %s",
+                                    doc.name,
+                                    save_result.file_path or save_result.storage_folder,
                                 )
                             else:
                                 st.error(
-                                    f"❌ Fehler beim Speichern von {doc.name}: {save_result.error}"
+                                    "❌ Fehler beim"
+                                    " Speichern von"
+                                    f" {doc.name}:"
+                                    f" {save_result.error}"
                                 )
                                 logger.error(
-                                    f"❌ Failed to save order document {doc.name}: {save_result.error}"
+                                    "Failed to save order" " document %s: %s",
+                                    doc.name,
+                                    save_result.error,
                                 )
 
                         except Exception as doc_error:
                             st.error(
-                                f"❌ Fehler beim Verarbeiten von {doc.name}: {doc_error}"
+                                "❌ Fehler beim"
+                                " Verarbeiten von"
+                                f" {doc.name}:"
+                                f" {doc_error}"
                             )
                             logger.error(
-                                f"Error processing order document {doc.name}: {doc_error}"
+                                "Error processing order" " document %s: %s",
+                                doc.name,
+                                doc_error,
                             )
 
                 except Exception as storage_error:
                     st.error(
-                        f"❌ Fehler beim Speichern der Bestelldokumente: {storage_error}"
+                        "❌ Fehler beim Speichern der"
+                        " Bestelldokumente:"
+                        f" {storage_error}"
                     )
-                    logger.error(f"Error saving order documents: {storage_error}")
+                    logger.error(
+                        "Error saving order" " documents: %s",
+                        storage_error,
+                    )
 
             # 4. Set workflow status
             item_service.complete_data_check(
@@ -507,12 +624,16 @@ class DataConfirmationPopup(InspectionPopup):
                 quantity=delivered_quantity
                 if delivered_quantity > 0
                 else delivery_slip_quantity,
-                notes=f"Lagerplatz: {confirmed_storage_location}, Bestellnummer: {order_number}",
+                notes=(
+                    "Lagerplatz:"
+                    f" {confirmed_storage_location},"
+                    " Bestellnummer:"
+                    f" {order_number}"
+                ),
             )
 
             # 5. Generate documents (Begleitschein, Wareneingangskontrolle, Barcode)
-            # Ordner existiert bereits, keine erneute Erstellung nötig
-            st.info("📄 **Automatische Dokument-Erstellung läuft...**")
+            st.info("📄 **Automatische" " Dokument-Erstellung laeuft...**")
             try:
                 generation_service = DocumentGenerationService()
                 documents_created = []
@@ -536,11 +657,12 @@ class DataConfirmationPopup(InspectionPopup):
                     if begleitschein_result.success:
                         documents_created.append("Begleitschein")
                         st.write(
-                            f"  ✅ Begleitschein: {begleitschein_result.document_path}"
+                            "  ✅ Begleitschein:"
+                            f" {begleitschein_result.document_path}"
                         )
                     else:
                         generation_errors.append(
-                            f"Begleitschein: {begleitschein_result.error}"
+                            "Begleitschein:" f" {begleitschein_result.error}"
                         )
                 except Exception as e:
                     generation_errors.append(f"Begleitschein Fehler: {e}")
@@ -557,20 +679,22 @@ class DataConfirmationPopup(InspectionPopup):
                         employee_name=employee_name,
                         additional_data={
                             "we_date": datetime.now().strftime("%d.%m.%Y"),
-                            # artikel und charge werden automatisch aus generation_models.py generiert (Artikelnummer_Chargennummer)
+                            # artikel und charge werden auto
+                            # aus generation_models generiert
                         },
                     )
                     if wareneingang_result.success:
                         documents_created.append("Wareneingangskontrolle")
                         st.write(
-                            f"  ✅ Wareneingangskontrolle: {wareneingang_result.document_path}"
+                            "  ✅ Wareneingangskontrolle:"
+                            f" {wareneingang_result.document_path}"
                         )
                     else:
                         generation_errors.append(
-                            f"Wareneingangskontrolle: {wareneingang_result.error}"
+                            "Wareneingangskontrolle:" f" {wareneingang_result.error}"
                         )
                 except Exception as e:
-                    generation_errors.append(f"Wareneingangskontrolle Fehler: {e}")
+                    generation_errors.append("Wareneingangskontrolle" f" Fehler: {e}")
 
                 # Generate Barcode/Label
                 try:
@@ -591,7 +715,9 @@ class DataConfirmationPopup(InspectionPopup):
                     )
                     if barcode_result.success:
                         documents_created.append("Barcode/Label")
-                        st.write(f"  ✅ Barcode/Label: {barcode_result.document_path}")
+                        st.write(
+                            "  ✅ Barcode/Label:" f" {barcode_result.document_path}"
+                        )
                     else:
                         generation_errors.append(
                             f"Barcode/Label: {barcode_result.error}"
@@ -601,28 +727,52 @@ class DataConfirmationPopup(InspectionPopup):
 
                 # Show summary
                 if documents_created:
+                    docs_str = ", ".join(documents_created)
                     st.success(
-                        f"📄 {len(documents_created)} Dokument(e) erstellt: {', '.join(documents_created)}"
+                        f"📄 {len(documents_created)}"
+                        " Dokument(e) erstellt:"
+                        f" {docs_str}"
                     )
                 if generation_errors:
                     for error in generation_errors:
                         st.warning(f"⚠️ {error}")
 
             except Exception as e:
-                st.warning(f"⚠️ Dokument-Generierung teilweise fehlgeschlagen: {e}")
+                st.warning(
+                    "⚠️ Dokument-Generierung" " teilweise fehlgeschlagen:" f" {e}"
+                )
 
-            st.success("🎉 **Datenbestätigung abgeschlossen!**")
+            logger.info(
+                "Datenbestaetigung abgeschlossen"
+                " - alle Daten gespeichert,"
+                " Dokumente erstellt"
+            )
 
             # Cleanup session state
-            if 'uploaded_order_documents' in st.session_state:
-                del st.session_state['uploaded_order_documents']
-            if 'pending_delivery_slip_save' in st.session_state:
-                del st.session_state['pending_delivery_slip_save']
+            if "uploaded_order_documents" in st.session_state:
+                del st.session_state["uploaded_order_documents"]
+            if "pending_delivery_slip_save" in st.session_state:
+                del st.session_state["pending_delivery_slip_save"]
+            # pending_save Flag löschen nach erfolgreicher Verarbeitung
+            pass  # cleanup placeholder
 
+            # Erfolgs-Toast anzeigen (überlebt den Rerun)
+            st.toast("🎉 Datenbestätigung abgeschlossen!", icon="✅")
+
+            # Dialog schließen durch Rerun
+            # (Dialog wird nur geöffnet wenn der Trigger-Button geklickt wird,
+            #  nach Rerun ist kein Button-Klick aktiv → Dialog schließt sich)
+            import time
+
+            time.sleep(0.5)  # Kurz warten damit Toast sichtbar wird
             st.rerun()
 
         except Exception as e:
-            logger.error(f"Error in data confirmation: {e}", exc_info=True)
+            logger.error(
+                "Error in data confirmation: %s",
+                e,
+                exc_info=True,
+            )
             st.error(f"❌ Fehler beim Speichern: {str(e)}")
 
     def handle_ai_analysis_action(self, form_data: Dict[str, Any]) -> None:
@@ -637,12 +787,6 @@ class DataConfirmationPopup(InspectionPopup):
         logger = logging.getLogger(__name__)
 
         try:
-            # Extract data
-            employee_name = form_data.get("data_employee_name", "").strip()
-            confirmed_article = form_data.get("data_article_number", "").strip()
-            confirmed_batch = form_data.get("data_batch_number", "").strip()
-            delivery_number = self.item_data.get("delivery_number", "")
-
             st.info("🤖 **KI-Analyse wird durchgeführt...**")
 
             # TODO: Implementiere KI-Analyse hier
@@ -652,7 +796,11 @@ class DataConfirmationPopup(InspectionPopup):
             if uploaded_docs:
                 st.write(f"📄 {len(uploaded_docs)} Dokument(e) werden analysiert...")
                 # KI-Analyse-Logik hier einfügen
-                st.info("⚠️ KI-Analyse noch nicht implementiert - führe normale Speicherung durch")
+                st.info(
+                    "⚠️ KI-Analyse noch nicht"
+                    " implementiert - fuehre normale"
+                    " Speicherung durch"
+                )
             else:
                 st.warning("⚠️ Keine Dokumente zum Analysieren hochgeladen")
 
@@ -665,17 +813,17 @@ class DataConfirmationPopup(InspectionPopup):
             st.error(f"❌ Fehler bei KI-Analyse: {str(e)}")
 
     def _save_delivery_slip_to_article_folder(
-        self,
-        article_number: str,
-        batch_number: str,
-        delivery_number: str
+        self, article_number: str, batch_number: str, delivery_number: str
     ) -> None:
         """
         Speichert den Lieferschein in den Artikelordner.
 
-        Diese Methode wird beim Klick auf "Daten bestätigen" aufgerufen und kopiert
-        den Lieferschein vom zentralen "Lieferscheine" Ordner in den spezifischen
-        Artikelordner. Dies ist der zentrale Punkt wo der Artikelordner erstellt wird!
+        Diese Methode wird beim Klick auf
+        "Daten bestaetigen" aufgerufen und kopiert
+        den Lieferschein vom zentralen "Lieferscheine"
+        Ordner in den spezifischen Artikelordner.
+        Dies ist der zentrale Punkt wo der
+        Artikelordner erstellt wird!
 
         Args:
             article_number: Bestätigte Artikelnummer
@@ -689,23 +837,36 @@ class DataConfirmationPopup(InspectionPopup):
 
         try:
             # Check if we have a pending delivery slip to save
-            pending_slip = st.session_state.get('pending_delivery_slip_save')
+            pending_slip = st.session_state.get("pending_delivery_slip_save")
 
             if not pending_slip:
-                logger.info("No pending delivery slip found - skipping save to article folder")
+                logger.info(
+                    "No pending delivery slip found"
+                    " - skipping save to"
+                    " article folder"
+                )
                 return
 
-            document_data = pending_slip.get('document_data')
-            filename = pending_slip.get('filename', 'Lieferschein.pdf')
+            document_data = pending_slip.get("document_data")
+            filename = pending_slip.get("filename", "Lieferschein.pdf")
 
             if not document_data:
-                logger.warning("Pending delivery slip has no document data - skipping save")
+                logger.warning(
+                    "Pending delivery slip has no document data - skipping save"
+                )
                 return
 
-            logger.info(f"🟢 Saving delivery slip to article folder: {article_number} / {batch_number}")
+            logger.info(
+                "Saving delivery slip to article" " folder: %s / %s",
+                article_number,
+                batch_number,
+            )
 
             # Get document storage service
-            from warehouse.application.services.service_registry import get_document_storage_service
+            from warehouse.application.services.service_registry import (
+                get_document_storage_service,
+            )
+
             storage_service = get_document_storage_service()
 
             if not storage_service:
@@ -713,7 +874,8 @@ class DataConfirmationPopup(InspectionPopup):
                 return
 
             # Save delivery slip to article folder
-            # WICHTIG: create_folders=True - Dies erstellt den Artikelordner!
+            # WICHTIG: create_folders=True erstellt
+            # den Artikelordner!
             save_result = storage_service.save_document(
                 document_data=document_data,
                 document_name=filename,
@@ -721,20 +883,38 @@ class DataConfirmationPopup(InspectionPopup):
                 batch_number=batch_number,
                 delivery_number=delivery_number,
                 article_number=article_number,
-                supplier_name="",  # Will be auto-determined
-                create_folders=True  # Create article folder NOW (single creation point!)
+                supplier_name="",
+                create_folders=True,
             )
 
             if save_result.success:
-                st.success(f"✅ Lieferschein in Artikelordner gespeichert")
-                logger.info(f"✅ Delivery slip saved to article folder: {save_result.storage_folder}")
+                st.success("✅ Lieferschein in" " Artikelordner gespeichert")
+                logger.info(
+                    "Delivery slip saved to article" " folder: %s",
+                    save_result.storage_folder,
+                )
             else:
-                st.warning(f"⚠️ Lieferschein konnte nicht im Artikelordner gespeichert werden: {save_result.error}")
-                logger.error(f"Failed to save delivery slip to article folder: {save_result.error}")
+                st.warning(
+                    "⚠️ Lieferschein konnte nicht"
+                    " im Artikelordner gespeichert"
+                    f" werden: {save_result.error}"
+                )
+                logger.error(
+                    "Failed to save delivery slip" " to article folder: %s",
+                    save_result.error,
+                )
 
         except Exception as e:
-            logger.error(f"Error saving delivery slip to article folder: {e}", exc_info=True)
-            st.warning(f"⚠️ Fehler beim Speichern des Lieferscheins im Artikelordner: {e}")
+            logger.error(
+                "Error saving delivery slip to" " article folder: %s",
+                e,
+                exc_info=True,
+            )
+            st.warning(
+                "⚠️ Fehler beim Speichern des"
+                " Lieferscheins im"
+                f" Artikelordner: {e}"
+            )
 
     def handle_secondary_action(self, form_data: Dict[str, Any]) -> None:
         """Zurückweisen - markiert Artikel als Ausschuss."""
@@ -752,11 +932,16 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     Args:
         item_data: Dictionary mit Item-Informationen
     """
-    # WICHTIG: Flag setzen, dass Popup nur am Rendern ist - KEINE Ordner erstellen!
-    if "data_confirmation_action_clicked" not in st.session_state:
+    # WICHTIG: Flag setzen, dass Popup nur am
+    # Rendern ist - KEINE Ordner erstellen!
+    if "data_confirmation_action_clicked" not in (st.session_state):
         st.session_state["data_confirmation_action_clicked"] = False
 
-    logger.info("🟡 show_data_confirmation_popup called - Rendering nur, KEINE Ordner-Erstellung")
+    logger.info(
+        "show_data_confirmation_popup called"
+        " - Rendering nur, KEINE"
+        " Ordner-Erstellung"
+    )
 
     popup = DataConfirmationPopup(item_data)
     popup._apply_css()  # CSS anwenden für kompakte Abstände
@@ -766,21 +951,13 @@ def show_data_confirmation_popup(item_data: Dict[str, Any]) -> None:
     form_data = popup.render_body()
     action = popup.render_footer()
 
-    # Handle Actions - NUR hier werden Ordner erstellt!
+    # Handle Actions - direkt und einfach
     if action == "save":
-        st.session_state["data_confirmation_action_clicked"] = True
-        logger.info("🟢 'Daten bestätigen' Button geklickt - Ordner werden JETZT erstellt!")
+        logger.info("'Daten bestätigen' Button geklickt")
         popup.handle_primary_action(form_data)
     elif action == "ai_save":
-        st.session_state["data_confirmation_action_clicked"] = True
-        logger.info("🟢 'KI-Analyse' Button geklickt - Ordner werden JETZT erstellt!")
         popup.handle_ai_analysis_action(form_data)
     elif action == "cancel":
-        st.session_state["data_confirmation_action_clicked"] = False
-        # Cleanup uploaded documents from session state
-        if 'uploaded_order_documents' in st.session_state:
-            del st.session_state['uploaded_order_documents']
-        # Keep pending_delivery_slip_save for next confirmation attempt
-        # (User might open popup again for same item)
-        logger.info("⚪ 'Abbrechen' Button geklickt - keine Ordner erstellt")
+        if "uploaded_order_documents" in st.session_state:
+            del st.session_state["uploaded_order_documents"]
         st.rerun()

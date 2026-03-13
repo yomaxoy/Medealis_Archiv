@@ -7,7 +7,6 @@ Verwendet StorageContext für konsistente Datenbereitstellung.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass
@@ -24,6 +23,7 @@ class PathResult:
     Ergebnis einer Pfad-Auflösung.
     Enthält Pfad und Metadaten über die Erstellung.
     """
+
     path: Path
     created: bool = False
     existed: bool = False
@@ -68,7 +68,9 @@ class PathResolver:
         self._server_storage_path = None
 
         # SharePoint Basis-Pfade
-        self._sharepoint_qm_base = "QM_System_Neu/08_Messung_Analyse/06_Überwachung_Produkte"
+        self._sharepoint_qm_base = (
+            "QM_System_Neu/08_Messung_Analyse/06_Überwachung_Produkte"
+        )
 
     @property
     def base_storage_path(self) -> Path:
@@ -116,21 +118,23 @@ class PathResolver:
         Verwendet DIREKT den UNC-Pfad statt gemapptem Laufwerk A:\.
 
         Struktur:
-        \\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes\
+        \\\\10.190.140.10\\Allgemein\\QM_MEDEALIS\\
+        03. Produkte\\Produktprüfung\\
+        Keyence_Messprogramme\\A QR-Codes\\
 
         Returns:
             Path zum Server QR-Code-Verzeichnis
         """
         qr_path = Path(
-            r"\\10.190.140.10\Allgemein\Qualitätsmanagement\QM_MEDEALIS"
-            r"\03. Produkte\Produktprüfung\Keyence_Messprogramme\A QR-Codes"
+            r"\\10.190.140.10\Allgemein"
+            r"\Qualitätsmanagement\QM_MEDEALIS"
+            r"\03. Produkte\Produktprüfung"
+            r"\Keyence_Messprogramme\A QR-Codes"
         )
 
         # Validiere dass Server erreichbar ist
         if not qr_path.exists():
-            self.logger.warning(
-                f"Server QR-Code-Pfad nicht verfügbar: {qr_path}"
-            )
+            self.logger.warning("Server QR-Code-Pfad nicht " f"verfügbar: {qr_path}")
 
         return qr_path
 
@@ -153,11 +157,15 @@ class PathResolver:
 
         DIES IST DER NEUE STANDARD für Produktiv-Speicherung!
 
-        Verwendet DIREKT den UNC-Pfad (\\10.190.140.10\Allgemein) statt gemapptem Laufwerk A:\,
-        da gemappte Laufwerke nicht immer in Python-Prozessen sichtbar sind.
+        Verwendet DIREKT den UNC-Pfad
+        (\\\\10.190.140.10\\Allgemein) statt gemapptem
+        Laufwerk A:\\, da gemappte Laufwerke nicht
+        immer in Python-Prozessen sichtbar sind.
 
         Struktur:
-        \\10.190.140.10\Allgemein\Qualitätsmanagement\QM_Medealis\03. Produkte\Chargenverwaltung\Produktionsunterlagen\
+        \\\\10.190.140.10\\Allgemein\\QM_Medealis\\
+        03. Produkte\\Chargenverwaltung\\
+        Produktionsunterlagen\\
 
         Returns:
             Path zum Server-Basis-Verzeichnis
@@ -183,9 +191,7 @@ class PathResolver:
         return self._server_storage_path
 
     def resolve_storage_path(
-        self,
-        context: StorageContextData,
-        create_folders: bool = True
+        self, context: StorageContextData, create_folders: bool = True
     ) -> PathResult:
         """
         EINZIGE Methode für Storage-Pfad-Erstellung.
@@ -199,34 +205,49 @@ class PathResolver:
             PathResult mit aufgelöstem Pfad und Metadaten
         """
         try:
-            self.logger.info(f"Resolving storage path for batch: {context.batch_number}")
+            self.logger.info(
+                f"Resolving storage path for batch: {context.batch_number}"
+            )
 
             # Validiere Kontext
             validation_issues = context.get_validation_issues()
             if not context.is_complete_for_storage():
-                error_msg = f"Incomplete storage context: {', '.join(validation_issues)}"
+                error_msg = (
+                    f"Incomplete storage context: {', '.join(validation_issues)}"
+                )
                 return PathResult(path=Path(), error=error_msg)
 
             # Erstelle Pfad-Komponenten (bereinigt für Dateisystem)
             clean_supplier = self._clean_path_component(context.supplier_normalized)
-            clean_manufacturer = self._clean_path_component(context.manufacturer)
+            clean_kompatibilitaet = self._clean_path_component(context.kompatibilitaet)
             clean_article = self._clean_path_component(context.article_number)
             clean_batch = self._clean_path_component(context.batch_number)
             clean_delivery = self._clean_path_component(context.delivery_number)
 
-            # SPEZIALFALL: Wenn Lieferant = Hersteller, überspringe Hersteller-Ordner
-            # (z.B. Terrats Medical ist gleichzeitig Lieferant UND Hersteller)
-            # Dies vermeidet Duplikationen wie TERRATS_Medical/Terrats_Medical/
-            supplier_is_manufacturer = (
-                clean_supplier.lower().replace("_", "").replace("-", "") ==
-                clean_manufacturer.lower().replace("_", "").replace("-", "")
+            # SPEZIALFALL: Wenn Lieferant = Kompatibilitätsmarke,
+            # überspringe den Ordner
+            # (z.B. Terrats Medical ist gleichzeitig Lieferant
+            # UND Kompatibilitätsmarke)
+            # Vermeidet Duplikationen wie
+            # TERRATS_Medical/Terrats_Medical/
+            supplier_is_kompatibilitaet = clean_supplier.lower().replace(
+                "_", ""
+            ).replace("-", "") == clean_kompatibilitaet.lower().replace(
+                "_", ""
+            ).replace(
+                "-", ""
             )
 
             # Baue Pfad-Struktur auf:
-            # Normal: Base / Supplier / Manufacturer / Article / Batch / Delivery
-            # Spezial (Supplier=Manufacturer): Base / Supplier / Article / Batch / Delivery
-            if supplier_is_manufacturer:
-                self.logger.info(f"Supplier equals manufacturer ({clean_supplier}), skipping manufacturer folder")
+            # Normal: Base/Supplier/Kompatibilität/
+            #   Article/Batch/Delivery
+            # Spezial (Supplier=Kompatibilität):
+            #   Base/Supplier/Article/Batch/Delivery
+            if supplier_is_kompatibilitaet:
+                self.logger.info(
+                    "Supplier equals Kompatibilität "
+                    f"({clean_supplier}), skipping folder"
+                )
                 storage_path = (
                     self.base_storage_path
                     / clean_supplier
@@ -238,7 +259,7 @@ class PathResolver:
                 storage_path = (
                     self.base_storage_path
                     / clean_supplier
-                    / clean_manufacturer
+                    / clean_kompatibilitaet
                     / clean_article
                     / clean_batch
                     / clean_delivery
@@ -262,11 +283,15 @@ class PathResolver:
             # Warnungen für niedrige Datenqualität
             if context.completeness_score < 0.8:
                 result.add_warning(
-                    f"Storage path created with low data completeness ({context.completeness_score:.1%})"
+                    "Storage path created with low data "
+                    "completeness "
+                    f"({context.completeness_score:.1%})"
                 )
 
             if context.context_source == "fallback":
-                result.add_warning("Storage path created with fallback data - verify accuracy")
+                result.add_warning(
+                    "Storage path created with fallback " "data - verify accuracy"
+                )
 
             self.logger.info(f"Storage path resolved successfully: {storage_path}")
             return result
@@ -277,80 +302,105 @@ class PathResolver:
             return PathResult(path=Path(), error=error_msg)
 
     def resolve_server_storage_path(
-        self,
-        context: StorageContextData,
-        create_folders: bool = True
+        self, context: StorageContextData, create_folders: bool = True
     ) -> PathResult:
         r"""
-        STANDARD-METHODE für Server-Speicherung (UNC-Pfad).
+        STANDARD-METHODE für Server-Speicherung
+        (UNC-Pfad).
 
-        Erstellt Pfad auf dem Firmenserver für zentrale Dokumentenverwaltung.
-        Verwendet direkt UNC-Pfad (\\10.190.140.10\Allgemein).
+        Erstellt Pfad auf dem Firmenserver für
+        zentrale Dokumentenverwaltung.
+        Verwendet direkt UNC-Pfad
+        (\\10.190.140.10\Allgemein).
 
-        Pfad-Struktur (identisch zur lokalen Struktur):
-        \\10.190.140.10\Allgemein\Qualitätsmanagement\...\Produktionsunterlagen\
-            {Lieferant}\{Hersteller}\{Artikelnummer}\{Chargennummer}\{Lieferscheinnummer}\
+        Pfad-Struktur (identisch zur lokalen):
+        \\10.190.140.10\...\Produktionsunterlagen\
+        {Lieferant}\{Hersteller}\{Artikelnummer}\
+        {Chargennummer}\{Lieferscheinnummer}\
 
         Args:
             context: Vollständiger Storage-Kontext
-            create_folders: Ob Ordnerstruktur erstellt werden soll (default: True)
+            create_folders: Ob Ordnerstruktur erstellt
+                werden soll (default: True)
 
         Returns:
-            PathResult mit aufgelöstem Server-Pfad und Metadaten
+            PathResult mit Server-Pfad und Metadaten
 
         Example:
-            >>> context = StorageContextData(
+            >>> ctx = StorageContextData(
             ...     batch_number="20240415-1234",
             ...     delivery_number="LS24-077",
             ...     article_number="MG0001",
-            ...     supplier_normalized="Primec_GmbH",
+            ...     supplier_normalized="Primec",
             ...     manufacturer="MegaGen"
             ... )
-            >>> result = path_resolver.resolve_server_storage_path(context)
-            >>> print(result.path)
-            \\10.190.140.10\Allgemein\Qualitätsmanagement\...\Primec_GmbH\MegaGen\MG0001\20240415-1234\LS24-077
+            >>> r = path_resolver\
+            ...     .resolve_server_storage_path(ctx)
+            >>> print(r.path)
         """
         try:
-            self.logger.info(f"Resolving SERVER storage path for batch: {context.batch_number}")
+            self.logger.info(
+                f"Resolving SERVER storage path for batch: {context.batch_number}"
+            )
 
             # Validiere Kontext
             validation_issues = context.get_validation_issues()
             if not context.is_complete_for_storage():
-                error_msg = f"Incomplete storage context: {', '.join(validation_issues)}"
+                error_msg = (
+                    f"Incomplete storage context: {', '.join(validation_issues)}"
+                )
                 return PathResult(path=Path(), error=error_msg)
 
             # Validiere dass Server verfügbar ist (prüfe direkt den UNC-Pfad)
             server_available = self.server_storage_path.exists()
-            self.logger.info(f"🔍 DEBUG path_resolver: Server storage available = {server_available}")
+            self.logger.info(
+                f"🔍 DEBUG path_resolver: Server storage available = {server_available}"
+            )
 
             if not server_available:
+                srv = self.server_storage_path
                 error_msg = (
-                    f"Server-Speicherpfad nicht verfügbar: {self.server_storage_path}\n"
-                    "Bitte Netzwerkverbindung prüfen oder IT-Support kontaktieren."
+                    "Server-Speicherpfad nicht "
+                    f"verfügbar: {srv}\n"
+                    "Bitte Netzwerkverbindung "
+                    "prüfen oder IT-Support "
+                    "kontaktieren."
                 )
                 self.logger.error(error_msg)
                 return PathResult(path=Path(), error=error_msg)
 
             # Erstelle Pfad-Komponenten (bereinigt für Dateisystem)
             clean_supplier = self._clean_path_component(context.supplier_normalized)
-            clean_manufacturer = self._clean_path_component(context.manufacturer)
+            clean_kompatibilitaet = self._clean_path_component(context.kompatibilitaet)
             clean_article = self._clean_path_component(context.article_number)
             clean_batch = self._clean_path_component(context.batch_number)
             clean_delivery = self._clean_path_component(context.delivery_number)
 
-            # SPEZIALFALL: Wenn Lieferant = Hersteller, überspringe Hersteller-Ordner
-            # (z.B. Terrats Medical ist gleichzeitig Lieferant UND Hersteller)
-            # Dies vermeidet Duplikationen wie TERRATS_Medical/Terrats_Medical/
-            supplier_is_manufacturer = (
-                clean_supplier.lower().replace("_", "").replace("-", "") ==
-                clean_manufacturer.lower().replace("_", "").replace("-", "")
+            # SPEZIALFALL: Wenn Lieferant = Kompatibilitätsmarke,
+            # überspringe den Ordner
+            # (z.B. Terrats Medical ist gleichzeitig Lieferant
+            # UND Kompatibilitätsmarke)
+            # Vermeidet Duplikationen wie
+            # TERRATS_Medical/Terrats_Medical/
+            supplier_is_kompatibilitaet = clean_supplier.lower().replace(
+                "_", ""
+            ).replace("-", "") == clean_kompatibilitaet.lower().replace(
+                "_", ""
+            ).replace(
+                "-", ""
             )
 
-            # Baue Server-Pfad-Struktur auf (IDENTISCH zur lokalen Struktur):
-            # Normal: Server / Supplier / Manufacturer / Article / Batch / Delivery
-            # Spezial (Supplier=Manufacturer): Server / Supplier / Article / Batch / Delivery
-            if supplier_is_manufacturer:
-                self.logger.info(f"Supplier equals manufacturer ({clean_supplier}), skipping manufacturer folder")
+            # Baue Server-Pfad-Struktur auf
+            # (IDENTISCH zur lokalen Struktur):
+            # Normal: Server/Supplier/Kompatibilität/
+            #   Article/Batch/Delivery
+            # Spezial (Supplier=Kompatibilität):
+            #   Server/Supplier/Article/Batch/Delivery
+            if supplier_is_kompatibilitaet:
+                self.logger.info(
+                    "Supplier equals Kompatibilität "
+                    f"({clean_supplier}), skipping folder"
+                )
                 server_path = (
                     self.server_storage_path
                     / clean_supplier
@@ -362,7 +412,7 @@ class PathResolver:
                 server_path = (
                     self.server_storage_path
                     / clean_supplier
-                    / clean_manufacturer
+                    / clean_kompatibilitaet
                     / clean_article
                     / clean_batch
                     / clean_delivery
@@ -385,14 +435,21 @@ class PathResolver:
 
             # Warnungen für niedrige Datenqualität
             if context.completeness_score < 0.8:
+                score = context.completeness_score
                 result.add_warning(
-                    f"Server path created with low data completeness ({context.completeness_score:.1%})"
+                    "Server path created with low "
+                    "data completeness "
+                    f"({score:.1%})"
                 )
 
             if context.context_source == "fallback":
-                result.add_warning("Server path created with fallback data - verify accuracy")
+                result.add_warning(
+                    "Server path created with fallback data - verify accuracy"
+                )
 
-            self.logger.info(f"Server storage path resolved successfully: {server_path}")
+            self.logger.info(
+                f"Server storage path resolved successfully: {server_path}"
+            )
             return result
 
         except Exception as e:
@@ -493,26 +550,40 @@ class PathResolver:
 
                     result = PathResult(path=path, created=True)
                     if attempt > 0:
-                        result.add_warning(f"Folder created after {attempt + 1} attempts")
+                        result.add_warning(
+                            f"Folder created after {attempt + 1} attempts"
+                        )
                     return result
 
                 except OSError as e:
                     last_error = e
                     # Bei transientem Fehler: kurz warten und retry
                     if attempt < max_retries - 1:
-                        self.logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {e}, retrying...")
-                        time.sleep(0.1 * (attempt + 1))  # Exponential backoff: 0.1s, 0.2s, 0.3s
+                        self.logger.warning(
+                            f"Attempt {attempt + 1}"
+                            f"/{max_retries} failed: "
+                            f"{e}, retrying..."
+                        )
+                        time.sleep(
+                            0.1 * (attempt + 1)
+                        )  # Exponential backoff: 0.1s, 0.2s, 0.3s
                         continue
                     # Letzter Versuch fehlgeschlagen
                     break
 
             # Alle Versuche fehlgeschlagen
             if isinstance(last_error, PermissionError):
-                error_msg = f"Permission denied creating folder {path}: {str(last_error)}"
+                error_msg = (
+                    f"Permission denied creating folder {path}: {str(last_error)}"
+                )
                 self.logger.error(error_msg)
                 return PathResult(path=path, error=error_msg)
             else:
-                error_msg = f"Failed to create folder {path} after {max_retries} attempts: {str(last_error)}"
+                error_msg = (
+                    f"Failed to create folder {path} "
+                    f"after {max_retries} attempts: "
+                    f"{str(last_error)}"
+                )
                 self.logger.error(error_msg)
                 return PathResult(path=path, error=error_msg)
 
@@ -522,10 +593,7 @@ class PathResolver:
             return PathResult(path=path, error=error_msg)
 
     def move_file(
-        self,
-        source_path: Path,
-        target_context: StorageContextData,
-        filename: str
+        self, source_path: Path, target_context: StorageContextData, filename: str
     ) -> PathResult:
         """
         Verschiebt Datei von temporärem Pfad zum finalen Storage-Pfad.
@@ -542,9 +610,14 @@ class PathResolver:
             import shutil
 
             # Löse Ziel-Pfad auf
-            storage_result = self.resolve_storage_path(target_context, create_folders=True)
+            storage_result = self.resolve_storage_path(
+                target_context, create_folders=True
+            )
             if not storage_result.success:
-                return PathResult(path=Path(), error=f"Cannot resolve target path: {storage_result.error}")
+                return PathResult(
+                    path=Path(),
+                    error=f"Cannot resolve target path: {storage_result.error}",
+                )
 
             # Bereite Ziel-Datei vor
             clean_filename = self._clean_filename(filename)
@@ -552,7 +625,9 @@ class PathResolver:
 
             # Prüfe Quell-Datei
             if not source_path.exists():
-                return PathResult(path=target_path, error=f"Source file does not exist: {source_path}")
+                return PathResult(
+                    path=target_path, error=f"Source file does not exist: {source_path}"
+                )
 
             # Verschiebe Datei
             shutil.move(str(source_path), str(target_path))
@@ -579,7 +654,7 @@ class PathResolver:
             import time
 
             if not self.temp_path.exists():
-                return {'cleaned_files': 0, 'errors': []}
+                return {"cleaned_files": 0, "errors": []}
 
             current_time = time.time()
             cutoff_time = current_time - (max_age_hours * 3600)
@@ -587,7 +662,7 @@ class PathResolver:
             cleaned_files = []
             errors = []
 
-            for temp_file in self.temp_path.rglob('*'):
+            for temp_file in self.temp_path.rglob("*"):
                 if temp_file.is_file():
                     try:
                         if temp_file.stat().st_mtime < cutoff_time:
@@ -599,17 +674,19 @@ class PathResolver:
                         errors.append(error_msg)
                         self.logger.warning(error_msg)
 
-            self.logger.info(f"Temp cleanup completed: {len(cleaned_files)} files cleaned")
+            self.logger.info(
+                f"Temp cleanup completed: {len(cleaned_files)} files cleaned"
+            )
             return {
-                'cleaned_files': len(cleaned_files),
-                'cleaned_paths': cleaned_files,
-                'errors': errors
+                "cleaned_files": len(cleaned_files),
+                "cleaned_paths": cleaned_files,
+                "errors": errors,
             }
 
         except Exception as e:
             error_msg = f"Temp cleanup failed: {str(e)}"
             self.logger.error(error_msg)
-            return {'cleaned_files': 0, 'errors': [error_msg]}
+            return {"cleaned_files": 0, "errors": [error_msg]}
 
     def _clean_path_component(self, component: str) -> str:
         """
@@ -636,7 +713,7 @@ class PathResolver:
             '"': "",
             "<": "",
             ">": "",
-            "|": "-"
+            "|": "-",
         }
 
         cleaned = component
@@ -667,6 +744,7 @@ class PathResolver:
         """
         if not filename or not isinstance(filename, str):
             from datetime import datetime
+
             return f"document_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
         # Separiere Name und Extension
@@ -680,12 +758,11 @@ class PathResolver:
         # Stelle sicher dass Extension sicher ist
         if extension:
             # Entferne potentiell gefährliche Zeichen aus Extension
-            clean_extension = ''.join(c for c in extension if c.isalnum() or c == '.')
+            clean_extension = "".join(c for c in extension if c.isalnum() or c == ".")
         else:
             clean_extension = ""
 
         return f"{cleaned_name}{clean_extension}"
-
 
     def get_path_preview(self, context: StorageContextData) -> str:
         """
@@ -701,7 +778,11 @@ class PathResolver:
         try:
             # Verwende resolve_storage_path ohne create_folders
             result = self.resolve_storage_path(context, create_folders=False)
-            return str(result.path) if result.success else "Fehler: Pfad konnte nicht bestimmt werden"
+            return (
+                str(result.path)
+                if result.success
+                else "Fehler: Pfad konnte nicht bestimmt werden"
+            )
 
         except Exception as e:
             self.logger.warning(f"Path preview failed: {e}")
@@ -732,25 +813,25 @@ class PathResolver:
                 safety_issue = "Path escapes base storage directory"
 
             return {
-                'is_safe': is_safe,
-                'resolved_path': str(resolved_path),
-                'safety_issue': safety_issue,
-                'warnings': []
+                "is_safe": is_safe,
+                "resolved_path": str(resolved_path),
+                "safety_issue": safety_issue,
+                "warnings": [],
             }
 
         except Exception as e:
             return {
-                'is_safe': False,
-                'resolved_path': str(path),
-                'safety_issue': f"Path validation error: {str(e)}",
-                'warnings': ['Path validation failed']
+                "is_safe": False,
+                "resolved_path": str(path),
+                "safety_issue": f"Path validation error: {str(e)}",
+                "warnings": ["Path validation failed"],
             }
 
     def resolve_delivery_slip_path(
         self,
         supplier_name: str,
         document_type: DocumentType = DocumentType.LIEFERSCHEIN,
-        create_folders: bool = True
+        create_folders: bool = True,
     ) -> PathResult:
         """
         Spezielle Pfad-Auflösung für Lieferscheine.
@@ -770,26 +851,38 @@ class PathResolver:
             PathResult mit Lieferschein-Pfad
         """
         try:
-            self.logger.info(f"🔧 DEBUG: Resolving delivery slip path for supplier: '{supplier_name}'")
+            self.logger.info(
+                "DEBUG: Resolving delivery slip path "
+                f"for supplier: '{supplier_name}'"
+            )
 
             # Validiere Eingaben
             if not supplier_name or not isinstance(supplier_name, str):
-                return PathResult(path=Path(), error="Invalid supplier name provided")
+                return PathResult(
+                    path=Path(),
+                    error="Invalid supplier name provided",
+                )
 
-            # NUTZE STORAGE_CONTEXT NORMALISIERUNG FÜR KONSISTENZ
-            # Die Normalisierung gibt bereits dateisystem-sichere Namen zurück (mit Unterstrichen)
+            # NUTZE STORAGE_CONTEXT NORMALISIERUNG
+            # Die Normalisierung gibt bereits
+            # dateisystem-sichere Namen zurück
             from .storage_context import storage_context
-            normalized_supplier = storage_context._basic_supplier_normalization(supplier_name)
-            self.logger.info(f"🔧 DEBUG: Normalized supplier: '{supplier_name}' → '{normalized_supplier}'")
 
-            # Baue FLACHEN Lieferschein-Pfad (OHNE Jahr/Monat!)
-            delivery_slip_path = (
-                self.base_storage_path
-                / normalized_supplier
-                / "Lieferscheine"
+            normalized_supplier = storage_context._basic_supplier_normalization(
+                supplier_name
+            )
+            self.logger.info(
+                "DEBUG: Normalized supplier: "
+                f"'{supplier_name}' -> "
+                f"'{normalized_supplier}'"
             )
 
-            self.logger.info(f"🔧 DEBUG: FLAT delivery slip path: {delivery_slip_path}")
+            # Baue FLACHEN Lieferschein-Pfad
+            delivery_slip_path = (
+                self.base_storage_path / normalized_supplier / "Lieferscheine"
+            )
+
+            self.logger.info("DEBUG: FLAT delivery slip path: " f"{delivery_slip_path}")
 
             # Erstelle Pfad-Ergebnis
             result = PathResult(path=delivery_slip_path)
@@ -816,16 +909,17 @@ class PathResolver:
         self,
         supplier_name: str,
         document_type: DocumentType = DocumentType.LIEFERSCHEIN,
-        create_folders: bool = True
+        create_folders: bool = True,
     ) -> PathResult:
         r"""
-        SERVER-Version der Lieferschein-Pfad-Auflösung (UNC-Pfad).
+        SERVER-Version der Lieferschein-Pfad-Auflösung
+        (UNC-Pfad).
 
-        Erstellt FLACHE Pfad-Struktur auf Server: \\10.190.140.10\Allgemein\...\Produktionsunterlagen\{Supplier}\Lieferscheine
-        Beispiel: \\10.190.140.10\Allgemein\Qualitätsmanagement\...\Primec_GmbH\Lieferscheine\
+        Erstellt FLACHE Pfad-Struktur auf Server:
+        \\10.190.140.10\...\{Supplier}\Lieferscheine
 
-        VORTEIL: Zentrale Server-Speicherung für alle Lieferscheine
-        IDENTISCH zur lokalen Struktur, nur auf anderem Laufwerk
+        VORTEIL: Zentrale Server-Speicherung
+        IDENTISCH zur lokalen Struktur
 
         Args:
             supplier_name: Name des Lieferanten
@@ -836,7 +930,9 @@ class PathResolver:
             PathResult mit Server-Lieferschein-Pfad
         """
         try:
-            self.logger.info(f"Resolving SERVER delivery slip path for supplier: '{supplier_name}'")
+            self.logger.info(
+                f"Resolving SERVER delivery slip path for supplier: '{supplier_name}'"
+            )
 
             # Validiere Eingaben
             if not supplier_name or not isinstance(supplier_name, str):
@@ -844,24 +940,32 @@ class PathResolver:
 
             # Validiere dass Server verfügbar ist (prüfe direkt den UNC-Pfad)
             if not self.server_storage_path.exists():
+                srv = self.server_storage_path
                 error_msg = (
-                    f"Server-Speicherpfad nicht verfügbar: {self.server_storage_path}\n"
-                    "Bitte Netzwerkverbindung prüfen oder IT-Support kontaktieren."
+                    "Server-Speicherpfad nicht "
+                    f"verfügbar: {srv}\n"
+                    "Bitte Netzwerkverbindung "
+                    "prüfen oder IT-Support "
+                    "kontaktieren."
                 )
                 self.logger.error(error_msg)
                 return PathResult(path=Path(), error=error_msg)
 
-            # NUTZE STORAGE_CONTEXT NORMALISIERUNG FÜR KONSISTENZ
-            # Die Normalisierung gibt bereits dateisystem-sichere Namen zurück (mit Unterstrichen)
+            # NUTZE STORAGE_CONTEXT NORMALISIERUNG
+            # Die Normalisierung gibt bereits
+            # dateisystem-sichere Namen zurück
             from .storage_context import storage_context
-            normalized_supplier = storage_context._basic_supplier_normalization(supplier_name)
-            self.logger.info(f"Normalized supplier: '{supplier_name}' → '{normalized_supplier}'")
+
+            normalized_supplier = storage_context._basic_supplier_normalization(
+                supplier_name
+            )
+            self.logger.info(
+                f"Normalized supplier: '{supplier_name}' → '{normalized_supplier}'"
+            )
 
             # Baue FLACHEN Server-Lieferschein-Pfad (OHNE Jahr/Monat!)
             server_delivery_slip_path = (
-                self.server_storage_path
-                / normalized_supplier
-                / "Lieferscheine"
+                self.server_storage_path / normalized_supplier / "Lieferscheine"
             )
 
             self.logger.info(f"Server delivery slip path: {server_delivery_slip_path}")
@@ -879,7 +983,9 @@ class PathResolver:
                     return result
                 result.warnings.extend(folder_result.warnings)
 
-            self.logger.info(f"Server delivery slip path resolved: {server_delivery_slip_path}")
+            self.logger.info(
+                f"Server delivery slip path resolved: {server_delivery_slip_path}"
+            )
             return result
 
         except Exception as e:
@@ -893,7 +999,7 @@ class PathResolver:
         delivery_number: Optional[str] = None,
         delivery_date: Optional[str] = None,
         original_filename: Optional[str] = None,
-        file_extension: Optional[str] = None
+        file_extension: Optional[str] = None,
     ) -> str:
         """
         Generiert standardisierten Dateinamen für Lieferscheine.
@@ -960,9 +1066,7 @@ class PathResolver:
             return f"Lieferschein_{timestamp}.pdf"
 
     def resolve_sharepoint_path(
-        self,
-        document_type: Union[str, DocumentType],
-        context: StorageContextData
+        self, document_type: Union[str, DocumentType], context: StorageContextData
     ) -> str:
         """
         Löst SharePoint-Pfad für Dokument-Typ auf.
@@ -978,47 +1082,73 @@ class PathResolver:
             SharePoint-Pfad als String (mit forward slashes)
 
         Pfad-Struktur:
-            - Lieferscheine: QM_System_Neu/.../Produktionsunterlagen/{Supplier}/Lieferscheine
-            - Alle anderen Docs (inkl. Barcodes): QM_System_Neu/.../Produktionsunterlagen/{Supplier}/{Manufacturer}/{Article}/{Batch}/{Delivery}
+            - Lieferscheine: .../Produktionsunterlagen/
+              {Supplier}/Lieferscheine
+            - Alle anderen Docs (inkl. Barcodes):
+              .../{Supplier}/{Manufacturer}/{Article}/
+              {Batch}/{Delivery}
 
         Hinweis:
-            - Der Ordner Keyence_QR-Codes_Messprogramme/ ist die QUELLE für QR-Code-Bilder (werden geladen)
-            - Barcode-Labels werden NICHT dort gespeichert, sondern im Artikel-Ordner!
+            - Keyence_QR-Codes_Messprogramme/ ist die
+              QUELLE für QR-Code-Bilder
+            - Barcode-Labels werden NICHT dort
+              gespeichert, sondern im Artikel-Ordner!
         """
         try:
             # Konvertiere zu DocumentType falls String
             if isinstance(document_type, str):
                 doc_type = DocumentType.from_string(document_type)
                 if doc_type is None:
-                    self.logger.warning(f"Unknown document type '{document_type}', using default path")
+                    self.logger.warning(
+                        f"Unknown document type '{document_type}', using default path"
+                    )
                     doc_type = DocumentType.PDB  # Fallback
             else:
                 doc_type = document_type
 
             # Hole Pfad-Komponenten aus Kontext
-            supplier = context.supplier_normalized if context.supplier_normalized else "Unknown"
-            manufacturer = context.manufacturer if context.manufacturer else "Unknown"
+            supplier = (
+                context.supplier_normalized
+                if context.supplier_normalized
+                else "Unknown"
+            )
+            kompatibilitaet = (
+                context.kompatibilitaet if context.kompatibilitaet else "Unknown"
+            )
             article = context.article_number if context.article_number else "Unknown"
             batch = context.batch_number if context.batch_number else "Unknown"
             delivery = context.delivery_number if context.delivery_number else "Unknown"
 
             # Bereinige Komponenten für SharePoint (Umlaute bleiben erhalten!)
             # Nur problematische Zeichen ersetzen: Leerzeichen, Slashes
-            clean_supplier = supplier.replace(" ", "_").replace("/", "-").replace("\\", "-")
-            clean_manufacturer = manufacturer.replace(" ", "_").replace("/", "-").replace("\\", "-")
-            clean_article = article.replace(" ", "_").replace("/", "-").replace("\\", "-")
+            clean_supplier = (
+                supplier.replace(" ", "_").replace("/", "-").replace("\\", "-")
+            )
+            clean_manufacturer = (
+                kompatibilitaet.replace(" ", "_").replace("/", "-").replace("\\", "-")
+            )
+            clean_article = (
+                article.replace(" ", "_").replace("/", "-").replace("\\", "-")
+            )
             clean_batch = batch.replace(" ", "_").replace("/", "-").replace("\\", "-")
-            clean_delivery = delivery.replace(" ", "_").replace("/", "-").replace("\\", "-")
+            clean_delivery = (
+                delivery.replace(" ", "_").replace("/", "-").replace("\\", "-")
+            )
 
             # Pfad-Mapping basierend auf Dokument-Typ
             if doc_type == DocumentType.LIEFERSCHEIN:
                 # Lieferscheine unter Produktionsunterlagen/{Supplier}/Lieferscheine
                 # (Flache Struktur für Lieferscheine)
-                return f"{self.sharepoint_produktionsunterlagen}/{clean_supplier}/Lieferscheine"
+                return (
+                    f"{self.sharepoint_produktionsunterlagen}"
+                    f"/{clean_supplier}/Lieferscheine"
+                )
 
             else:
                 # Alle anderen Dokumente (PDB, Begleitschein, Sichtkontrolle, etc.)
-                # Vollständige Pfad-Hierarchie: {Supplier}/{Manufacturer}/{Article}/{Batch}/{Delivery}
+                # Vollständige Pfad-Hierarchie:
+                # {Supplier}/{Manufacturer}/{Article}/
+                # {Batch}/{Delivery}
                 return (
                     f"{self.sharepoint_produktionsunterlagen}/"
                     f"{clean_supplier}/"

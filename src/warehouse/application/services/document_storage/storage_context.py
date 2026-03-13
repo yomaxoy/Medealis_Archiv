@@ -7,7 +7,7 @@ Holt und bereitet alle benötigten Daten für Storage-Operationen auf.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from dataclasses import dataclass
 
 # Domain Repository Imports (Clean Architecture)
@@ -48,8 +48,12 @@ class StorageContextData:
     supplier_name: str = ""
     supplier_normalized: str = ""
 
-    # Hersteller-Informationen (abgeleitet aus article_number)
-    manufacturer: str = ""
+    # Hersteller / Kompatibilitäts-Informationen
+    # Verantwortlicher Hersteller des Abutments (aus Artikelstamm)
+    hersteller: str = ""
+    kompatibilitaet: str = (
+        ""  # Kompatible Implantatmarke – abgeleitet aus Artikelnummer-Präfix
+    )
 
     # Zusätzliche Kontextdaten
     quantity: int = 0
@@ -95,7 +99,9 @@ class StorageContextData:
             issues.append("delivery_number ist erforderlich")
 
         if not self.article_number or not self.article_number.strip():
-            issues.append("article_number fehlt - kann zu inkonsistenten Pfaden führen")
+            issues.append(
+                "article_number fehlt - kann zu " "inkonsistenten Pfaden führen"
+            )
 
         if not self.supplier_name or not self.supplier_name.strip():
             issues.append("supplier_name fehlt - verwendet Fallback-Wert")
@@ -205,14 +211,15 @@ class StorageContext:
             # Lieferanten-Daten normalisieren
             context = self._resolve_supplier_data(context)
 
-            # Hersteller-Daten ableiten
-            context = self._resolve_manufacturer_data(context)
+            # Kompatibilitäts-Daten ableiten (aus Artikelnummer-Präfix)
+            context = self._resolve_kompatibilitaet_data(context)
 
             # Completeness Score berechnen
             context.completeness_score = self._calculate_completeness_score(context)
 
             self.logger.info(
-                f"Storage context completed with score: {context.completeness_score:.2f}"
+                "Storage context completed with score: "
+                f"{context.completeness_score:.2f}"
             )
             return context
 
@@ -243,13 +250,21 @@ class StorageContext:
 
             # Versuche komplette Lieferungsdaten zu holen
             if delivery_number:
-                self.logger.debug(f"Fetching delivery data for: {delivery_number}, batch: {batch_number}")
+                self.logger.debug(
+                    "Fetching delivery data for: "
+                    f"{delivery_number}, "
+                    f"batch: {batch_number}"
+                )
                 delivery_data = self.database_integration.get_complete_delivery_data(
                     delivery_number, batch_number
                 )
                 if delivery_data:
                     supplier_name = delivery_data.get("supplier_name", "")
-                    self.logger.info(f"Database returned supplier_name: '{supplier_name}' for delivery: {delivery_number}")
+                    self.logger.info(
+                        "Database returned supplier_name: "
+                        f"'{supplier_name}' for delivery: "
+                        f"{delivery_number}"
+                    )
                     return {
                         "delivery_number": delivery_data.get("delivery_number", ""),
                         "article_number": delivery_data.get("article_number", ""),
@@ -263,14 +278,16 @@ class StorageContext:
                         "source": "database",
                     }
                 else:
-                    self.logger.warning(f"No delivery data found for: {delivery_number}")
+                    self.logger.warning(
+                        f"No delivery data found for: {delivery_number}"
+                    )
 
             # Fallback: DataIntegrationService hat keine search_items_by_batch Methode
             # Verwende minimalen Context
-            self.logger.debug(f"No delivery_number provided or no data found, using minimal context")
+            self.logger.debug(
+                "No delivery_number provided or no data " "found, using minimal context"
+            )
             return {"source": "database_no_batch_search"}
-
-            return {"source": "database_empty"}
 
         except Exception as e:
             self.logger.warning(f"Database context lookup failed: {e}")
@@ -288,14 +305,21 @@ class StorageContext:
         """
         try:
             if not context.supplier_name:
-                self.logger.warning(f"No supplier_name in context, using fallback 'Unbekannt'. Context source: {context.context_source}")
+                self.logger.warning(
+                    "No supplier_name in context, using "
+                    "fallback 'Unbekannt'. Context source: "
+                    f"{context.context_source}"
+                )
                 context.supplier_name = "Unbekannt"
                 context.supplier_normalized = "Unbekannt"
                 return context
 
-            self.logger.debug(f"Normalizing supplier_name: '{context.supplier_name}'")
+            self.logger.debug(
+                "Normalizing supplier_name: " f"'{context.supplier_name}'"
+            )
 
-            # FIXED: Use database_integration or internal fallback (no more manufacturer_service)
+            # FIXED: Use database_integration or internal
+            # fallback (no more manufacturer_service)
             if self.database_integration and hasattr(
                 self.database_integration, "normalize_supplier_name"
             ):
@@ -310,7 +334,9 @@ class StorageContext:
                     context.supplier_name
                 )
 
-            self.logger.debug(f"Supplier normalized to: '{context.supplier_normalized}'")
+            self.logger.debug(
+                f"Supplier normalized to: '{context.supplier_normalized}'"
+            )
             return context
 
         except Exception as e:
@@ -318,33 +344,32 @@ class StorageContext:
             context.supplier_normalized = context.supplier_name or "Unbekannt"
             return context
 
-    def _resolve_manufacturer_data(
+    def _resolve_kompatibilitaet_data(
         self, context: StorageContextData
     ) -> StorageContextData:
         """
-        Bestimmt Hersteller basierend auf Artikelnummer.
+        Bestimmt kompatible Implantatmarke basierend auf Artikelnummer-Präfix.
 
         Args:
             context: Storage context
 
         Returns:
-            Context mit Hersteller-Information
+            Context mit Kompatibilitäts-Information
         """
         try:
             if not context.article_number:
-                context.manufacturer = "Standard_Implantate"
+                context.kompatibilitaet = "Standard_Implantate"
                 return context
 
-            # FIXED: Always use internal manufacturer determination (no more helper fallback)
-            context.manufacturer = self._basic_manufacturer_determination(
+            context.kompatibilitaet = self._basic_manufacturer_determination(
                 context.article_number
             )
 
             return context
 
         except Exception as e:
-            self.logger.warning(f"Manufacturer determination failed: {e}")
-            context.manufacturer = "Standard_Implantate"
+            self.logger.warning(f"Kompatibilität determination failed: {e}")
+            context.kompatibilitaet = "Standard_Implantate"
             return context
 
     def _calculate_completeness_score(self, context: StorageContextData) -> float:
@@ -363,7 +388,7 @@ class StorageContext:
             "delivery_number": 0.25,  # Pflichtfeld
             "article_number": 0.20,  # Wichtig für Pfade
             "supplier_name": 0.15,  # Wichtig für Pfade
-            "manufacturer": 0.10,  # Abgeleitet
+            "kompatibilitaet": 0.10,  # Abgeleitet aus Artikelnummer
             "quantity": 0.05,  # Optional
         }
 
@@ -412,7 +437,7 @@ class StorageContext:
         context.supplier_normalized = self._basic_supplier_normalization(
             context.supplier_name
         )
-        context.manufacturer = self._basic_manufacturer_determination(
+        context.kompatibilitaet = self._basic_manufacturer_determination(
             context.article_number
         )
         context.completeness_score = self._calculate_completeness_score(context)
@@ -450,24 +475,31 @@ class StorageContext:
             return "Straumann"
         elif "nobel" in supplier_lower:
             return "Nobel_Biocare"  # FIXED: Mit Unterstrich statt Leerzeichen
+        elif "fleima" in supplier_lower:
+            return "Fleima"
         else:
-            # Fallback: Ersetze Leerzeichen durch Unterstriche für unbekannte Lieferanten
+            # Fallback: Ersetze Leerzeichen durch
+            # Unterstriche für unbekannte Lieferanten
             return supplier_name.replace(" ", "_")
 
-    def determine_manufacturer(self, article_number: str) -> str:
+    def determine_kompatibilitaet(self, article_number: str) -> str:
         """
-        ZENTRALE MANUFACTURER-BESTIMMUNG für alle Services.
+        ZENTRALE KOMPATIBILITÄTS-BESTIMMUNG für alle Services.
 
-        Diese Methode ist jetzt die einzige standardisierte Manufacturer-Logik im System.
-        Alle neuen Services sollen diese verwenden statt alte Helper-Dependencies.
+        Leitet die kompatible Implantatmarke aus dem Artikelnummer-Präfix ab.
+        Alle Services sollen diese verwenden.
 
         Args:
             article_number: Artikelnummer (z.B. "MG0001", "M12345")
 
         Returns:
-            Hersteller-Name (z.B. "MegaGen", "Medentis")
+            Implantatmarke (z.B. "MegaGen", "Medentis")
         """
         return self._basic_manufacturer_determination(article_number)
+
+    def determine_manufacturer(self, article_number: str) -> str:
+        """Backward-Compat-Alias für determine_kompatibilitaet."""
+        return self.determine_kompatibilitaet(article_number)
 
     def _basic_manufacturer_determination(self, article_number: str) -> str:
         """
@@ -487,7 +519,8 @@ class StorageContext:
 
         # Spezial-Check für Terrats Medical: 71000XX-X Format
         import re
-        if re.match(r'^71000\d{2}-\d{1,3}$', article_number):
+
+        if re.match(r"^71000\d{2}-\d{1,3}$", article_number):
             return "Terrats_Medical"  # FIXED: Mit Unterstrich statt Leerzeichen
 
         article_upper = article_number.upper()
@@ -551,7 +584,7 @@ class StorageContext:
         # Warnungen für niedrige Completeness Score
         if context.completeness_score < 0.7:
             validation_result["warnings"].append(
-                f"Niedrige Datenvollständigkeit ({context.completeness_score:.1%})"
+                "Niedrige Datenvollständigkeit " f"({context.completeness_score:.1%})"
             )
 
         # Empfehlungen basierend auf fehlenden Daten
@@ -572,23 +605,28 @@ class StorageContext:
 storage_context = StorageContext()
 
 
-# CENTRALIZED MANUFACTURER DETERMINATION - Global Access Function
-def determine_manufacturer(article_number: str) -> str:
+# CENTRALIZED KOMPATIBILITÄT DETERMINATION - Global Access Function
+def determine_kompatibilitaet(article_number: str) -> str:
     """
-    ZENTRALE MANUFACTURER-BESTIMMUNG für alle Services (Global Access Function).
+    ZENTRALE KOMPATIBILITÄTS-BESTIMMUNG für alle Services (Global Access Function).
 
-    Diese Funktion stellt die standardisierte Manufacturer-Logik für das gesamte System bereit.
-    Ersetzt alle alten Helper-Dependencies für Manufacturer-Bestimmung.
+    Leitet die kompatible Implantatmarke aus dem Artikelnummer-Präfix ab.
 
     Args:
         article_number: Artikelnummer (z.B. "MG0001", "M12345")
 
     Returns:
-        Hersteller-Name (z.B. "MegaGen", "Medentis")
+        Implantatmarke (z.B. "MegaGen", "Medentis")
 
     Examples:
-        >>> determine_manufacturer("MG0001")  # "MegaGen"
-        >>> determine_manufacturer("M12345")  # "Medentis"
-        >>> determine_manufacturer("A1234")   # "Zubehörteile"
+        >>> determine_kompatibilitaet("MG0001")  # "MegaGen"
+        >>> determine_kompatibilitaet("M12345")  # "Medentis"
+        >>> determine_kompatibilitaet("A1234")   # "Zubehörteile"
     """
-    return storage_context.determine_manufacturer(article_number)
+    return storage_context.determine_kompatibilitaet(article_number)
+
+
+# Backward-Compat-Alias
+def determine_manufacturer(article_number: str) -> str:
+    """Backward-Compat-Alias für determine_kompatibilitaet."""
+    return determine_kompatibilitaet(article_number)

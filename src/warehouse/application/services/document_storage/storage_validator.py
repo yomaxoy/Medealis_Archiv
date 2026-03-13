@@ -9,7 +9,6 @@ import logging
 import mimetypes
 import hashlib
 import os
-import stat
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple
 from dataclasses import dataclass
@@ -22,17 +21,19 @@ logger = logging.getLogger(__name__)
 
 class ValidationLevel(Enum):
     """Validierungs-Stufen für verschiedene Anwendungsfälle."""
-    STRICT = "strict"       # Maximale Sicherheit, alle Prüfungen
-    STANDARD = "standard"   # Standard-Prüfungen für normale Operationen
+
+    STRICT = "strict"  # Maximale Sicherheit, alle Prüfungen
+    STANDARD = "standard"  # Standard-Prüfungen für normale Operationen
     PERMISSIVE = "permissive"  # Minimale Prüfungen für Kompatibilität
 
 
 class SecurityRisk(Enum):
     """Sicherheitsrisiko-Kategorien."""
-    CRITICAL = "critical"   # Sofort blockieren
-    HIGH = "high"          # Warnung, aber erlauben
-    MEDIUM = "medium"      # Info-Warnung
-    LOW = "low"           # Debug-Info
+
+    CRITICAL = "critical"  # Sofort blockieren
+    HIGH = "high"  # Warnung, aber erlauben
+    MEDIUM = "medium"  # Info-Warnung
+    LOW = "low"  # Debug-Info
 
 
 @dataclass
@@ -41,6 +42,7 @@ class ValidationResult:
     Ergebnis einer Validierungs-Operation.
     Enthält Status, Fehler, Warnungen und Sicherheits-Informationen.
     """
+
     is_valid: bool
     errors: List[str] = None
     warnings: List[str] = None
@@ -94,7 +96,10 @@ class StorageValidator:
     - Malware-Scanning (Basic)
     """
 
-    def __init__(self, validation_level: ValidationLevel = ValidationLevel.STANDARD):
+    def __init__(
+        self,
+        validation_level: ValidationLevel = ValidationLevel.STANDARD,
+    ):
         self.logger = logger
         self.validation_level = validation_level
 
@@ -105,29 +110,47 @@ class StorageValidator:
 
         # Erlaubte Dateitypen (MIME types)
         self.allowed_mime_types = {
-            'application/pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # .docx
-            'application/msword',  # .doc
-            'text/plain',
-            'image/png',
-            'image/jpeg',
-            'image/gif',
-            'application/vnd.ms-excel',  # .xls
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # .xlsx
-            'application/zip'  # für komprimierte Dokumente
+            "application/pdf",
+            # .docx
+            "application/vnd.openxmlformats-officedocument"
+            ".wordprocessingml.document",
+            "application/msword",  # .doc
+            "text/plain",
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "application/vnd.ms-excel",  # .xls
+            # .xlsx
+            "application/vnd.openxmlformats-officedocument" ".spreadsheetml.sheet",
+            "application/zip",  # für komprimierte Dokumente
         }
 
         # Gefährliche Datei-Extensions
         self.dangerous_extensions = {
-            '.exe', '.scr', '.com', '.bat', '.cmd', '.pif', '.vbs', '.js',
-            '.jar', '.msi', '.dll', '.sys', '.bin', '.run', '.app', '.deb', '.rpm'
+            ".exe",
+            ".scr",
+            ".com",
+            ".bat",
+            ".cmd",
+            ".pif",
+            ".vbs",
+            ".js",
+            ".jar",
+            ".msi",
+            ".dll",
+            ".sys",
+            ".bin",
+            ".run",
+            ".app",
+            ".deb",
+            ".rpm",
         }
 
     def validate_document_data(
         self,
         document_data: Union[bytes, memoryview],
         filename: str,
-        expected_mime_type: Optional[str] = None
+        expected_mime_type: Optional[str] = None,
     ) -> ValidationResult:
         """
         Validiert Dokument-Daten vor Speicherung.
@@ -163,13 +186,20 @@ class StorageValidator:
             # Dateigröße prüfen
             file_size = len(document_data_bytes)
             if file_size > self.max_file_size:
-                result.add_error(f"File size ({file_size} bytes) exceeds limit ({self.max_file_size} bytes)")
+                result.add_error(
+                    f"File size ({file_size} bytes) exceeds "
+                    f"limit ({self.max_file_size} bytes)"
+                )
 
             if file_size == 0:
                 result.add_error("File is empty (0 bytes)")
 
             # MIME Type Validierung
-            mime_result = self._validate_mime_type(document_data_bytes, filename, expected_mime_type)
+            mime_result = self._validate_mime_type(
+                document_data_bytes,
+                filename,
+                expected_mime_type,
+            )
             if not mime_result.is_valid:
                 result.errors.extend(mime_result.errors)
                 result.warnings.extend(mime_result.warnings)
@@ -181,17 +211,24 @@ class StorageValidator:
                 result.warnings.extend(filename_result.warnings)
 
             # Malware-Scanning (Basic)
-            if self.validation_level in [ValidationLevel.STRICT, ValidationLevel.STANDARD]:
+            if self.validation_level in [
+                ValidationLevel.STRICT,
+                ValidationLevel.STANDARD,
+            ]:
                 malware_result = self._basic_malware_scan(document_data_bytes, filename)
                 result.security_risks.extend(malware_result.security_risks)
 
             # Metadaten hinzufügen
-            result.metadata.update({
-                'file_size': file_size,
-                'detected_mime_type': self._detect_mime_type(document_data_bytes, filename),
-                'file_hash': self._calculate_file_hash(document_data_bytes),
-                'validation_level': self.validation_level.value
-            })
+            result.metadata.update(
+                {
+                    "file_size": file_size,
+                    "detected_mime_type": self._detect_mime_type(
+                        document_data_bytes, filename
+                    ),
+                    "file_hash": self._calculate_file_hash(document_data_bytes),
+                    "validation_level": self.validation_level.value,
+                }
+            )
 
             return result
 
@@ -204,7 +241,8 @@ class StorageValidator:
         Prüft Storage-Berechtigungen für Pfad.
 
         WICHTIG: Diese Methode erstellt KEINE Ordner mehr!
-        Ordner-Erstellung erfolgt in PathResolver.create_folder_structure()
+        Ordner-Erstellung erfolgt in
+        PathResolver.create_folder_structure()
 
         Diese Methode prüft nur:
         - Wenn Pfad existiert: Lese/Schreib-Berechtigung
@@ -222,12 +260,14 @@ class StorageValidator:
             # Prüfe ob Pfad existiert
             if not path.exists():
                 # KEINE Ordner-Erstellung mehr hier!
-                # Das macht create_folder_structure() mit besserer Fehlerbehandlung
-                result.add_warning(f"Path does not exist yet (will be created): {path}")
+                # create_folder_structure() macht das besser
+                result.add_warning(
+                    "Path does not exist yet " f"(will be created): {path}"
+                )
                 # Kein Error! Ordner wird später erstellt
-                result.metadata['path'] = str(path)
-                result.metadata['exists'] = False
-                result.metadata['is_directory'] = None
+                result.metadata["path"] = str(path)
+                result.metadata["exists"] = False
+                result.metadata["is_directory"] = None
                 return result
 
             # Pfad existiert bereits - prüfe Berechtigungen
@@ -250,9 +290,9 @@ class StorageValidator:
                 if not test_result.is_valid:
                     result.errors.extend(test_result.errors)
 
-            result.metadata['path'] = str(path)
-            result.metadata['exists'] = path.exists()
-            result.metadata['is_directory'] = path.is_dir() if path.exists() else None
+            result.metadata["path"] = str(path)
+            result.metadata["exists"] = path.exists()
+            result.metadata["is_directory"] = path.is_dir() if path.exists() else None
 
             return result
 
@@ -279,24 +319,36 @@ class StorageValidator:
 
         # Dateiname-Länge prüfen
         if len(filename) > self.max_filename_length:
-            filename = filename[:self.max_filename_length]
-            warnings.append(f"Filename truncated to {self.max_filename_length} characters")
+            filename = filename[: self.max_filename_length]
+            warnings.append(
+                f"Filename truncated to {self.max_filename_length} characters"
+            )
 
         # Gefährliche Zeichen entfernen
-        dangerous_chars = ['<', '>', ':', '"', '|', '?', '*', '\\', '/']
+        dangerous_chars = [
+            "<",
+            ">",
+            ":",
+            '"',
+            "|",
+            "?",
+            "*",
+            "\\",
+            "/",
+        ]
         for char in dangerous_chars:
             if char in filename:
-                filename = filename.replace(char, '_')
-                warnings.append(f"Replaced dangerous character '{char}' with '_'")
+                filename = filename.replace(char, "_")
+                warnings.append("Replaced dangerous character " f"'{char}' with '_'")
 
         # Control characters entfernen
-        filename = ''.join(char for char in filename if ord(char) >= 32)
+        filename = "".join(char for char in filename if ord(char) >= 32)
 
         # Mehrfache Punkte reduzieren (außer vor Extension)
-        parts = filename.split('.')
+        parts = filename.split(".")
         if len(parts) > 2:
             # Behalte nur den letzten Punkt für Extension
-            base_name = '_'.join(parts[:-1])
+            base_name = "_".join(parts[:-1])
             extension = parts[-1]
             filename = f"{base_name}.{extension}"
             warnings.append("Reduced multiple dots in filename")
@@ -304,17 +356,21 @@ class StorageValidator:
         # Prüfe auf gefährliche Extensions
         extension = Path(filename).suffix.lower()
         if extension in self.dangerous_extensions:
-            filename = filename[:-len(extension)] + '.txt'
-            warnings.append(f"Changed dangerous extension {extension} to .txt")
+            filename = filename[: -len(extension)] + ".txt"
+            warnings.append("Changed dangerous extension " f"{extension} to .txt")
 
         # Fallback falls Dateiname leer wird
-        if not filename.strip() or filename.strip() == '.':
+        if not filename.strip() or filename.strip() == ".":
             from datetime import datetime
-            filename = f"document_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"document_{ts}.pdf"
             warnings.append("Generated fallback filename")
 
         if filename != original_filename:
-            warnings.append(f"Filename sanitized: '{original_filename}' -> '{filename}'")
+            warnings.append(
+                f"Filename sanitized: '{original_filename}'" f" -> '{filename}'"
+            )
 
         return filename, warnings
 
@@ -342,9 +398,15 @@ class StorageValidator:
 
             # Datenqualität prüfen
             if context.completeness_score < 0.5:
-                result.add_error(f"Storage context completeness too low: {context.completeness_score:.1%}")
+                result.add_error(
+                    "Storage context completeness too low: "
+                    f"{context.completeness_score:.1%}"
+                )
             elif context.completeness_score < 0.8:
-                result.add_warning(f"Low storage context completeness: {context.completeness_score:.1%}")
+                result.add_warning(
+                    "Low storage context completeness: "
+                    f"{context.completeness_score:.1%}"
+                )
 
             # Konsistenz-Prüfungen
             consistency_result = self._validate_context_consistency(context)
@@ -355,11 +417,17 @@ class StorageValidator:
             security_result = self._validate_context_security(context)
             result.security_risks.extend(security_result.security_risks)
 
-            result.metadata.update({
-                'completeness_score': context.completeness_score,
-                'context_source': context.context_source,
-                'validation_timestamp': logger.handlers[0].formatter.formatTime(logger.makeRecord('', 0, '', 0, '', (), None)) if logger.handlers else 'unknown'
-            })
+            timestamp = "unknown"
+            if logger.handlers:
+                record = logger.makeRecord("", 0, "", 0, "", (), None)
+                timestamp = logger.handlers[0].formatter.formatTime(record)
+            result.metadata.update(
+                {
+                    "completeness_score": (context.completeness_score),
+                    "context_source": context.context_source,
+                    "validation_timestamp": timestamp,
+                }
+            )
 
             return result
 
@@ -371,7 +439,7 @@ class StorageValidator:
         self,
         document_data: bytes,
         filename: str,
-        expected_mime_type: Optional[str] = None
+        expected_mime_type: Optional[str] = None,
     ) -> ValidationResult:
         """Validiert MIME-Type von Dokumentdaten."""
         result = ValidationResult(is_valid=True)
@@ -388,13 +456,18 @@ class StorageValidator:
                 if self.validation_level == ValidationLevel.STRICT:
                     result.add_error(f"MIME type not allowed: {detected_mime}")
                 else:
-                    result.add_warning(f"Potentially unsafe MIME type: {detected_mime}")
+                    result.add_warning(
+                        "Potentially unsafe MIME type: " f"{detected_mime}"
+                    )
 
             # Prüfe gegen erwarteten Type
             if expected_mime_type and detected_mime != expected_mime_type:
-                result.add_warning(f"MIME type mismatch: expected {expected_mime_type}, got {detected_mime}")
+                result.add_warning(
+                    "MIME type mismatch: expected "
+                    f"{expected_mime_type}, got {detected_mime}"
+                )
 
-            result.metadata['detected_mime_type'] = detected_mime
+            result.metadata["detected_mime_type"] = detected_mime
 
             return result
 
@@ -408,22 +481,35 @@ class StorageValidator:
 
         try:
             if len(filename) > self.max_filename_length:
-                result.add_error(f"Filename too long: {len(filename)} > {self.max_filename_length}")
+                result.add_error(
+                    f"Filename too long: {len(filename)} "
+                    f"> {self.max_filename_length}"
+                )
 
             # Prüfe auf gefährliche Zeichen
-            dangerous_chars = ['<', '>', ':', '"', '|', '?', '*', '\\', '/']
+            dangerous_chars = [
+                "<",
+                ">",
+                ":",
+                '"',
+                "|",
+                "?",
+                "*",
+                "\\",
+                "/",
+            ]
             found_dangerous = [char for char in dangerous_chars if char in filename]
             if found_dangerous:
                 result.add_security_risk(
                     SecurityRisk.MEDIUM,
-                    f"Dangerous characters in filename: {found_dangerous}"
+                    f"Dangerous characters in filename: {found_dangerous}",
                 )
 
             # Prüfe auf Directory Traversal
-            if '..' in filename or filename.startswith('/') or ':' in filename:
+            if ".." in filename or filename.startswith("/") or ":" in filename:
                 result.add_security_risk(
                     SecurityRisk.HIGH,
-                    "Potential directory traversal in filename"
+                    "Potential directory traversal " "in filename",
                 )
 
             # Prüfe Extension
@@ -431,7 +517,7 @@ class StorageValidator:
             if extension in self.dangerous_extensions:
                 result.add_security_risk(
                     SecurityRisk.CRITICAL,
-                    f"Dangerous file extension: {extension}"
+                    f"Dangerous file extension: {extension}",
                 )
 
             return result
@@ -440,7 +526,11 @@ class StorageValidator:
             result.add_error(f"Filename validation failed: {str(e)}")
             return result
 
-    def _basic_malware_scan(self, document_data: Union[bytes, memoryview], filename: str) -> ValidationResult:
+    def _basic_malware_scan(
+        self,
+        document_data: Union[bytes, memoryview],
+        filename: str,
+    ) -> ValidationResult:
         """Basis Malware-Scanning (einfache Heuristiken)."""
         result = ValidationResult(is_valid=True)
 
@@ -454,14 +544,19 @@ class StorageValidator:
                 document_data_bytes = bytes(document_data)
 
             # PE Header Check (Windows executables)
-            if document_data_bytes[:2] == b'MZ':
+            if document_data_bytes[:2] == b"MZ":
                 result.add_security_risk(
                     SecurityRisk.CRITICAL,
-                    "File appears to be a Windows executable"
+                    "File appears to be a Windows executable",
                 )
 
             # Script-Content Check
-            script_indicators = [b'<script', b'javascript:', b'vbscript:', b'powershell']
+            script_indicators = [
+                b"<script",
+                b"javascript:",
+                b"vbscript:",
+                b"powershell",
+            ]
 
             # Convert document_data to lowercase bytes for comparison
             try:
@@ -471,9 +566,11 @@ class StorageValidator:
                 for indicator in script_indicators:
                     indicator_lower = indicator.lower()
                     if indicator_lower in document_lower:
+                        decoded = indicator.decode("utf-8", errors="ignore")
                         result.add_security_risk(
                             SecurityRisk.HIGH,
-                            f"Potentially malicious script content detected: {indicator.decode('utf-8', errors='ignore')}"
+                            "Potentially malicious script "
+                            f"content detected: {decoded}",
                         )
 
             except Exception as e:
@@ -481,10 +578,13 @@ class StorageValidator:
                 # Continue without malware check rather than failing completely
 
             # Archive Bombs Check (einfach)
-            if len(document_data_bytes) < 1000 and filename.lower().endswith('.zip'):
+            is_small_zip = len(
+                document_data_bytes
+            ) < 1000 and filename.lower().endswith(".zip")
+            if is_small_zip:
                 result.add_security_risk(
                     SecurityRisk.MEDIUM,
-                    "Suspiciously small ZIP file - potential zip bomb"
+                    "Suspiciously small ZIP file " "- potential zip bomb",
                 )
 
             return result
@@ -493,40 +593,56 @@ class StorageValidator:
             result.add_warning(f"Malware scan failed: {str(e)}")
             return result
 
-    def _validate_context_consistency(self, context: StorageContextData) -> ValidationResult:
+    def _validate_context_consistency(
+        self, context: StorageContextData
+    ) -> ValidationResult:
         """Validiert interne Konsistenz des Storage-Kontexts."""
         result = ValidationResult(is_valid=True)
 
         # Batch-Number Format Check
-        if context.batch_number and not context.batch_number.startswith('P-'):
+        if context.batch_number and not context.batch_number.startswith("P-"):
             if len(context.batch_number) < 6:
                 result.add_warning("Batch number appears too short")
 
         # Article-Number Consistency
-        if context.article_number and context.manufacturer:
-            # Prüfe ob Article-Number zum Manufacturer passt
+        if context.article_number and context.kompatibilitaet:
+            # Prüfe ob Article-Number zur Kompatibilitätsmarke passt
             article_upper = context.article_number.upper()
-            if context.manufacturer == "C-Tech" and not article_upper.startswith('CT'):
-                result.add_warning("Article number doesn't match manufacturer pattern")
+            if context.kompatibilitaet == "C-Tech" and not article_upper.startswith(
+                "CT"
+            ):
+                result.add_warning(
+                    "Article number doesn't match " "Kompatibilität pattern"
+                )
 
         return result
 
-    def _validate_context_security(self, context: StorageContextData) -> ValidationResult:
+    def _validate_context_security(
+        self, context: StorageContextData
+    ) -> ValidationResult:
         """Prüft Storage-Kontext auf Sicherheitsrisiken."""
         result = ValidationResult(is_valid=True)
 
         # Injection-Versuche in Strings prüfen
         string_fields = [
-            context.batch_number, context.delivery_number, context.article_number,
-            context.supplier_name, context.manufacturer
+            context.batch_number,
+            context.delivery_number,
+            context.article_number,
+            context.supplier_name,
+            context.kompatibilitaet,
         ]
 
         for field_value in string_fields:
             if field_value and isinstance(field_value, str):
-                if any(dangerous in field_value.lower() for dangerous in ['../', '..\\', 'script', 'exec']):
+                if any(
+                    dangerous in field_value.lower()
+                    for dangerous in ["../", "..\\", "script", "exec"]
+                ):
                     result.add_security_risk(
                         SecurityRisk.HIGH,
-                        f"Potentially dangerous content in context field: {field_value[:50]}..."
+                        "Potentially dangerous content "
+                        "in context field: "
+                        f"{field_value[:50]}...",
                     )
 
         return result
@@ -536,18 +652,15 @@ class StorageValidator:
         result = ValidationResult(is_valid=True)
 
         try:
-            import tempfile
-            import os
-
             # Test-Datei erstellen
             test_file = path / f"test_permissions_{os.getpid()}.tmp"
 
             try:
-                with open(test_file, 'w') as f:
+                with open(test_file, "w") as f:
                     f.write("permission test")
 
                 # Test-Datei lesen
-                with open(test_file, 'r') as f:
+                with open(test_file, "r") as f:
                     content = f.read()
                     if content != "permission test":
                         result.add_error("File read/write test failed")
@@ -561,7 +674,7 @@ class StorageValidator:
                 if test_file.exists():
                     try:
                         test_file.unlink()
-                    except:
+                    except Exception:
                         pass
 
             return result
@@ -575,6 +688,7 @@ class StorageValidator:
         try:
             # Versuche MIME-Type aus Daten zu erkennen
             import magic
+
             detected_mime = magic.from_buffer(document_data, mime=True)
             return detected_mime
         except ImportError:

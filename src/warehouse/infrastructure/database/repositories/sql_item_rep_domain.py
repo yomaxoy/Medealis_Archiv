@@ -17,7 +17,10 @@ from warehouse.domain.value_objects.article_number import ArticleNumber
 from warehouse.domain.value_objects.batch_number import BatchNumber
 from warehouse.domain.repositories.item_repository import ItemRepository, ItemId
 from warehouse.infrastructure.database.connection import get_session
-from warehouse.infrastructure.database.models.item_model import ItemModel, ItemInfoModel
+from warehouse.infrastructure.database.models.item_model import (
+    ItemModel,
+    ItemInfoModel,
+)
 from warehouse.infrastructure.database.models.item_workflow_steps_model import (
     ItemWorkflowStepsModel,
 )
@@ -130,12 +133,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             if not item_models:
                 return []
 
-            # Lade alle WorkflowSteps in einem Query (Performance!)
-            composite_keys = [
-                (m.article_number, m.batch_number, m.delivery_number)
-                for m in item_models
-            ]
-
+            # Lade alle WorkflowSteps in einem Query
             workflow_models = (
                 session.query(ItemWorkflowStepsModel)
                 .filter(ItemWorkflowStepsModel.delivery_number == delivery_number)
@@ -287,11 +285,16 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         revision_number: int = None,
         drawing_reference: str = "",
         storage_location: str = "",
+        hersteller: str = "",
+        kompatibilitaet: str = "",
+        # Backward-Compat-Alias -> kompatibilitaet
         manufacturer: str = "",
         material_specification: str = "",
         description: str = "",
     ) -> str:
         """Speichert oder aktualisiert ItemInfo (Artikel-Stammdaten)."""
+        # Backward-Compat: falls alter Parameter manufacturer übergeben wird
+        _kompatibilitaet = kompatibilitaet or manufacturer
         with get_session() as session:
             item_info = session.get(ItemInfoModel, article_number)
 
@@ -305,8 +308,10 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
                     item_info.drawing_reference = drawing_reference
                 if storage_location is not None:
                     item_info.storage_location = storage_location
-                if manufacturer:
-                    item_info.manufacturer = manufacturer
+                if hersteller:
+                    item_info.hersteller = hersteller
+                if _kompatibilitaet:
+                    item_info.kompatibilitaet = _kompatibilitaet
                 if material_specification:
                     item_info.material_specification = material_specification
                 if description:
@@ -319,7 +324,8 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
                     revision_number=revision_number,
                     drawing_reference=drawing_reference,
                     storage_location=storage_location,
-                    manufacturer=manufacturer,
+                    hersteller=hersteller,
+                    kompatibilitaet=_kompatibilitaet,
                     material_specification=material_specification,
                     description=description,
                 )
@@ -343,7 +349,8 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
             "revision_number": item_info.revision_number,
             "drawing_reference": item_info.drawing_reference,
             "storage_location": item_info.storage_location,
-            "manufacturer": item_info.manufacturer,
+            "hersteller": item_info.hersteller,
+            "kompatibilitaet": item_info.kompatibilitaet,
             "material_specification": item_info.material_specification,
             "description": item_info.description,
             "created_at": item_info.created_at,
@@ -388,7 +395,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         return entity
 
     def find_by_id(self, entity_id: str) -> Optional[Item]:
-        """BaseRepository find_by_id - erwartet 'ArticleNumber#BatchNumber#DeliveryNumber'."""
+        """find_by_id - erwartet 'ArtNr#BatchNr#DeliveryNr'."""
         parts = entity_id.split("#")
         if len(parts) == 3:
             try:
@@ -901,7 +908,7 @@ class SQLAlchemyItemRepositoryDomain(ItemRepository):
         status_dist = self.get_status_distribution()
         completion_stats = self.get_completion_statistics()
 
-        # NEU: waste_quantity ist nicht mehr direkt im Item, sondern in inspection_result
+        # waste_quantity ist in inspection_result
         total_waste = sum(
             item.inspection_result.waste_quantity
             for item in all_items

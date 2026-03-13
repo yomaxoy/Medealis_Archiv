@@ -8,11 +8,11 @@ aus verschiedenen Datenquellen.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional
 from dataclasses import asdict
 
 # Internal imports
-from .generation_models import GenerationContext, ProcessingOptions
+from .generation_models import GenerationContext
 from .document_types import DocumentType, get_template_info
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,12 @@ logger = logging.getLogger(__name__)
 # Import Storage System (Phase 1) - mit Error Handling
 try:
     from ..document_storage.storage_context import StorageContextData, StorageContext
+
     STORAGE_SYSTEM_AVAILABLE = True
 except ImportError:
-    logger.warning("Phase 1 Storage System not available - using minimal context building")
+    logger.warning(
+        "Phase 1 Storage System not available - using minimal context building"
+    )
     STORAGE_SYSTEM_AVAILABLE = False
 
 
@@ -45,24 +48,29 @@ class ContextBuilder:
         if STORAGE_SYSTEM_AVAILABLE:
             try:
                 self.storage_context_service = StorageContext()
-                logger.info("ContextBuilder initialized with Phase 1 Storage System integration")
+                logger.info(
+                    "ContextBuilder initialized with "
+                    "Phase 1 Storage System integration"
+                )
             except Exception as e:
-                logger.warning(f"Failed to initialize Storage System integration: {e}")
+                logger.warning(
+                    f"Failed to initialize Storage System " f"integration: {e}"
+                )
                 self.storage_context_service = None
 
         # Statistics
         self.stats = {
-            'contexts_built': 0,
-            'storage_integrations': 0,
-            'validation_failures': 0,
-            'data_quality_warnings': 0
+            "contexts_built": 0,
+            "storage_integrations": 0,
+            "validation_failures": 0,
+            "data_quality_warnings": 0,
         }
 
     def build_from_storage_context(
         self,
-        storage_context: 'StorageContextData',
+        storage_context: "StorageContextData",
         document_type: DocumentType,
-        additional_data: Optional[Dict[str, Any]] = None
+        additional_data: Optional[Dict[str, Any]] = None,
     ) -> GenerationContext:
         """
         Erstellt GenerationContext aus Phase 1 StorageContextData.
@@ -82,40 +90,40 @@ class ContextBuilder:
                 batch_number=storage_context.batch_number,
                 delivery_number=storage_context.delivery_number,
                 article_number=storage_context.article_number,
-
-                # Supplier & Manufacturer
+                # Supplier, Hersteller & Kompatibilität
                 supplier_name=storage_context.supplier_name,
                 supplier_normalized=storage_context.supplier_normalized,
-                manufacturer=storage_context.manufacturer,
-
+                hersteller=storage_context.hersteller,
+                kompatibilitaet=storage_context.kompatibilitaet,
                 # Item Details
                 quantity=storage_context.quantity,
                 unit=storage_context.unit,
                 description=storage_context.article_description,
-
                 # Delivery Information
                 delivery_date=storage_context.delivery_date,
                 order_number=storage_context.order_number,
                 employee_name=storage_context.employee_name,
-
                 # Generation-spezifische Daten
                 document_type=document_type,
                 generation_timestamp=datetime.now(),
                 template_version="1.0",
-
                 # Metadaten
                 context_source="storage_system",
-                completeness_score=storage_context.completeness_score
+                completeness_score=storage_context.completeness_score,
             )
 
             # Zusätzliche Daten integrieren
             if additional_data:
                 generation_context.custom_data.update(additional_data)
 
-            self.stats['contexts_built'] += 1
-            self.stats['storage_integrations'] += 1
+            self.stats["contexts_built"] += 1
+            self.stats["storage_integrations"] += 1
 
-            logger.info(f"GenerationContext built from StorageContext - Completeness: {storage_context.completeness_score:.1%}")
+            logger.info(
+                f"GenerationContext built from StorageContext"
+                f" - Completeness: "
+                f"{storage_context.completeness_score:.1%}"
+            )
 
             return generation_context
 
@@ -134,7 +142,7 @@ class ContextBuilder:
         quantity: int = 0,
         employee_name: str = "",
         additional_placeholders: Optional[Dict[str, Any]] = None,
-        **kwargs
+        **kwargs,
     ) -> GenerationContext:
         """
         Erstellt GenerationContext aus direkten Parametern.
@@ -164,7 +172,7 @@ class ContextBuilder:
                 employee_name=employee_name,
                 document_type=document_type,
                 generation_timestamp=datetime.now(),
-                context_source="parameters"
+                context_source="parameters",
             )
 
             # Zusätzliche Parameter aus kwargs
@@ -180,116 +188,193 @@ class ContextBuilder:
 
             # Versuche Item-Daten aus Datenbank zu laden für Zertifikatsinformationen
             try:
-                from warehouse.application.services.entity_services.item_service import ItemService
+                from warehouse.application.services.entity_services.item_service import (  # noqa: E501
+                    ItemService,
+                )
+
                 item_service = ItemService()
 
                 # Hole Item-Daten mit Zertifikaten
                 item_data = item_service.get_item_by_composite_key(
                     article_number=article_number,
                     batch_number=batch_number,
-                    delivery_number=delivery_number
+                    delivery_number=delivery_number,
                 )
 
                 if item_data:
-                    logger.debug("Item data found, integrating certificate and quantity information")
+                    logger.debug(
+                        "Item data found, integrating "
+                        "certificate and quantity information"
+                    )
 
                     # Aktualisiere Context mit Item-Daten
-                    if item_data.get('designation'):
-                        generation_context.description = item_data['designation']
-                    if item_data.get('manufacturer'):
-                        generation_context.manufacturer = item_data['manufacturer']
-                    if item_data.get('supplier_name'):
-                        generation_context.supplier_name = item_data['supplier_name']
+                    if item_data.get("designation"):
+                        generation_context.description = item_data["designation"]
+                    if item_data.get("kompatibilitaet"):
+                        generation_context.kompatibilitaet = item_data[
+                            "kompatibilitaet"
+                        ]
+                    elif item_data.get("manufacturer"):  # Backward-Compat
+                        generation_context.kompatibilitaet = item_data["manufacturer"]
+                    if item_data.get("supplier_name"):
+                        generation_context.supplier_name = item_data["supplier_name"]
                     # DB-Wert nur übernehmen wenn kein Parameter gesetzt ist
                     # Parameter hat immer Vorrang vor DB-Wert
-                    if not generation_context.employee_name and item_data.get('employee_name'):
-                        generation_context.employee_name = item_data['employee_name']
+                    if not generation_context.employee_name and item_data.get(
+                        "employee_name"
+                    ):
+                        generation_context.employee_name = item_data["employee_name"]
 
                     # Aktualisiere Bestellnummer aus Item-Daten
-                    if item_data.get('order_number'):
-                        generation_context.order_number = item_data['order_number']
+                    if item_data.get("order_number"):
+                        generation_context.order_number = item_data["order_number"]
 
-                    # Aktualisiere Mengen-Daten für PDB - verwende die beste verfügbare Menge
+                    # Aktualisiere Mengen-Daten für PDB
+                    # Verwende die beste verfügbare Menge
                     best_quantity = (
-                        item_data.get('delivery_quantity') or
-                        item_data.get('quantity') or
-                        generation_context.quantity or
-                        0
+                        item_data.get("delivery_quantity")
+                        or item_data.get("quantity")
+                        or generation_context.quantity
+                        or 0
                     )
                     generation_context.quantity = best_quantity
 
                     # Füge PDB-spezifische Daten hinzu (Mengen und Bestellnummer)
                     pdb_data = {
                         # Mengen-Platzhalter
-                        'orderq': item_data.get('order_quantity') or item_data.get('ordered_quantity') or '-',  # FIXED: "-" statt 0
-                        'deliveryq': item_data.get('delivery_quantity') or item_data.get('quantity') or '-',   # FIXED: "-" statt 0
-                        'delivery_slip_quantity': item_data.get('delivery_slip_quantity') or '-',              # FIXED: "-" statt 0
-                        'LSQ': item_data.get('delivery_slip_quantity') or '-',                                 # FIXED: "-" statt 0
-
+                        "orderq": item_data.get("order_quantity")
+                        or item_data.get("ordered_quantity")
+                        or "-",  # FIXED: "-" statt 0
+                        "deliveryq": item_data.get("delivery_quantity")
+                        or item_data.get("quantity")
+                        or "-",  # FIXED: "-" statt 0
+                        "delivery_slip_quantity": item_data.get(
+                            "delivery_slip_quantity"
+                        )
+                        or "-",  # FIXED: "-" statt 0
+                        "LSQ": item_data.get("delivery_slip_quantity")
+                        or "-",  # FIXED: "-" statt 0
                         # Alternative Namen für Kompatibilität
-                        'order_quantity': item_data.get('order_quantity') or item_data.get('ordered_quantity') or '-',  # FIXED
-                        'delivery_quantity': item_data.get('delivery_quantity') or item_data.get('quantity') or '-',    # FIXED
-                        'ordered_quantity': item_data.get('ordered_quantity') or '-',  # FIXED
-
+                        "order_quantity": item_data.get("order_quantity")
+                        or item_data.get("ordered_quantity")
+                        or "-",  # FIXED
+                        "delivery_quantity": item_data.get("delivery_quantity")
+                        or item_data.get("quantity")
+                        or "-",  # FIXED
+                        "ordered_quantity": item_data.get("ordered_quantity")
+                        or "-",  # FIXED
                         # Bestellnummer-Platzhalter
-                        'ordernr': item_data.get('order_number') or '',        # PDB Template verwendet [[ordernr]]
-                        'order_number': item_data.get('order_number') or '',   # Vollständiger Name
+                        "ordernr": item_data.get("order_number")
+                        or "",  # PDB Template verwendet [[ordernr]]
+                        "order_number": item_data.get("order_number")
+                        or "",  # Vollständiger Name
                     }
 
                     generation_context.custom_data.update(pdb_data)
-                    logger.info(f"🔥 DEBUG PDB QUANTITIES - Raw item_data: ordered={item_data.get('ordered_quantity')}, slip={item_data.get('delivery_slip_quantity')}, delivered={item_data.get('delivered_quantity')}")
-                    logger.info(f"🔥 DEBUG PDB QUANTITIES - Final pdb_data: {pdb_data}")
+                    logger.info(
+                        f"DEBUG PDB QUANTITIES - Raw "
+                        f"item_data: ordered="
+                        f"{item_data.get('ordered_quantity')}"
+                        f", slip="
+                        f"{item_data.get('delivery_slip_quantity')}"
+                        f", delivered="
+                        f"{item_data.get('delivered_quantity')}"
+                    )
+                    logger.info(
+                        f"DEBUG PDB QUANTITIES - " f"Final pdb_data: {pdb_data}"
+                    )
 
                     # Integriere Zertifikatsdaten in custom_data
-                    certificates = item_data.get('certificates', {})
+                    certificates = item_data.get("certificates", {})
                     if certificates:
                         logger.debug(f"Integrating certificate data: {certificates}")
 
                         # Mappa Zertifikate zu Template-Platzhaltern
                         cert_mapping = {
                             # Positive Zertifikate (X wenn vorhanden)
-                            'VP': 'X' if certificates.get('measurement_protocol') else '',
-                            'MZ': 'X' if certificates.get('material_certificate') else '',
-                            'MP': 'X' if certificates.get('measurement_protocol') else '',
-                            'B': 'X' if certificates.get('coating_certificate') else '',
-                            'HZ': 'X' if certificates.get('hardness_certificate') else '',
-                            'WZ': 'X' if certificates.get('additional_certificates') else '',
-                            'EDV': 'X' if certificates.get('label_present') else '',
-                            'BG': 'X' if certificates.get('accompanying_document') else '',
-
+                            "VP": "X"
+                            if certificates.get("measurement_protocol")
+                            else "",
+                            "MZ": "X"
+                            if certificates.get("material_certificate")
+                            else "",
+                            "MP": "X"
+                            if certificates.get("measurement_protocol")
+                            else "",
+                            "B": "X" if certificates.get("coating_certificate") else "",
+                            "HZ": "X"
+                            if certificates.get("hardness_certificate")
+                            else "",
+                            "WZ": "X"
+                            if certificates.get("additional_certificates")
+                            else "",
+                            "EDV": "X" if certificates.get("label_present") else "",
+                            "BG": "X"
+                            if certificates.get("accompanying_document")
+                            else "",
                             # Negative Zertifikate (X wenn NICHT vorhanden)
-                            'nVP': '' if certificates.get('measurement_protocol') else 'X',
-                            'nMZ': '' if certificates.get('material_certificate') else 'X',
-                            'nMP': '' if certificates.get('measurement_protocol') else 'X',
-                            'nB': '' if certificates.get('coating_certificate') else 'X',
-                            'nHZ': '' if certificates.get('hardness_certificate') else 'X',
-                            'nWZ': '' if certificates.get('additional_certificates') else 'X',
-                            'nEDV': '' if certificates.get('label_present') else 'X',
-                            'nBG': '' if certificates.get('accompanying_document') else 'X'
+                            "nVP": ""
+                            if certificates.get("measurement_protocol")
+                            else "X",
+                            "nMZ": ""
+                            if certificates.get("material_certificate")
+                            else "X",
+                            "nMP": ""
+                            if certificates.get("measurement_protocol")
+                            else "X",
+                            "nB": ""
+                            if certificates.get("coating_certificate")
+                            else "X",
+                            "nHZ": ""
+                            if certificates.get("hardness_certificate")
+                            else "X",
+                            "nWZ": ""
+                            if certificates.get("additional_certificates")
+                            else "X",
+                            "nEDV": "" if certificates.get("label_present") else "X",
+                            "nBG": ""
+                            if certificates.get("accompanying_document")
+                            else "X",
                         }
 
                         generation_context.custom_data.update(cert_mapping)
-                        logger.debug("Certificate placeholders integrated into context")
+                        logger.debug(
+                            "Certificate placeholders " "integrated into context"
+                        )
 
             except Exception as item_error:
-                logger.warning(f"Could not enhance context with Item data: {item_error}")
+                logger.warning(
+                    f"Could not enhance context with Item data: {item_error}"
+                )
 
             # Versuche Storage System Integration für vollständigere Daten
             if STORAGE_SYSTEM_AVAILABLE and self.storage_context_service:
                 try:
-                    storage_context = self.storage_context_service.get_complete_storage_context(
-                        batch_number=batch_number,
-                        delivery_number=delivery_number,
-                        article_number=article_number,
-                        supplier_name=supplier_name
+                    storage_context = (
+                        self.storage_context_service.get_complete_storage_context(
+                            batch_number=batch_number,
+                            delivery_number=delivery_number,
+                            article_number=article_number,
+                            supplier_name=supplier_name,
+                        )
                     )
 
                     # Merge mit Storage-Daten falls verfügbar
-                    if storage_context.completeness_score > generation_context.completeness_score:
-                        # Parameter-Werte vor Merge sichern (haben Vorrang vor Storage-Werten)
-                        original_employee_name = generation_context.employee_name if employee_name else None
+                    if (
+                        storage_context.completeness_score
+                        > generation_context.completeness_score
+                    ):
+                        # Parameter-Werte vor Merge sichern
+                        # (haben Vorrang vor Storage-Werten)
+                        original_employee_name = (
+                            generation_context.employee_name if employee_name else None
+                        )
 
-                        generation_context = generation_context.merge_with_storage_context(storage_context)
+                        generation_context = (
+                            generation_context.merge_with_storage_context(
+                                storage_context
+                            )
+                        )
 
                         # Parameter-Werte nach Merge wiederherstellen
                         if original_employee_name:
@@ -298,14 +383,23 @@ class ContextBuilder:
                         logger.debug("Context enhanced with Storage System data")
 
                 except Exception as storage_error:
-                    logger.warning(f"Could not enhance context with Storage System: {storage_error}")
+                    logger.warning(
+                        "Could not enhance context with "
+                        f"Storage System: {storage_error}"
+                    )
 
             # Berechne Completeness Score
-            generation_context.completeness_score = self._calculate_completeness_score(generation_context)
+            generation_context.completeness_score = self._calculate_completeness_score(
+                generation_context
+            )
 
-            self.stats['contexts_built'] += 1
+            self.stats["contexts_built"] += 1
 
-            logger.info(f"GenerationContext built from parameters - Completeness: {generation_context.completeness_score:.1%}")
+            logger.info(
+                f"GenerationContext built from parameters"
+                f" - Completeness: "
+                f"{generation_context.completeness_score:.1%}"
+            )
 
             return generation_context
 
@@ -320,7 +414,7 @@ class ContextBuilder:
         delivery_entity: Optional[Any] = None,
         order_entity: Optional[Any] = None,
         document_type: DocumentType = None,
-        additional_data: Optional[Dict[str, Any]] = None
+        additional_data: Optional[Dict[str, Any]] = None,
     ) -> GenerationContext:
         """
         Erstellt GenerationContext aus Warehouse Domain Entities.
@@ -343,30 +437,36 @@ class ContextBuilder:
 
             # Erstelle Context mit extrahierten Daten
             generation_context = GenerationContext(
-                batch_number=context_data.get('batch_number', ''),
-                delivery_number=context_data.get('delivery_number', ''),
-                article_number=context_data.get('article_number', ''),
-                supplier_name=context_data.get('supplier_name', ''),
-                quantity=context_data.get('quantity', 0),
-                description=context_data.get('description', ''),
+                batch_number=context_data.get("batch_number", ""),
+                delivery_number=context_data.get("delivery_number", ""),
+                article_number=context_data.get("article_number", ""),
+                supplier_name=context_data.get("supplier_name", ""),
+                quantity=context_data.get("quantity", 0),
+                description=context_data.get("description", ""),
                 document_type=document_type,
                 generation_timestamp=datetime.now(),
-                context_source="warehouse_entities"
+                context_source="warehouse_entities",
             )
 
             # Zusätzliche Entity-Daten als custom_data
-            generation_context.custom_data.update(context_data.get('custom_data', {}))
+            generation_context.custom_data.update(context_data.get("custom_data", {}))
 
             # Zusätzliche Daten integrieren
             if additional_data:
                 generation_context.custom_data.update(additional_data)
 
             # Completeness Score berechnen
-            generation_context.completeness_score = self._calculate_completeness_score(generation_context)
+            generation_context.completeness_score = self._calculate_completeness_score(
+                generation_context
+            )
 
-            self.stats['contexts_built'] += 1
+            self.stats["contexts_built"] += 1
 
-            logger.info(f"GenerationContext built from entities - Completeness: {generation_context.completeness_score:.1%}")
+            logger.info(
+                f"GenerationContext built from entities"
+                f" - Completeness: "
+                f"{generation_context.completeness_score:.1%}"
+            )
 
             return generation_context
 
@@ -376,9 +476,7 @@ class ContextBuilder:
             raise ValueError(error_msg) from e
 
     def enhance_context_for_document_type(
-        self,
-        context: GenerationContext,
-        document_type: DocumentType
+        self, context: GenerationContext, document_type: DocumentType
     ) -> GenerationContext:
         """
         Erweitert bestehenden Context für spezifischen Document Type.
@@ -403,7 +501,7 @@ class ContextBuilder:
                 **asdict(context),
                 # Update Document Type
                 document_type=document_type,
-                template_version=template_info.version
+                template_version=template_info.version,
             )
 
             # Document-spezifische Placeholder hinzufügen
@@ -413,10 +511,16 @@ class ContextBuilder:
             enhanced_context.placeholders.update(document_placeholders)
 
             # Validiere für Document Type
-            validation_result = enhanced_context.validate_for_document_type(document_type)
+            validation_result = enhanced_context.validate_for_document_type(
+                document_type
+            )
             if not validation_result.is_valid:
-                self.stats['validation_failures'] += 1
-                logger.warning(f"Context validation warnings for {document_type.value}: {validation_result.warnings}")
+                self.stats["validation_failures"] += 1
+                logger.warning(
+                    f"Context validation warnings for "
+                    f"{document_type.value}: "
+                    f"{validation_result.warnings}"
+                )
 
                 if validation_result.errors:
                     error_msg = f"Context validation failed: {validation_result.errors}"
@@ -433,9 +537,7 @@ class ContextBuilder:
             raise ValueError(error_msg) from e
 
     def validate_context_completeness(
-        self,
-        context: GenerationContext,
-        required_completeness: float = 0.7
+        self, context: GenerationContext, required_completeness: float = 0.7
     ) -> Dict[str, Any]:
         """
         Validiert Context-Vollständigkeit für Document Generation.
@@ -449,110 +551,117 @@ class ContextBuilder:
         """
         try:
             validation_result = {
-                'is_complete': context.completeness_score >= required_completeness,
-                'completeness_score': context.completeness_score,
-                'required_score': required_completeness,
-                'missing_fields': [],
-                'data_quality_issues': [],
-                'recommendations': []
+                "is_complete": context.completeness_score >= required_completeness,
+                "completeness_score": context.completeness_score,
+                "required_score": required_completeness,
+                "missing_fields": [],
+                "data_quality_issues": [],
+                "recommendations": [],
             }
 
             # Pflicht-Felder prüfen
-            required_fields = ['batch_number', 'delivery_number']
+            required_fields = ["batch_number", "delivery_number"]
             for field in required_fields:
                 value = getattr(context, field, None)
                 if not value or (isinstance(value, str) and not value.strip()):
-                    validation_result['missing_fields'].append(field)
+                    validation_result["missing_fields"].append(field)
 
             # Data Quality Issues identifizieren
             if not context.article_number:
-                validation_result['data_quality_issues'].append("article_number missing")
+                validation_result["data_quality_issues"].append(
+                    "article_number missing"
+                )
 
             if not context.supplier_name:
-                validation_result['data_quality_issues'].append("supplier_name missing")
+                validation_result["data_quality_issues"].append("supplier_name missing")
 
             if context.quantity <= 0:
-                validation_result['data_quality_issues'].append("quantity not specified")
+                validation_result["data_quality_issues"].append(
+                    "quantity not specified"
+                )
 
             # Recommendations generieren
             if context.completeness_score < 0.5:
-                validation_result['recommendations'].append(
+                validation_result["recommendations"].append(
                     "Consider using Storage System integration for better data quality"
                 )
 
-            if validation_result['missing_fields']:
-                validation_result['recommendations'].append(
-                    f"Required fields missing: {', '.join(validation_result['missing_fields'])}"
+            if validation_result["missing_fields"]:
+                missing = ", ".join(validation_result["missing_fields"])
+                validation_result["recommendations"].append(
+                    f"Required fields missing: {missing}"
                 )
 
             # Statistics
-            if not validation_result['is_complete']:
-                self.stats['data_quality_warnings'] += 1
+            if not validation_result["is_complete"]:
+                self.stats["data_quality_warnings"] += 1
 
             return validation_result
 
         except Exception as e:
             logger.error(f"Error validating context completeness: {e}")
-            return {
-                'is_complete': False,
-                'error': str(e),
-                'completeness_score': 0.0
-            }
+            return {"is_complete": False, "error": str(e), "completeness_score": 0.0}
 
     def _extract_data_from_entities(
         self,
         item_entity: Optional[Any],
         delivery_entity: Optional[Any],
-        order_entity: Optional[Any]
+        order_entity: Optional[Any],
     ) -> Dict[str, Any]:
         """Extrahiert Daten aus Warehouse Domain Entities."""
         extracted_data = {
-            'batch_number': '',
-            'delivery_number': '',
-            'article_number': '',
-            'supplier_name': '',
-            'quantity': 0,
-            'description': '',
-            'custom_data': {}
+            "batch_number": "",
+            "delivery_number": "",
+            "article_number": "",
+            "supplier_name": "",
+            "quantity": 0,
+            "description": "",
+            "custom_data": {},
         }
 
         try:
             # Item Entity Daten
             if item_entity:
-                if hasattr(item_entity, 'batch_number'):
-                    extracted_data['batch_number'] = str(item_entity.batch_number)
-                if hasattr(item_entity, 'article_number'):
-                    extracted_data['article_number'] = str(item_entity.article_number)
-                if hasattr(item_entity, 'quantity'):
-                    extracted_data['quantity'] = int(item_entity.quantity)
-                if hasattr(item_entity, 'description'):
-                    extracted_data['description'] = str(item_entity.description)
+                if hasattr(item_entity, "batch_number"):
+                    extracted_data["batch_number"] = str(item_entity.batch_number)
+                if hasattr(item_entity, "article_number"):
+                    extracted_data["article_number"] = str(item_entity.article_number)
+                if hasattr(item_entity, "quantity"):
+                    extracted_data["quantity"] = int(item_entity.quantity)
+                if hasattr(item_entity, "description"):
+                    extracted_data["description"] = str(item_entity.description)
 
                 # Zusätzliche Item-Daten
-                item_attrs = ['unit', 'status', 'location', 'expiry_date']
+                item_attrs = ["unit", "status", "location", "expiry_date"]
                 for attr in item_attrs:
                     if hasattr(item_entity, attr):
-                        extracted_data['custom_data'][attr] = getattr(item_entity, attr)
+                        extracted_data["custom_data"][attr] = getattr(item_entity, attr)
 
             # Delivery Entity Daten
             if delivery_entity:
-                if hasattr(delivery_entity, 'delivery_number'):
-                    extracted_data['delivery_number'] = str(delivery_entity.delivery_number)
-                if hasattr(delivery_entity, 'supplier_name'):
-                    extracted_data['supplier_name'] = str(delivery_entity.supplier_name)
+                if hasattr(delivery_entity, "delivery_number"):
+                    extracted_data["delivery_number"] = str(
+                        delivery_entity.delivery_number
+                    )
+                if hasattr(delivery_entity, "supplier_name"):
+                    extracted_data["supplier_name"] = str(delivery_entity.supplier_name)
 
                 # Zusätzliche Delivery-Daten
-                delivery_attrs = ['delivery_date', 'order_number', 'status']
+                delivery_attrs = ["delivery_date", "order_number", "status"]
                 for attr in delivery_attrs:
                     if hasattr(delivery_entity, attr):
-                        extracted_data['custom_data'][attr] = getattr(delivery_entity, attr)
+                        extracted_data["custom_data"][attr] = getattr(
+                            delivery_entity, attr
+                        )
 
             # Order Entity Daten
             if order_entity:
-                order_attrs = ['order_number', 'order_date', 'priority']
+                order_attrs = ["order_number", "order_date", "priority"]
                 for attr in order_attrs:
                     if hasattr(order_entity, attr):
-                        extracted_data['custom_data'][attr] = getattr(order_entity, attr)
+                        extracted_data["custom_data"][attr] = getattr(
+                            order_entity, attr
+                        )
 
         except Exception as e:
             logger.warning(f"Error extracting data from entities: {e}")
@@ -562,21 +671,18 @@ class ContextBuilder:
     def _calculate_completeness_score(self, context: GenerationContext) -> float:
         """Berechnet Completeness Score für GenerationContext."""
         try:
-            total_fields = 12  # Anzahl wichtiger Felder
-            completed_fields = 0
-
             # Pflicht-Felder (Gewichtung: 2x)
             required_fields = {
-                'batch_number': 2,
-                'delivery_number': 2,
-                'article_number': 1,
-                'supplier_name': 1,
-                'quantity': 1,
-                'description': 1,
-                'employee_name': 1,
-                'manufacturer': 1,
-                'unit': 1,
-                'delivery_date': 1
+                "batch_number": 2,
+                "delivery_number": 2,
+                "article_number": 1,
+                "supplier_name": 1,
+                "quantity": 1,
+                "description": 1,
+                "employee_name": 1,
+                "kompatibilitaet": 1,
+                "unit": 1,
+                "delivery_date": 1,
             }
 
             total_weight = sum(required_fields.values())
@@ -606,9 +712,7 @@ class ContextBuilder:
             return 0.5  # Default fallback
 
     def _get_document_type_placeholders(
-        self,
-        document_type: DocumentType,
-        context: GenerationContext
+        self, document_type: DocumentType, context: GenerationContext
     ) -> Dict[str, str]:
         """Generiert Document-Type spezifische Placeholder."""
         placeholders = {}
@@ -619,28 +723,31 @@ class ContextBuilder:
 
             # Document-spezifische Placeholder Logic
             if document_type == DT.PDB:
-                placeholders.update({
-                    'document_title': 'Produktdatenblatt',
-                    'document_code': 'Fo00040'
-                })
+                placeholders.update(
+                    {"document_title": "Produktdatenblatt", "document_code": "Fo00040"}
+                )
             elif document_type == DT.BEGLEITSCHEIN:
-                placeholders.update({
-                    'document_title': 'Begleitschein',
-                    'document_code': 'Fo00057'
-                })
+                placeholders.update(
+                    {"document_title": "Begleitschein", "document_code": "Fo00057"}
+                )
             elif document_type == DT.SICHTKONTROLLE:
-                placeholders.update({
-                    'document_title': 'Sichtkontrolle',
-                    'document_code': 'Fo00141'
-                })
+                placeholders.update(
+                    {"document_title": "Sichtkontrolle", "document_code": "Fo00141"}
+                )
 
             # Allgemeine Metadaten
-            placeholders.update({
-                'generation_date': context.generation_timestamp.strftime('%d.%m.%Y'),
-                'generation_time': context.generation_timestamp.strftime('%H:%M:%S'),
-                'document_type': document_type.value,
-                'template_version': context.template_version
-            })
+            placeholders.update(
+                {
+                    "generation_date": context.generation_timestamp.strftime(
+                        "%d.%m.%Y"
+                    ),
+                    "generation_time": context.generation_timestamp.strftime(
+                        "%H:%M:%S"
+                    ),
+                    "document_type": document_type.value,
+                    "template_version": context.template_version,
+                }
+            )
 
         except Exception as e:
             logger.warning(f"Error generating document type placeholders: {e}")
@@ -656,7 +763,7 @@ class ContextBuilder:
         supplier_name: str = "",
         quantity: int = 0,
         employee_name: str = "",
-        **kwargs
+        **kwargs,
     ) -> GenerationContext:
         """
         Wrapper-Methode für build_from_parameters - für Kompatibilität.
@@ -682,18 +789,18 @@ class ContextBuilder:
             supplier_name=supplier_name,
             quantity=quantity,
             employee_name=employee_name,
-            **kwargs
+            **kwargs,
         )
 
     def get_builder_statistics(self) -> Dict[str, Any]:
         """Gibt Context Builder Statistiken zurück."""
         return {
-            'contexts_built': self.stats['contexts_built'],
-            'storage_integrations': self.stats['storage_integrations'],
-            'validation_failures': self.stats['validation_failures'],
-            'data_quality_warnings': self.stats['data_quality_warnings'],
-            'storage_system_available': STORAGE_SYSTEM_AVAILABLE,
-            'storage_service_initialized': self.storage_context_service is not None
+            "contexts_built": self.stats["contexts_built"],
+            "storage_integrations": self.stats["storage_integrations"],
+            "validation_failures": self.stats["validation_failures"],
+            "data_quality_warnings": self.stats["data_quality_warnings"],
+            "storage_system_available": STORAGE_SYSTEM_AVAILABLE,
+            "storage_service_initialized": self.storage_context_service is not None,
         }
 
     def reset_statistics(self):
@@ -705,10 +812,11 @@ class ContextBuilder:
 
 # Convenience Functions für einfache Context-Erstellung
 
+
 def create_context_from_storage(
-    storage_context: 'StorageContextData',
+    storage_context: "StorageContextData",
     document_type: DocumentType,
-    additional_data: Optional[Dict[str, Any]] = None
+    additional_data: Optional[Dict[str, Any]] = None,
 ) -> GenerationContext:
     """
     Convenience Function: Erstellt Context aus StorageContextData.
@@ -722,14 +830,13 @@ def create_context_from_storage(
         GenerationContext
     """
     builder = ContextBuilder()
-    return builder.build_from_storage_context(storage_context, document_type, additional_data)
+    return builder.build_from_storage_context(
+        storage_context, document_type, additional_data
+    )
 
 
 def create_context_from_parameters(
-    batch_number: str,
-    delivery_number: str,
-    document_type: DocumentType,
-    **kwargs
+    batch_number: str, delivery_number: str, document_type: DocumentType, **kwargs
 ) -> GenerationContext:
     """
     Convenience Function: Erstellt Context aus Parametern.
@@ -748,13 +855,12 @@ def create_context_from_parameters(
         batch_number=batch_number,
         delivery_number=delivery_number,
         document_type=document_type,
-        **kwargs
+        **kwargs,
     )
 
 
 def validate_context_quality(
-    context: GenerationContext,
-    required_completeness: float = 0.7
+    context: GenerationContext, required_completeness: float = 0.7
 ) -> Dict[str, Any]:
     """
     Convenience Function: Validiert Context Qualität.

@@ -8,7 +8,7 @@ Wird aus dem Extraktions-Popup heraus geöffnet.
 import streamlit as st
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from PIL import Image
 
 from warehouse.application.services.audit_service import audit_service
@@ -67,15 +67,33 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
             help="Artikelbezeichnung (Pflichtfeld, max. 50 Zeichen)",
         )
 
-        # Hersteller aus supplier_name vorausgefüllt (vom Lieferschein) - PFLICHTFELD
-        manufacturer = st.text_input(
+        # Hersteller – verantwortlicher Hersteller des Abutments (PFLICHTFELD)
+        hersteller = st.text_input(
             "Hersteller *",
-            value=existing_iteminfo.manufacturer
+            value=existing_iteminfo.hersteller
             if existing_iteminfo
-            else article_data.get("manufacturer", ""),
-            key="iteminfo_edit_manufacturer",
-            placeholder="z.B. Primec, Dentsply, Straumann",
-            help="Hersteller (Pflichtfeld, max. 50 Zeichen). Mehrere Hersteller kommagetrennt möglich.",
+            else article_data.get("hersteller", "Medealis GmbH"),
+            key="iteminfo_edit_hersteller",
+            placeholder="z.B. Medealis GmbH, Terrats Medical",
+            help="Verantwortlicher Hersteller des Abutments (Pflichtfeld)",
+        )
+
+        # Kompatibilität – kompatible Implantatmarke (optional, automatisch abgeleitet)
+        from warehouse.application.services.document_storage.storage_context import (
+            determine_kompatibilitaet,
+        )
+
+        _article_number_for_komp = article_data.get("article_number", "")
+        kompatibilitaet = st.text_input(
+            "Kompatibilität",
+            value=existing_iteminfo.kompatibilitaet
+            if existing_iteminfo
+            else article_data.get("kompatibilitaet", "")
+            or determine_kompatibilitaet(_article_number_for_komp),
+            key="iteminfo_edit_kompatibilitaet",
+            placeholder="z.B. Straumann, Camlog, MegaGen",
+            help="Kompatible Implantatmarke (automatisch "
+            "aus Artikelnummer abgeleitet, editierbar)",
         )
 
         # Zeichnungsreferenz / Revision Number - PFLICHTFELD (INT)
@@ -133,9 +151,9 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
 
     # Zeige existierenden QR-Code falls vorhanden
     if existing_iteminfo and existing_iteminfo.qr_code_image:
-        st.info(
-            f"✅ QR-Code vorhanden: {existing_iteminfo.qr_code_filename} (hochgeladen am {existing_iteminfo.qr_code_uploaded_at.strftime('%d.%m.%Y %H:%M')})"
-        )
+        qr_fname = existing_iteminfo.qr_code_filename
+        qr_date = existing_iteminfo.qr_code_uploaded_at.strftime("%d.%m.%Y %H:%M")
+        st.info(f"✅ QR-Code vorhanden: {qr_fname} " f"(hochgeladen am {qr_date})")
 
         col_qr1, col_qr2 = st.columns(2)
         with col_qr1:
@@ -173,7 +191,9 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
                     image = Image.open(qr_file)
                     st.image(image, caption=qr_file.name, width=200)
                     st.success(
-                        f"✅ QR-Code hochgeladen: {qr_file.name} ({file_size_mb:.2f} MB)"
+                        "✅ QR-Code hochgeladen: "
+                        f"{qr_file.name} "
+                        f"({file_size_mb:.2f} MB)"
                     )
 
                     # Speichere in Session State
@@ -204,7 +224,8 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
             validation_data = {
                 "designation": designation,
                 "storage_location": str(storage_location),
-                "manufacturer": manufacturer,
+                "hersteller": hersteller,
+                "kompatibilitaet": kompatibilitaet,
                 "revision_number": revision_number,
             }
 
@@ -220,7 +241,10 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
             iteminfo_data = {
                 "article_number": article_number,
                 "designation": designation.strip(),
-                "manufacturer": manufacturer.strip() if manufacturer else None,
+                "hersteller": hersteller.strip() if hersteller else "Medealis GmbH",
+                "kompatibilitaet": (
+                    kompatibilitaet.strip() if kompatibilitaet else None
+                ),
                 "drawing_reference": drawing_reference.strip()
                 if drawing_reference
                 else None,
@@ -258,14 +282,20 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
                             user=current_user,
                             article_number=article_number,
                             designation=designation.strip(),
-                            manufacturer=manufacturer.strip() if manufacturer else None,
+                            hersteller=hersteller.strip() if hersteller else None,
+                            kompatibilitaet=kompatibilitaet.strip()
+                            if kompatibilitaet
+                            else None,
                         )
                     else:
                         audit_service.log_iteminfo_created(
                             user=current_user,
                             article_number=article_number,
                             designation=designation.strip(),
-                            manufacturer=manufacturer.strip() if manufacturer else None,
+                            hersteller=hersteller.strip() if hersteller else None,
+                            kompatibilitaet=kompatibilitaet.strip()
+                            if kompatibilitaet
+                            else None,
                         )
 
                     # QR-Code Upload loggen falls vorhanden

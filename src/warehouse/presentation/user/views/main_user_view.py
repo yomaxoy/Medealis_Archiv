@@ -39,7 +39,9 @@ SESSION_KEY_EXTRACTION_CONFIRMED = "extraction_confirmed"
 SESSION_KEY_EXTRACTED_DELIVERY = "extracted_delivery_data"
 
 
-def _prepare_delivery_slip_for_article_folders(extraction_data: Dict[str, Any]) -> None:
+def _prepare_delivery_slip_for_article_folders(
+    extraction_data: Dict[str, Any],
+) -> None:
     """
     Bereitet das Lieferschein-Dokument für spätere Speicherung in Artikelordnern vor.
 
@@ -69,7 +71,10 @@ def _prepare_delivery_slip_for_article_folders(extraction_data: Dict[str, Any]) 
         items = extraction_data.get("items", [])
 
         if not items:
-            logger.warning("No items found in extraction data - skipping delivery slip preparation")
+            logger.warning(
+                "No items found in extraction data "
+                "- skipping delivery slip preparation"
+            )
             return
 
         # Check if we have storage information from the original upload
@@ -77,27 +82,39 @@ def _prepare_delivery_slip_for_article_folders(extraction_data: Dict[str, Any]) 
         pdf_stored = original_data.get("pdf_stored", False)
         pdf_path = original_data.get("pdf_path") or storage_info.get("file_path")
 
-        logger.info(f"Preparing delivery slip for later save to {len(items)} article folders")
+        logger.info(
+            f"Preparing delivery slip for later save to {len(items)} article folders"
+        )
         logger.info(f"PDF stored centrally: {pdf_stored}, PDF path: {pdf_path}")
 
         # Load document data from either stored file or session state
         document_data = _load_delivery_document_data(pdf_path)
         if not document_data:
-            logger.warning("Could not load delivery document data - skipping preparation")
+            logger.warning(
+                "Could not load delivery document data - skipping preparation"
+            )
             return
 
         # Store in session state for later use when "Daten bestätigen" is clicked
-        st.session_state['pending_delivery_slip_save'] = {
-            'document_data': document_data,
-            'delivery_number': delivery_number,
-            'supplier_name': supplier_name,
-            'filename': f"Lieferschein_{delivery_number}.pdf" if delivery_number else "Lieferschein.pdf"
+        st.session_state["pending_delivery_slip_save"] = {
+            "document_data": document_data,
+            "delivery_number": delivery_number,
+            "supplier_name": supplier_name,
+            "filename": f"Lieferschein_{delivery_number}.pdf"
+            if delivery_number
+            else "Lieferschein.pdf",
         }
 
-        logger.info("✅ Delivery slip prepared for later save to article folders (will be saved when user clicks 'Daten bestätigen')")
+        logger.info(
+            "Delivery slip prepared for later save "
+            "to article folders (will be saved when "
+            "user clicks 'Daten bestätigen')"
+        )
 
     except Exception as e:
-        logger.error(f"Error preparing delivery slip for article folders: {e}", exc_info=True)
+        logger.error(
+            f"Error preparing delivery slip for article folders: {e}", exc_info=True
+        )
         # Don't show warning to user - this is not critical, just a preparation step
 
 
@@ -129,7 +146,9 @@ def _save_delivery_slip_to_article_folders(extraction_data: Dict[str, Any]) -> N
         items = extraction_data.get("items", [])
 
         if not items:
-            logger.warning("No items found in extraction data - skipping document save")
+            logger.warning(
+                "No items found in extraction data " "- skipping document save"
+            )
             return
 
         # Check if we have storage information from the original upload
@@ -137,7 +156,9 @@ def _save_delivery_slip_to_article_folders(extraction_data: Dict[str, Any]) -> N
         pdf_stored = original_data.get("pdf_stored", False)
         pdf_path = original_data.get("pdf_path") or storage_info.get("file_path")
 
-        logger.info(f"Attempting to save delivery slip to {len(items)} article folders")
+        logger.info(
+            "Attempting to save delivery slip " f"to {len(items)} article folders"
+        )
         logger.info(f"PDF stored: {pdf_stored}, PDF path: {pdf_path}")
 
         # Load document data from either stored file or session state
@@ -146,7 +167,10 @@ def _save_delivery_slip_to_article_folders(extraction_data: Dict[str, Any]) -> N
             return  # Warning already shown in _load_delivery_document_data
 
         # Get document storage service
-        from warehouse.application.services.service_registry import get_document_storage_service
+        from warehouse.application.services.service_registry import (
+            get_document_storage_service,
+        )
+
         storage_service = get_document_storage_service()
 
         if not storage_service:
@@ -159,17 +183,22 @@ def _save_delivery_slip_to_article_folders(extraction_data: Dict[str, Any]) -> N
             document_data=document_data,
             delivery_number=delivery_number,
             supplier_name=supplier_name,
-            storage_service=storage_service
+            storage_service=storage_service,
         )
 
         # Show summary
         if saved_count > 0:
             st.success(f"✅ Lieferschein in {saved_count} Artikelordner gespeichert")
         if failed_count > 0:
-            st.warning(f"⚠️ {failed_count} Artikel: Lieferschein konnte nicht gespeichert werden")
+            st.warning(
+                f"⚠️ {failed_count} Artikel: Lieferschein "
+                "konnte nicht gespeichert werden"
+            )
 
     except Exception as e:
-        logger.error(f"Error saving delivery slip to article folders: {e}", exc_info=True)
+        logger.error(
+            f"Error saving delivery slip to article folders: {e}", exc_info=True
+        )
         st.warning(f"⚠️ Fehler beim Speichern des Lieferscheins in Artikelordner: {e}")
 
 
@@ -190,16 +219,24 @@ def _load_delivery_document_data(pdf_path: Optional[str]) -> Optional[bytes]:
             logger.info("Using uploaded file data from session state")
             return document_data
         else:
-            logger.info("No PDF path found and no uploaded file data - cannot save to article folders")
-            st.warning("⚠️ Lieferschein-Dokument konnte nicht in Artikelordner gespeichert werden (kein Dateipfad)")
+            logger.info(
+                "No PDF path found and no uploaded file "
+                "data - cannot save to article folders"
+            )
+            st.warning(
+                "⚠️ Lieferschein-Dokument konnte nicht "
+                "in Artikelordner gespeichert werden "
+                "(kein Dateipfad)"
+            )
             return None
 
     # Read the stored PDF file
     try:
         from pathlib import Path
+
         pdf_file = Path(pdf_path)
         if pdf_file.exists():
-            with open(pdf_file, 'rb') as f:
+            with open(pdf_file, "rb") as f:
                 document_data = f.read()
             logger.info(f"Read delivery slip PDF from {pdf_path}")
             return document_data
@@ -218,7 +255,7 @@ def _save_to_all_article_folders(
     document_data: bytes,
     delivery_number: str,
     supplier_name: str,
-    storage_service: Any
+    storage_service: Any,
 ) -> tuple[int, int]:
     """
     Speichert das Dokument in alle Artikelordner.
@@ -241,13 +278,19 @@ def _save_to_all_article_folders(
         batch_number = item.get("batch_number", "")
 
         if not article_number or not batch_number:
-            logger.warning(f"Skipping item with missing article or batch number: {item}")
+            logger.warning(
+                f"Skipping item with missing article or batch number: {item}"
+            )
             failed_count += 1
             continue
 
         try:
             # Create filename
-            filename = f"Lieferschein_{delivery_number}.pdf" if delivery_number else "Lieferschein.pdf"
+            filename = (
+                f"Lieferschein_{delivery_number}.pdf"
+                if delivery_number
+                else "Lieferschein.pdf"
+            )
 
             # Save to article folder
             save_result = storage_service.save_document(
@@ -265,11 +308,17 @@ def _save_to_all_article_folders(
                 logger.info(f"Saved delivery slip to article folder: {article_number}")
             else:
                 failed_count += 1
-                logger.error(f"Failed to save delivery slip for {article_number}: {save_result.error}")
+                logger.error(
+                    "Failed to save delivery slip for "
+                    f"{article_number}: {save_result.error}"
+                )
 
         except Exception as item_error:
             failed_count += 1
-            logger.error(f"Error saving delivery slip for article {article_number}: {item_error}")
+            logger.error(
+                "Error saving delivery slip for "
+                f"article {article_number}: {item_error}"
+            )
 
     return saved_count, failed_count
 
@@ -299,6 +348,7 @@ def show_main_user_view():
         st.caption(f"{user.get('full_name') or user.get('username', '')}")
         if st.button("Abmelden", use_container_width=True, key="logout_header"):
             from warehouse.presentation.auth.login_view import LoginView
+
             LoginView().logout()
 
     # Check system initialization
@@ -443,7 +493,10 @@ def show_item_table(services):
             "primary" if current_status_filter == "Dokumente geprüft" else "secondary"
         )
         if st.button(
-            "📄 Dokumente", use_container_width=True, type=button_type, key="status_docs"
+            "📄 Dokumente",
+            use_container_width=True,
+            type=button_type,
+            key="status_docs",
         ):
             st.session_state.user_filter_status = "Dokumente geprüft"
             st.rerun()
@@ -461,7 +514,9 @@ def show_item_table(services):
 
     with status_col5:
         button_type = (
-            "primary" if current_status_filter == "Sichtkontrolle durchgeführt" else "secondary"
+            "primary"
+            if current_status_filter == "Sichtkontrolle durchgeführt"
+            else "secondary"
         )
         if st.button(
             "👁️ Sichtkontrolle",
@@ -530,7 +585,8 @@ def show_item_table(services):
                     if matching_delivery
                     else "Unbekannt"
                 ),
-                # Use 'designation' from DB, fallback to 'description', then article_number
+                # Use 'designation' from DB, fallback to
+                # 'description', then article_number
                 "description": (
                     item.get("designation", "")
                     or item.get("description", "")
@@ -543,8 +599,8 @@ def show_item_table(services):
                 "delivery_slip_quantity": item.get("delivery_slip_quantity") or 0,
                 "delivered_quantity": item.get("delivered_quantity") or 0,
                 "status": item.get("status") or "Pending",
-                # Manufacturer from item (wichtig für Ordner-Pfad!)
-                "manufacturer": item.get("manufacturer") or "",
+                # Kompatibilität (wichtig für Ordner-Pfad!)
+                "kompatibilitaet": item.get("kompatibilitaet") or "",
             }
             all_items.append(item_entry)
 
@@ -590,7 +646,8 @@ def show_item_table(services):
 
     if active_filters:
         st.info(
-            f"📊 {len(filtered_items)} Artikel gefunden | Filter: {' | '.join(active_filters)}"
+            f"📊 {len(filtered_items)} Artikel gefunden "
+            f"| Filter: {' | '.join(active_filters)}"
         )
     else:
         st.info(f"📊 {len(filtered_items)} Artikel gefunden (keine Filter aktiv)")
@@ -672,15 +729,11 @@ def show_item_table(services):
                         "Artikel angelegt"
                     )
                     data_completed = domain_item.is_step_completed("Daten geprüft")
-                    docs_completed = domain_item.is_step_completed(
-                        "Dokumente geprüft"
-                    )
+                    docs_completed = domain_item.is_step_completed("Dokumente geprüft")
                     visual_completed = domain_item.is_step_completed(
                         "Sichtkontrolle durchgeführt"
                     )
-                    measurement_completed = domain_item.is_step_completed(
-                        "Vermessen"
-                    )
+                    measurement_completed = domain_item.is_step_completed("Vermessen")
                 else:
                     # Fallback wenn Item nicht gefunden
                     iteminfo_completed = False
@@ -689,7 +742,7 @@ def show_item_table(services):
                     visual_completed = False
                     measurement_completed = False
 
-            except Exception as e:
+            except Exception:
                 # Fallback bei Fehler
                 iteminfo_completed = False
                 data_completed = False
@@ -712,14 +765,12 @@ def show_item_table(services):
                     help=iteminfo_help,
                     use_container_width=True,
                 ):
-                    # Hole Lieferantenname für den Dialog
-                    supplier_name = item.get("supplier", "")
-
                     # Speichere Artikel-Daten für ItemInfo-Dialog
                     st.session_state.edit_iteminfo_item_data = {
                         "article_number": article_number,
                         "description": item.get("description", ""),
-                        "manufacturer": supplier_name,
+                        "kompatibilitaet": item.get("kompatibilitaet", ""),
+                        "hersteller": item.get("hersteller", ""),
                     }
                     st.session_state.show_iteminfo_edit_dialog = True
                     st.rerun()
@@ -752,9 +803,7 @@ def show_item_table(services):
                         "order_number": item.get("order_number", ""),
                         "storage_location": item.get("storage_location", ""),
                         "ordered_quantity": item.get("ordered_quantity", 0),
-                        "delivery_slip_quantity": item.get(
-                            "delivery_slip_quantity", 0
-                        ),
+                        "delivery_slip_quantity": item.get("delivery_slip_quantity", 0),
                         "delivered_quantity": item.get("delivered_quantity", 0),
                     }
                     show_data_confirmation_popup(item_data)
@@ -791,7 +840,8 @@ def show_item_table(services):
                         item["delivery_number"],
                     )
 
-                    # Prepare item data for popup with all fields including certificates
+                    # Prepare item data for popup with all
+                    # fields including certificates
                     item_data = (
                         full_item_data
                         if full_item_data
@@ -898,7 +948,9 @@ def show_item_table(services):
                     "batch_number": item["batch_number"],
                     "delivery_number": item["delivery_number"],
                     "supplier_name": item["supplier"],
-                    "manufacturer": item.get("manufacturer", ""),  # Echter Manufacturer aus DB!
+                    "kompatibilitaet": item.get(
+                        "kompatibilitaet", ""
+                    ),  # Kompatibilität aus DB
                 }
                 render_compact_folder_button(folder_item_data, key_suffix=f"user_{i}")
 
@@ -934,7 +986,8 @@ def handle_extraction_confirmation(services: Dict[str, Any]) -> None:
         result = delivery_service.create_delivery_from_extraction(extraction_data)
 
         if result.get("success"):
-            success_message = f"Lieferung '{extraction_data.get('delivery_number')}' erfolgreich gespeichert!"
+            dn = extraction_data.get("delivery_number")
+            success_message = f"Lieferung '{dn}' " "erfolgreich gespeichert!"
             if result.get("items_created", 0) > 0:
                 success_message += f" {result.get('items_created')} Items erstellt."
             if result.get("items_failed", 0) > 0:
@@ -944,9 +997,9 @@ def handle_extraction_confirmation(services: Dict[str, Any]) -> None:
 
             st.success(success_message)
 
-            # CHANGED: Don't save delivery slip to article folders immediately!
-            # Instead, store document data in session state for later use when user clicks "Daten bestätigen"
-            # The delivery slip is already saved centrally in the "Lieferscheine" folder by the document processing service
+            # Don't save delivery slip to article folders
+            # immediately! Store in session state for later
+            # use when user clicks "Daten bestätigen".
             _prepare_delivery_slip_for_article_folders(extraction_data)
 
             # Clean up session state
@@ -970,7 +1023,8 @@ def handle_extraction_confirmation(services: Dict[str, Any]) -> None:
 
 def _cleanup_delivery_session_state() -> None:
     """
-    Bereinigt alle Session State Variablen die für Lieferschein-Verarbeitung verwendet wurden.
+    Bereinigt alle Session State Variablen die fuer
+    Lieferschein-Verarbeitung verwendet wurden.
     """
     cleanup_keys = [
         "popup_action",

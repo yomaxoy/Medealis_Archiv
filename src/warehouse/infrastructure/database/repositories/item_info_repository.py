@@ -58,7 +58,8 @@ class ItemInfoRepository:
             item_info_data: Dictionary mit ItemInfo-Daten {
                 article_number: str,
                 designation: str,
-                manufacturer: str (optional),
+                hersteller: str (optional),
+                kompatibilitaet: str (optional),
                 drawing_reference: str (optional),
                 revision_number: int (optional),
                 storage_location: str (optional),
@@ -84,8 +85,9 @@ class ItemInfoRepository:
                 )
 
                 if existing:
+                    art_nr = item_info_data["article_number"]
                     logger.warning(
-                        f"ItemInfo for {item_info_data['article_number']} already exists - skipping"
+                        f"ItemInfo for {art_nr} " f"already exists - skipping"
                     )
                     session.expunge(existing)
                     return existing
@@ -94,7 +96,8 @@ class ItemInfoRepository:
                 item_info = ItemInfoModel(
                     article_number=item_info_data["article_number"],
                     designation=item_info_data["designation"],
-                    manufacturer=item_info_data.get("manufacturer"),
+                    hersteller=item_info_data.get("hersteller"),
+                    kompatibilitaet=item_info_data.get("kompatibilitaet"),
                     drawing_reference=item_info_data.get("drawing_reference"),
                     revision_number=item_info_data.get("revision_number"),
                     storage_location=item_info_data.get("storage_location"),
@@ -117,7 +120,8 @@ class ItemInfoRepository:
                     session, item_info_data["article_number"]
                 )
 
-                # EXPLICIT COMMIT before detach to ensure data is in DB before st.rerun()
+                # EXPLICIT COMMIT before detach
+                # to ensure data is in DB before rerun
                 session.commit()
 
                 # Detach from session
@@ -170,7 +174,8 @@ class ItemInfoRepository:
                 # Automatisch Workflow-Status "Artikeldetails vollständig" setzen
                 self._set_iteminfo_complete_status(session, article_number)
 
-                # EXPLICIT COMMIT before detach to ensure data is in DB before st.rerun()
+                # EXPLICIT COMMIT before detach
+                # to ensure data is in DB before rerun
                 session.commit()
 
                 # Detach from session
@@ -297,15 +302,16 @@ class ItemInfoRepository:
 
     def _set_iteminfo_complete_status(self, session, article_number: str) -> None:
         """
-        Setzt automatisch den Workflow-Status "Artikeldetails vollständig" für alle Items
-        mit dieser Artikelnummer.
+        Setzt automatisch den Workflow-Status
+        "Artikeldetails vollständig" für alle Items mit
+        dieser Artikelnummer.
 
         Args:
             session: Aktive SQLAlchemy Session
             article_number: Artikelnummer
         """
         try:
-            from warehouse.infrastructure.database.models.item_workflow_steps_model import (
+            from warehouse.infrastructure.database.models.item_workflow_steps_model import (  # noqa: E501
                 ItemWorkflowStepsModel,
             )
 
@@ -332,8 +338,11 @@ class ItemInfoRepository:
                     workflow.iteminfo_complete_by = current_user
                     workflow.iteminfo_complete_at = current_time
                     logger.info(
-                        f"Workflow status 'Artikeldetails vollständig' set for "
-                        f"{article_number}/{workflow.batch_number}/{workflow.delivery_number}"
+                        f"Workflow status "
+                        f"'Artikeldetails vollständig'"
+                        f" set for {article_number}"
+                        f"/{workflow.batch_number}"
+                        f"/{workflow.delivery_number}"
                     )
 
             session.flush()

@@ -19,7 +19,6 @@ from sqlalchemy import (
     DateTime,
     LargeBinary,
 )
-from sqlalchemy.orm import relationship
 from warehouse.infrastructure.database.connection import Base
 
 
@@ -52,9 +51,12 @@ class ItemInfoModel(Base):
     storage_location = Column(Text, nullable=True)  # Lagernummer
 
     # === ZUSÄTZLICHE INFOS ===
-    manufacturer = Column(
+    hersteller = Column(
         String(100), nullable=True
-    )  # Implantathersteller für Docklocs Schema
+    )  # Verantwortlicher Hersteller des Abutments (z.B. Medealis GmbH, Terrats Medical)
+    # Kompatible Implantatmarke, abgeleitet aus
+    # Artikelnummer-Präfix (z.B. Straumann, Camlog)
+    kompatibilitaet = Column(String(100), nullable=True)
     material_specification = Column(Text, nullable=True)  # Material-Spezifikation
     description = Column(Text, nullable=True)  # Zusätzliche Beschreibung
 
@@ -146,7 +148,9 @@ class ItemModel(Base):
     # Temporarily disabled due to SQLAlchemy registry conflicts
     # item_info = relationship("ItemInfoModel", back_populates="items", lazy="select")
     # delivery = relationship("DeliveryModel", back_populates="items", lazy="select")
-    # order = relationship("OrderModel", back_populates="items", lazy="select")  # ← NEU: Order-Beziehung
+    # order = relationship(
+    #     "OrderModel", back_populates="items",
+    #     lazy="select")  # Order-Beziehung
 
     def __repr__(self):
         return (

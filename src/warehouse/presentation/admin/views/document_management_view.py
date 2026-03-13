@@ -5,10 +5,10 @@ Manages document generation for deliveries, items, and reports.
 
 import streamlit as st
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from pathlib import Path
 import pandas as pd
-from datetime import date, datetime
+from datetime import datetime
 
 from warehouse.presentation.shared.components import render_open_folder_button
 
@@ -17,30 +17,34 @@ logger = logging.getLogger(__name__)
 
 def show_document_management_view():
     """Show document management interface with tabs for different document types."""
-    if not st.session_state.get('system_initialized'):
+    if not st.session_state.get("system_initialized"):
         st.warning("System nicht initialisiert")
         return
 
     # Get services
-    services = st.session_state.get('services', {})
-    if 'delivery' not in services:
+    services = st.session_state.get("services", {})
+    if "delivery" not in services:
         st.error("Delivery Service nicht verfügbar")
         return
 
-    delivery_service = services['delivery']
-    item_service = services['item']
+    delivery_service = services["delivery"]
+    item_service = services["item"]
 
     st.header("📄 Dokumentenverwaltung")
-    st.write("Generierung und Verwaltung aller Dokumente für Lieferungen und Artikel")
+    st.write(
+        "Generierung und Verwaltung aller Dokumente " "für Lieferungen und Artikel"
+    )
 
     # Create tabs for different document types
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📋 Lieferschein-Dokumente",
-        "📄 Artikel-Dokumente",
-        "📊 Berichte & Export",
-        "🔧 Bulk-Operationen",
-        "📥 Lieferschein Upload"
-    ])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        [
+            "📋 Lieferschein-Dokumente",
+            "📄 Artikel-Dokumente",
+            "📊 Berichte & Export",
+            "🔧 Bulk-Operationen",
+            "📥 Lieferschein Upload",
+        ]
+    )
 
     with tab1:
         _show_delivery_documents_section(delivery_service, item_service)
@@ -61,17 +65,26 @@ def show_document_management_view():
 def _show_delivery_documents_section(delivery_service, item_service):
     """Show delivery documents generation section."""
     st.subheader("📋 Lieferschein-Dokumente")
-    st.write("Hier können Sie Lieferscheine und Prüfprotokolle für Deliveries generieren.")
+    st.write(
+        "Hier können Sie Lieferscheine und " "Prüfprotokolle für Deliveries generieren."
+    )
 
     # Delivery selection for document generation
     try:
-        deliveries_data = delivery_service.get_all_deliveries() if hasattr(delivery_service, 'get_all_deliveries') else []
+        deliveries_data = (
+            delivery_service.get_all_deliveries()
+            if hasattr(delivery_service, "get_all_deliveries")
+            else []
+        )
         if deliveries_data:
-            delivery_options = {f"{d['delivery_number']} ({d['supplier_id']})": d['delivery_number'] for d in deliveries_data}
+            delivery_options = {
+                f"{d['delivery_number']} ({d['supplier_id']})": d["delivery_number"]
+                for d in deliveries_data
+            }
             selected_delivery_display = st.selectbox(
                 "Wählen Sie eine Lieferung:",
                 options=list(delivery_options.keys()),
-                key="doc_delivery_selection"
+                key="doc_delivery_selection",
             )
 
             if selected_delivery_display:
@@ -79,13 +92,22 @@ def _show_delivery_documents_section(delivery_service, item_service):
 
                 # Enhanced document generation section
                 st.write("### 📄 Enhanced Document Generation")
-                st.write("Integriert Datenbankdaten und erstellt organisierte Ordnerstruktur.")
+                st.write(
+                    "Integriert Datenbankdaten und erstellt "
+                    "organisierte Ordnerstruktur."
+                )
 
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    if st.button("🚀 Vollständige Lieferung erstellen", use_container_width=True, type="primary"):
-                        _create_complete_delivery_documentation(selected_delivery_number)
+                    if st.button(
+                        "🚀 Vollständige Lieferung erstellen",
+                        use_container_width=True,
+                        type="primary",
+                    ):
+                        _create_complete_delivery_documentation(
+                            selected_delivery_number
+                        )
 
                 with col2:
                     if st.button("📁 Ordner öffnen", use_container_width=True):
@@ -96,7 +118,11 @@ def _show_delivery_documents_section(delivery_service, item_service):
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    if st.button("📄 Alle Dokumente erstellen", use_container_width=True, type="primary"):
+                    if st.button(
+                        "📄 Alle Dokumente erstellen",
+                        use_container_width=True,
+                        type="primary",
+                    ):
                         _create_all_word_documents(selected_delivery_number)
 
                 with col2:
@@ -138,24 +164,43 @@ def _show_delivery_documents_section(delivery_service, item_service):
 def _show_item_documents_section(item_service):
     """Show item-specific documents section."""
     st.subheader("📄 Artikel-Dokumente")
-    st.write("Hier können Sie Sichtkontrollen für Items generieren und Excel-Exporte erstellen.")
+    st.write(
+        "Hier können Sie Sichtkontrollen für Items "
+        "generieren und Excel-Exporte erstellen."
+    )
 
     # Item selection for document generation
     try:
-        items_data = item_service.get_all_items() if hasattr(item_service, 'get_all_items') else []
+        items_data = (
+            item_service.get_all_items()
+            if hasattr(item_service, "get_all_items")
+            else []
+        )
         if items_data:
-            item_options = {f"{item['article_number']} | {item['batch_number']} ({item.get('delivery_number', 'N/A')})": item for item in items_data}
+            item_options = {
+                f"{item['article_number']} | "
+                f"{item['batch_number']} "
+                f"({item.get('delivery_number', 'N/A')})": item
+                for item in items_data
+            }
             selected_item_display = st.selectbox(
                 "Wählen Sie einen Artikel:",
                 options=list(item_options.keys()),
-                key="doc_item_selection"
+                key="doc_item_selection",
             )
 
             if selected_item_display:
                 selected_item = item_options[selected_item_display]
 
                 # Artikel-Info Box
-                st.info(f"**Ausgewählter Artikel:** {selected_item['article_number']} | **Charge:** {selected_item['batch_number']} | **Lieferung:** {selected_item.get('delivery_number', 'N/A')}")
+                st.info(
+                    f"**Ausgewählter Artikel:** "
+                    f"{selected_item['article_number']} | "
+                    f"**Charge:** "
+                    f"{selected_item['batch_number']} | "
+                    f"**Lieferung:** "
+                    f"{selected_item.get('delivery_number', 'N/A')}"
+                )
 
                 # Action-Buttons in 3 Spalten
                 col1, col2, col3 = st.columns(3)
@@ -167,14 +212,16 @@ def _show_item_documents_section(item_service):
                         "article_number": selected_item["article_number"],
                         "batch_number": selected_item["batch_number"],
                         "delivery_number": selected_item.get("delivery_number", ""),
-                        "supplier_name": selected_item.get("supplier_name", selected_item.get("supplier", "")),
-                        "manufacturer": selected_item.get("manufacturer", selected_item.get("supplier_name", selected_item.get("supplier", ""))),
+                        "supplier_name": selected_item.get(
+                            "supplier_name", selected_item.get("supplier", "")
+                        ),
+                        "kompatibilitaet": selected_item.get("kompatibilitaet", ""),
                     }
                     render_open_folder_button(
                         folder_item_data,
                         label="🗂️ Artikelordner öffnen",
                         button_type="primary",
-                        key_suffix="doc_mgmt"
+                        key_suffix="doc_mgmt",
                     )
 
                 with col2:
@@ -182,11 +229,20 @@ def _show_item_documents_section(item_service):
                         _create_excel_export(selected_item)
 
                 with col3:
-                    st.caption("💡 **Tipp:** Nutze den Ordner-Button für direkten Zugriff auf alle Artikel-Dokumente!")
+                    st.caption(
+                        "💡 **Tipp:** Nutze den Ordner-Button "
+                        "für direkten Zugriff auf alle "
+                        "Artikel-Dokumente!"
+                    )
 
                 # Info-Box für Sichtkontrolle
                 st.write("")  # Spacing
-                st.info("👥 **Sichtkontrolle:** Verwende das Visual Inspection Popup im Sichtkontrolle-Tab für korrekte Ausschuss-Erfassung!")
+                st.info(
+                    "👥 **Sichtkontrolle:** Verwende das "
+                    "Visual Inspection Popup im "
+                    "Sichtkontrolle-Tab für korrekte "
+                    "Ausschuss-Erfassung!"
+                )
 
         else:
             st.info("Keine Artikel in der Datenbank gefunden.")
@@ -223,14 +279,18 @@ def _show_reports_section(delivery_service, item_service):
 def _show_bulk_operations_section(delivery_service, item_service):
     """Show bulk operations section."""
     st.subheader("🔧 Bulk-Operationen")
-    st.write("Führen Sie Operationen für mehrere Datensätze gleichzeitig durch.")
+    st.write("Führen Sie Operationen für mehrere " "Datensätze gleichzeitig durch.")
 
     # Bulk delivery operations
     st.write("#### 📋 Bulk-Lieferungs-Operationen")
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("🚀 Alle Lieferungen dokumentieren", use_container_width=True, type="primary"):
+        if st.button(
+            "🚀 Alle Lieferungen dokumentieren",
+            use_container_width=True,
+            type="primary",
+        ):
             _bulk_create_delivery_documents(delivery_service)
 
     with col2:
@@ -242,10 +302,18 @@ def _show_bulk_operations_section(delivery_service, item_service):
     col1, col2 = st.columns(2)
 
     with col1:
-        st.info("👁️ **Sichtkontrolle-Dokumente** werden über die Visual Inspection Popups erstellt, da diese benutzerdefinierte Ausschussmengen benötigen.")
+        st.info(
+            "👁️ **Sichtkontrolle-Dokumente** werden "
+            "über die Visual Inspection Popups "
+            "erstellt, da diese benutzerdefinierte "
+            "Ausschussmengen benötigen."
+        )
 
     with col2:
-        if st.button("📊 Vollständiger Excel-Export", use_container_width=True):
+        if st.button(
+            "📊 Vollständiger Excel-Export",
+            use_container_width=True,
+        ):
             _create_complete_excel_export(delivery_service, item_service)
 
 
@@ -253,28 +321,35 @@ def _show_bulk_operations_section(delivery_service, item_service):
 # DOCUMENT CREATION FUNCTIONS
 # ================================
 
+
 def _create_complete_delivery_documentation(delivery_number: str):
     """Create complete delivery documentation using enhanced service."""
     with st.spinner("Erstelle vollständige Dokumentation..."):
         try:
-            from warehouse.application.services.delivery_workflow_service import DeliveryWorkflowService
+            from warehouse.application.services.delivery_workflow_service import (
+                DeliveryWorkflowService,
+            )
 
             workflow_service = DeliveryWorkflowService()
             results = workflow_service.create_delivery_documents(
                 delivery_number=delivery_number,
                 open_documents=True,
-                create_folder=True
+                create_folder=True,
             )
 
             if results.success:
-                st.success(f"✅ Dokumentation erstellt: {len(results.documents_created)} Dokumente")
+                st.success(
+                    f"✅ Dokumentation erstellt: "
+                    f"{len(results.documents_created)} "
+                    "Dokumente"
+                )
                 if results.folder_path:
                     st.info(f"📁 Ordner erstellt: {results.folder_path}")
 
                 # Show created documents
                 for doc in results.documents_created:
-                    doc_type = doc.get('type', 'Unknown')
-                    doc_path = doc.get('path', '')
+                    doc_type = doc.get("type", "Unknown")
+                    doc_path = doc.get("path", "")
                     if doc_path:
                         st.write(f"📄 {doc_type}: `{Path(doc_path).name}`")
             else:
@@ -289,36 +364,41 @@ def _create_complete_delivery_documentation(delivery_number: str):
 
 def _create_all_word_documents(delivery_number: str):
     """Create all Word documents for a delivery."""
-    with st.spinner("Erstelle Word-Dokumente (PDB, Begleitschein, Sichtkontrolle)..."):
+    with st.spinner(
+        "Erstelle Word-Dokumente " "(PDB, Begleitschein, Sichtkontrolle)..."
+    ):
         try:
             # FIXED: Use standardized services instead of enhanced_document_service
-            from warehouse.application.services.delivery_workflow_service import DeliveryWorkflowService
+            from warehouse.application.services.delivery_workflow_service import (
+                DeliveryWorkflowService,
+            )
 
             workflow_service = DeliveryWorkflowService()
             result = workflow_service.create_delivery_documents(
                 delivery_number=delivery_number,
                 open_documents=False,  # Don't open, just save
-                create_folder=True
+                create_folder=True,
             )
 
-            if result['success']:
-                st.success(f"✅ {len(result['documents_created'])} Word-Dokumente erstellt!")
+            if result["success"]:
+                doc_count = len(result["documents_created"])
+                st.success(f"✅ {doc_count} Word-Dokumente erstellt!")
 
                 # Show created documents
-                for doc in result['documents_created']:
+                for doc in result["documents_created"]:
                     st.info(f"📄 {doc['type']}: {doc['path'].name}")
 
-                if result['folder_path']:
+                if result["folder_path"]:
                     st.info(f"📁 Gespeichert in: {result['folder_path']}")
 
                 # Show any warnings
-                if result['errors']:
-                    for error in result['errors']:
+                if result["errors"]:
+                    for error in result["errors"]:
                         st.warning(f"⚠️ {error}")
 
             else:
                 st.error("❌ Fehler bei der Word-Dokument-Erstellung")
-                for error in result['errors']:
+                for error in result["errors"]:
                     st.error(f"• {error}")
 
         except Exception as e:
@@ -331,65 +411,95 @@ def _create_pdb_document_only(delivery_number: str):
     with st.spinner("Erstelle PDB (Prüfprotokoll)..."):
         try:
             # FIXED: Use standardized services instead of enhanced_document_service
-            from warehouse.application.services.document_generation.document_generation_service import DocumentGenerationService
-            from warehouse.application.services.document_generation.document_types import DocumentType
+            from warehouse.application.services.document_generation.document_generation_service import (  # noqa: E501
+                DocumentGenerationService,
+            )
+            from warehouse.application.services.document_generation.document_types import (  # noqa: E501
+                DocumentType,
+            )
 
             # Get delivery data first
-            services = st.session_state.get('services', {})
-            delivery_service = services.get('delivery')
+            services = st.session_state.get("services", {})
+            delivery_service = services.get("delivery")
 
             if delivery_service:
                 delivery_data = delivery_service.get_delivery(delivery_number)
-                if delivery_data and 'items' in delivery_data:
+                if delivery_data and "items" in delivery_data:
                     doc_service = DocumentGenerationService()
 
-                    # Create PDB for first item (or adjust logic as needed)
-                    first_item = delivery_data['items'][0] if delivery_data['items'] else {}
+                    # Create PDB for first item
+                    first_item = (
+                        delivery_data["items"][0] if delivery_data["items"] else {}
+                    )
 
                     pdb_result = doc_service.generate_document(
                         document_type=DocumentType.PDB,
-                        batch_number=first_item.get('batch_number', ''),
+                        batch_number=first_item.get("batch_number", ""),
                         delivery_number=delivery_number,
-                        article_number=first_item.get('article_number', ''),
-                        supplier_name=delivery_data.get('supplier_name', ''),
-                        quantity=first_item.get('quantity', 0),
-                        employee_name=st.session_state.get('current_user', 'System')
+                        article_number=first_item.get("article_number", ""),
+                        supplier_name=delivery_data.get("supplier_name", ""),
+                        quantity=first_item.get("quantity", 0),
+                        employee_name=st.session_state.get("current_user", "System"),
                     )
 
                     # Create compatible result format
                     result = {
-                        'success': pdb_result.success,
-                        'documents_created': [{'type': 'PDB', 'path': pdb_result.document_path}] if pdb_result.success else [],
-                        'errors': [pdb_result.error] if not pdb_result.success else []
+                        "success": pdb_result.success,
+                        "documents_created": [
+                            {"type": "PDB", "path": pdb_result.document_path}
+                        ]
+                        if pdb_result.success
+                        else [],
+                        "errors": [pdb_result.error] if not pdb_result.success else [],
                     }
                 else:
-                    result = {'success': False, 'documents_created': [], 'errors': ['Delivery data not found']}
+                    result = {
+                        "success": False,
+                        "documents_created": [],
+                        "errors": ["Delivery data not found"],
+                    }
             else:
-                result = {'success': False, 'documents_created': [], 'errors': ['Delivery service not available']}
+                result = {
+                    "success": False,
+                    "documents_created": [],
+                    "errors": ["Delivery service not available"],
+                }
 
-            if result['success']:
+            if result["success"]:
                 # Find and highlight the PDB document
-                pdb_docs = [doc for doc in result['documents_created'] if doc['type'] == 'PDB']
+                pdb_docs = [
+                    doc for doc in result["documents_created"] if doc["type"] == "PDB"
+                ]
 
                 if pdb_docs:
                     pdb_doc = pdb_docs[0]
-                    st.success(f"✅ PDB (Prüfprotokoll) erstellt: {pdb_doc['path'].name}")
+                    st.success(
+                        "✅ PDB (Prüfprotokoll) erstellt: " f"{pdb_doc['path'].name}"
+                    )
                     st.info(f"📁 Gespeichert unter: {pdb_doc['path']}")
 
                     # Show info about other documents created
-                    other_docs = [doc for doc in result['documents_created'] if doc['type'] != 'PDB']
+                    other_docs = [
+                        doc
+                        for doc in result["documents_created"]
+                        if doc["type"] != "PDB"
+                    ]
                     if other_docs:
-                        st.info(f"💡 Zusätzlich erstellt: {', '.join([doc['type'] for doc in other_docs])}")
+                        other_types = ", ".join([doc["type"] for doc in other_docs])
+                        st.info("💡 Zusätzlich erstellt: " f"{other_types}")
                 else:
                     st.error("❌ PDB konnte nicht erstellt werden")
 
-                if result['errors']:
-                    for error in result['errors']:
+                if result["errors"]:
+                    for error in result["errors"]:
                         st.warning(f"⚠️ {error}")
             else:
                 # Fallback to document generation service
                 st.info("🔄 Versuche mit Standard-Daten...")
-                from warehouse.application.services.document_generation import DocumentGenerationService, DocumentType
+                from warehouse.application.services.document_generation import (
+                    DocumentGenerationService,
+                    DocumentType,
+                )
 
                 # Create document generation service
                 doc_service = DocumentGenerationService()
@@ -400,13 +510,16 @@ def _create_pdb_document_only(delivery_number: str):
                     article_number="A001",  # Default fallback
                     batch_number="B000001",  # Default fallback
                     delivery_number=delivery_number,
-                    auto_open=True
+                    auto_open=True,
                 )
 
                 doc_path = result.output_path if result.success else None
 
                 st.success(f"✅ PDB mit Standard-Daten erstellt: {doc_path.name}")
-                st.warning("⚠️ Dokument wurde mit Standard-Daten erstellt. Bitte Werte manuell anpassen!")
+                st.warning(
+                    "⚠️ Dokument wurde mit Standard-Daten "
+                    "erstellt. Bitte Werte manuell anpassen!"
+                )
                 st.info(f"📁 Gespeichert unter: {doc_path}")
 
         except Exception as e:
@@ -418,41 +531,52 @@ def _generate_barcodes_for_delivery(delivery_number: str):
     """Generate barcodes for a specific delivery."""
     with st.spinner("Generiere Barcodes..."):
         try:
-            # FIXED: Use standardized DocumentGenerationService instead of word_template_service
-            from warehouse.application.services.document_generation.document_generation_service import DocumentGenerationService
-            from warehouse.application.services.document_generation.document_types import DocumentType
+            # Use standardized DocumentGenerationService
+            from warehouse.application.services.document_generation.document_generation_service import (  # noqa: E501
+                DocumentGenerationService,
+            )
+            from warehouse.application.services.document_generation.document_types import (  # noqa: E501
+                DocumentType,
+            )
 
             # Get delivery data to extract article/batch info
-            services = st.session_state.get('services', {})
-            delivery_service = services.get('delivery')
+            services = st.session_state.get("services", {})
+            delivery_service = services.get("delivery")
 
             if delivery_service:
                 delivery_data = delivery_service.get_delivery(delivery_number)
-                if delivery_data and 'items' in delivery_data:
+                if delivery_data and "items" in delivery_data:
                     barcode_results = []
                     doc_service = DocumentGenerationService()
 
-                    for item in delivery_data['items']:
+                    for item in delivery_data["items"]:
                         try:
                             result = doc_service.generate_document(
                                 document_type=DocumentType.BARCODE,
-                                article_number=item.get('article_number', 'A001'),
-                                batch_number=item.get('batch_number', 'B000001'),
+                                article_number=item.get("article_number", "A001"),
+                                batch_number=item.get("batch_number", "B000001"),
                                 delivery_number=delivery_number,
-                                supplier_name=delivery_data.get('supplier_name', ''),
-                                additional_data={'open_after_creation': True}
+                                supplier_name=delivery_data.get("supplier_name", ""),
+                                additional_data={"open_after_creation": True},
                             )
                             if result.success:
                                 barcode_results.append(result)
                         except Exception as item_e:
-                            st.warning(f"⚠️ Barcode-Fehler für {item.get('article_number', 'Unknown')}: {item_e}")
+                            art = item.get("article_number", "Unknown")
+                            st.warning(f"⚠️ Barcode-Fehler für " f"{art}: {item_e}")
 
                     if barcode_results:
-                        st.success(f"✅ Barcodes für {len(barcode_results)} Artikel erstellt!")
+                        st.success(
+                            f"✅ Barcodes für "
+                            f"{len(barcode_results)} "
+                            "Artikel erstellt!"
+                        )
 
                         # Show folder info
-                        if barcode_results[0].get('article_barcode'):
-                            folder_path = Path(barcode_results[0]['article_barcode']).parent
+                        if barcode_results[0].get("article_barcode"):
+                            folder_path = Path(
+                                barcode_results[0]["article_barcode"]
+                            ).parent
                             st.info(f"📁 Barcodes gespeichert in: `{folder_path.name}`")
                     else:
                         st.warning("⚠️ Keine Barcodes erstellt")
@@ -475,27 +599,31 @@ def _generate_barcodes_for_delivery(delivery_number: str):
 # FOLDER & FILE OPERATIONS
 # ================================
 
+
 def _open_delivery_folder(delivery_number: str):
     """Open delivery folder in file explorer."""
     try:
-        # FIXED: Use standardized services instead of enhanced_document_service
-        from warehouse.application.services.document_storage.document_storage_service import document_storage_service
-        from warehouse.application.services.document_operations.document_opening_service import DocumentOpeningService
+        from warehouse.application.services.document_storage.document_storage_service import (  # noqa: E501
+            document_storage_service,
+        )
+        from warehouse.application.services.document_operations.document_opening_service import (  # noqa: E501
+            DocumentOpeningService,
+        )
 
         # Get delivery data to extract required parameters
-        services = st.session_state.get('services', {})
-        delivery_service = services.get('delivery')
+        services = st.session_state.get("services", {})
+        delivery_service = services.get("delivery")
 
         if delivery_service:
             delivery_data = delivery_service.get_delivery(delivery_number)
-            if delivery_data and 'items' in delivery_data and delivery_data['items']:
-                first_item = delivery_data['items'][0]
-                folder_path, warnings = document_storage_service.get_document_path(
-                    batch_number=first_item.get('batch_number', ''),
+            if delivery_data and "items" in delivery_data and delivery_data["items"]:
+                first_item = delivery_data["items"][0]
+                folder_path, _warnings = document_storage_service.get_document_path(
+                    batch_number=first_item.get("batch_number", ""),
                     delivery_number=delivery_number,
-                    article_number=first_item.get('article_number', ''),
-                    supplier_name=delivery_data.get('supplier_name', ''),
-                    create_folders=False
+                    article_number=first_item.get("article_number", ""),
+                    supplier_name=delivery_data.get("supplier_name", ""),
+                    create_folders=False,
                 )
 
                 if folder_path and folder_path.exists():
@@ -504,7 +632,7 @@ def _open_delivery_folder(delivery_number: str):
                     if success:
                         st.success(f"✅ Ordner geöffnet: {folder_path}")
                     else:
-                        st.warning("⚠️ Ordner konnte nicht geöffnet werden")
+                        st.warning("⚠️ Ordner konnte nicht " "geöffnet werden")
                 else:
                     st.warning("⚠️ Ordner nicht gefunden")
             else:
@@ -520,46 +648,72 @@ def _open_delivery_folder(delivery_number: str):
 def _open_article_folder(delivery_number: str):
     """Open article folder for delivery."""
     try:
-        # FIXED: Use standardized services instead of enhanced_document_service
-        from warehouse.application.services.document_storage.document_storage_service import document_storage_service
-        from warehouse.application.services.document_operations.document_opening_service import DocumentOpeningService
+        from warehouse.application.services.document_storage.document_storage_service import (  # noqa: E501
+            document_storage_service,
+        )
+        from warehouse.application.services.document_operations.document_opening_service import (  # noqa: E501
+            DocumentOpeningService,
+        )
 
         # Get delivery data to extract required parameters
-        services = st.session_state.get('services', {})
-        delivery_service = services.get('delivery')
+        services = st.session_state.get("services", {})
+        delivery_service = services.get("delivery")
 
         if delivery_service:
             delivery_data = delivery_service.get_delivery(delivery_number)
-            if delivery_data and 'items' in delivery_data and delivery_data['items']:
-                first_item = delivery_data['items'][0]
-                folder_path, warnings = document_storage_service.get_document_path(
-                    batch_number=first_item.get('batch_number', ''),
+            if delivery_data and "items" in delivery_data and delivery_data["items"]:
+                first_item = delivery_data["items"][0]
+                folder_path, _warnings = document_storage_service.get_document_path(
+                    batch_number=first_item.get("batch_number", ""),
                     delivery_number=delivery_number,
-                    article_number=first_item.get('article_number', ''),
-                    supplier_name=delivery_data.get('supplier_name', ''),
-                    create_folders=False
+                    article_number=first_item.get("article_number", ""),
+                    supplier_name=delivery_data.get("supplier_name", ""),
+                    create_folders=False,
                 )
 
                 if folder_path and folder_path.exists():
                     opener = DocumentOpeningService()
                     success = opener.open_folder(folder_path)
                     if success:
-                        st.success(f"✅ Artikel-Ordner geöffnet: {folder_path}")
+                        st.success("✅ Artikel-Ordner geöffnet: " f"{folder_path}")
                     else:
-                        # Fallback to manual platform-specific opening
-                        import os, platform, subprocess
+                        # Fallback: platform-specific
+                        import os
+                        import platform
+                        import subprocess
+
                         try:
                             if platform.system() == "Windows":
                                 os.startfile(str(folder_path))
-                                st.success(f"✅ Artikel-Ordner geöffnet: {folder_path}")
-                            elif platform.system() == "Darwin":  # macOS
-                                subprocess.run(["open", str(folder_path)], check=False)
-                                st.success(f"✅ Artikel-Ordner geöffnet: {folder_path}")
+                                st.success(
+                                    "✅ Artikel-Ordner " "geöffnet: " f"{folder_path}"
+                                )
+                            elif platform.system() == "Darwin":
+                                subprocess.run(
+                                    [
+                                        "open",
+                                        str(folder_path),
+                                    ],
+                                    check=False,
+                                )
+                                st.success(
+                                    "✅ Artikel-Ordner " "geöffnet: " f"{folder_path}"
+                                )
                             else:  # Linux
-                                subprocess.run(["xdg-open", str(folder_path)], check=False)
-                                st.success(f"✅ Artikel-Ordner geöffnet: {folder_path}")
+                                subprocess.run(
+                                    [
+                                        "xdg-open",
+                                        str(folder_path),
+                                    ],
+                                    check=False,
+                                )
+                                st.success(
+                                    "✅ Artikel-Ordner " "geöffnet: " f"{folder_path}"
+                                )
                         except Exception:
-                            st.warning("⚠️ Artikel-Ordner konnte nicht geöffnet werden")
+                            st.warning(
+                                "⚠️ Artikel-Ordner konnte" " nicht geöffnet werden"
+                            )
                 else:
                     st.warning("⚠️ Artikel-Ordner nicht gefunden")
             else:
@@ -568,7 +722,7 @@ def _open_article_folder(delivery_number: str):
             st.warning("⚠️ Delivery Service nicht verfügbar")
 
     except Exception as e:
-        st.error(f"❌ Fehler beim Öffnen des Artikel-Ordners: {e}")
+        st.error("❌ Fehler beim Öffnen des " f"Artikel-Ordners: {e}")
         logger.error(f"Error opening article folder: {e}")
 
 
@@ -576,39 +730,45 @@ def _merge_delivery_pdfs(delivery_number: str):
     """Merge PDFs for a delivery."""
     with st.spinner("Führe PDFs zusammen..."):
         try:
-            # FIXED: Use standardized services instead of enhanced_document_service
-            from warehouse.application.services.document_operations.pdf_merge_service import PDFMergeService
-            from warehouse.application.services.document_storage.document_storage_service import document_storage_service
+            from warehouse.application.services.document_operations.pdf_merge_service import (  # noqa: E501
+                PDFMergeService,
+            )
+            from warehouse.application.services.document_storage.document_storage_service import (  # noqa: E501
+                document_storage_service,
+            )
 
             # Get delivery data to extract required parameters for path resolution
-            services = st.session_state.get('services', {})
-            delivery_service = services.get('delivery')
+            services = st.session_state.get("services", {})
+            delivery_service = services.get("delivery")
 
             if delivery_service:
                 delivery_data = delivery_service.get_delivery(delivery_number)
-                if delivery_data and 'items' in delivery_data and delivery_data['items']:
-                    first_item = delivery_data['items'][0]
+                if (
+                    delivery_data
+                    and "items" in delivery_data
+                    and delivery_data["items"]
+                ):
+                    first_item = delivery_data["items"][0]
 
                     # Get delivery folder path
-                    folder_path, warnings = document_storage_service.get_document_path(
-                        batch_number=first_item.get('batch_number', ''),
+                    folder_path, _warnings = document_storage_service.get_document_path(
+                        batch_number=first_item.get("batch_number", ""),
                         delivery_number=delivery_number,
-                        article_number=first_item.get('article_number', ''),
-                        supplier_name=delivery_data.get('supplier_name', ''),
-                        create_folders=False
+                        article_number=first_item.get("article_number", ""),
+                        supplier_name=delivery_data.get("supplier_name", ""),
+                        create_folders=False,
                     )
 
                     if folder_path and folder_path.exists():
-                        # Initialize PDF merge service
                         pdf_service = PDFMergeService()
                         merged_path = pdf_service.merge_delivery_pdfs(str(folder_path))
 
                         if merged_path:
-                            st.success(f"✅ PDFs zusammengeführt: {merged_path.name}")
+                            st.success("✅ PDFs zusammengeführt: " f"{merged_path.name}")
                         else:
-                            st.warning("⚠️ Keine PDFs zum Zusammenführen gefunden")
+                            st.warning("⚠️ Keine PDFs zum " "Zusammenführen gefunden")
                     else:
-                        st.warning("⚠️ Lieferungsordner nicht gefunden")
+                        st.warning("⚠️ Lieferungsordner " "nicht gefunden")
                 else:
                     st.warning("⚠️ Lieferdaten nicht gefunden")
             else:
@@ -622,34 +782,39 @@ def _merge_delivery_pdfs(delivery_number: str):
 def _list_delivery_documents(delivery_number: str):
     """List all documents in delivery folder."""
     try:
-        # FIXED: Use standardized services instead of enhanced_document_service
-        from warehouse.application.services.document_storage.document_storage_service import document_storage_service
+        from warehouse.application.services.document_storage.document_storage_service import (  # noqa: E501
+            document_storage_service,
+        )
 
         # Get delivery data to extract required parameters
-        services = st.session_state.get('services', {})
-        delivery_service = services.get('delivery')
+        services = st.session_state.get("services", {})
+        delivery_service = services.get("delivery")
 
         if delivery_service:
             delivery_data = delivery_service.get_delivery(delivery_number)
-            if delivery_data and 'items' in delivery_data and delivery_data['items']:
-                first_item = delivery_data['items'][0]
-                folder_path, warnings = document_storage_service.get_document_path(
-                    batch_number=first_item.get('batch_number', ''),
+            if delivery_data and "items" in delivery_data and delivery_data["items"]:
+                first_item = delivery_data["items"][0]
+                folder_path, _warnings = document_storage_service.get_document_path(
+                    batch_number=first_item.get("batch_number", ""),
                     delivery_number=delivery_number,
-                    article_number=first_item.get('article_number', ''),
-                    supplier_name=delivery_data.get('supplier_name', ''),
-                    create_folders=False
+                    article_number=first_item.get("article_number", ""),
+                    supplier_name=delivery_data.get("supplier_name", ""),
+                    create_folders=False,
                 )
 
                 if folder_path and folder_path.exists():
-                    files = list(folder_path.rglob('*'))
+                    files = list(folder_path.rglob("*"))
                     document_files = [f for f in files if f.is_file()]
 
                     if document_files:
                         st.write(f"📁 Dateien in {folder_path.name}:")
                         for file in sorted(document_files):
                             file_size = file.stat().st_size
-                            size_str = f"({file_size:,} bytes)" if file_size < 1024 else f"({file_size/1024:.1f} KB)"
+                            size_str = (
+                                f"({file_size:,} bytes)"
+                                if file_size < 1024
+                                else f"({file_size/1024:.1f} KB)"
+                            )
                             st.write(f"• {file.name} {size_str}")
                     else:
                         st.info("Keine Dateien im Lieferungsordner gefunden")
@@ -669,6 +834,7 @@ def _list_delivery_documents(delivery_number: str):
 # EXPORT & REPORTING FUNCTIONS
 # ================================
 
+
 def _export_deliveries_to_excel(delivery_service):
     """Export deliveries to Excel."""
     with st.spinner("Erstelle Excel-Export..."):
@@ -678,7 +844,8 @@ def _export_deliveries_to_excel(delivery_service):
                 df = pd.DataFrame(deliveries_data)
 
                 # Create Excel file
-                excel_path = Path.home() / "Downloads" / f"deliveries_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                excel_path = Path.home() / "Downloads" / f"deliveries_export_{ts}.xlsx"
                 df.to_excel(excel_path, index=False)
 
                 st.success(f"✅ Excel-Export erstellt: {excel_path.name}")
@@ -700,10 +867,11 @@ def _export_items_to_excel(item_service):
                 df = pd.DataFrame(items_data)
 
                 # Create Excel file
-                excel_path = Path.home() / "Downloads" / f"items_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                excel_path = Path.home() / "Downloads" / f"items_export_{ts}.xlsx"
                 df.to_excel(excel_path, index=False)
 
-                st.success(f"✅ Artikel-Excel-Export erstellt: {excel_path.name}")
+                st.success("✅ Artikel-Excel-Export erstellt: " f"{excel_path.name}")
                 st.info(f"📁 Gespeichert unter: {excel_path}")
             else:
                 st.warning("⚠️ Keine Artikeldaten zum Export gefunden")
@@ -721,7 +889,9 @@ def _create_excel_export(item_data: Dict[str, Any]):
             df = pd.DataFrame([item_data])
 
             # Create Excel file
-            excel_path = Path.home() / "Downloads" / f"item_{item_data.get('article_number', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            art = item_data.get("article_number", "unknown")
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            excel_path = Path.home() / "Downloads" / f"item_{art}_{ts}.xlsx"
             df.to_excel(excel_path, index=False)
 
             st.success(f"✅ Item-Excel-Export erstellt: {excel_path.name}")
@@ -736,6 +906,7 @@ def _create_excel_export(item_data: Dict[str, Any]):
 # BULK OPERATIONS
 # ================================
 
+
 def _bulk_create_delivery_documents(delivery_service):
     """Create documents for all deliveries."""
     with st.spinner("Erstelle Dokumente für alle Lieferungen..."):
@@ -749,35 +920,44 @@ def _bulk_create_delivery_documents(delivery_service):
                 status_text = st.empty()
 
                 for i, delivery in enumerate(deliveries_data):
-                    delivery_number = delivery['delivery_number']
+                    delivery_number = delivery["delivery_number"]
                     status_text.text(f"Verarbeite Lieferung {delivery_number}...")
 
                     try:
-                        # FIXED: Use standardized services instead of enhanced_document_service
-                        from warehouse.application.services.delivery_workflow_service import DeliveryWorkflowService
+                        from warehouse.application.services.delivery_workflow_service import (  # noqa: E501
+                            DeliveryWorkflowService,
+                        )
 
                         workflow_service = DeliveryWorkflowService()
                         result = workflow_service.create_delivery_documents(
                             delivery_number=delivery_number,
                             open_documents=False,
-                            create_folder=True
+                            create_folder=True,
                         )
 
-                        if result['success']:
+                        if result["success"]:
                             success_count += 1
                         else:
                             error_count += 1
 
                     except Exception as delivery_e:
                         error_count += 1
-                        logger.error(f"Error processing delivery {delivery_number}: {delivery_e}")
+                        logger.error(
+                            "Error processing delivery "
+                            f"{delivery_number}: "
+                            f"{delivery_e}"
+                        )
 
                     progress_bar.progress((i + 1) / len(deliveries_data))
 
                 status_text.text("")
                 progress_bar.empty()
 
-                st.success(f"✅ Bulk-Operation abgeschlossen: {success_count} erfolgreich, {error_count} Fehler")
+                st.success(
+                    "✅ Bulk-Operation abgeschlossen: "
+                    f"{success_count} erfolgreich, "
+                    f"{error_count} Fehler"
+                )
             else:
                 st.warning("⚠️ Keine Lieferungen für Bulk-Operation gefunden")
 
@@ -799,20 +979,24 @@ def _bulk_generate_all_barcodes(item_service):
                 status_text = st.empty()
 
                 for i, item in enumerate(items_data):
-                    article_number = item.get('article_number', 'Unknown')
+                    article_number = item.get("article_number", "Unknown")
                     status_text.text(f"Verarbeite Artikel {article_number}...")
 
                     try:
-                        from warehouse.application.services.document_generation.barcode_generator import BarcodeGenerator
+                        from warehouse.application.services.document_generation.barcode_generator import (  # noqa: E501
+                            BarcodeGenerator,
+                        )
 
                         barcode_gen = BarcodeGenerator()
+                        art_num = item.get("article_number", "A001")
+                        batch_num = item.get("batch_number", "B000001")
                         article_result = barcode_gen.generate_barcode_png(
-                            barcode_data=item.get('article_number', 'A001'),
-                            output_filename=f"Article_{item.get('article_number', 'A001')}"
+                            barcode_data=art_num,
+                            output_filename=(f"Article_{art_num}"),
                         )
                         batch_result = barcode_gen.generate_barcode_png(
-                            barcode_data=item.get('batch_number', 'B000001'),
-                            output_filename=f"Batch_{item.get('batch_number', 'B000001')}"
+                            barcode_data=batch_num,
+                            output_filename=(f"Batch_{batch_num}"),
                         )
                         result = article_result.success and batch_result.success
 
@@ -823,16 +1007,23 @@ def _bulk_generate_all_barcodes(item_service):
 
                     except Exception as item_e:
                         error_count += 1
-                        logger.error(f"Error creating barcode for {article_number}: {item_e}")
+                        logger.error(
+                            "Error creating barcode for " f"{article_number}: {item_e}"
+                        )
 
                     progress_bar.progress((i + 1) / len(items_data))
 
                 status_text.text("")
                 progress_bar.empty()
 
-                st.success(f"✅ Barcode-Bulk-Operation abgeschlossen: {success_count} erfolgreich, {error_count} Fehler")
+                st.success(
+                    "✅ Barcode-Bulk-Operation "
+                    "abgeschlossen: "
+                    f"{success_count} erfolgreich, "
+                    f"{error_count} Fehler"
+                )
             else:
-                st.warning("⚠️ Keine Artikel für Barcode-Bulk-Operation gefunden")
+                st.warning("⚠️ Keine Artikel für " "Barcode-Bulk-Operation gefunden")
 
         except Exception as e:
             st.error(f"❌ Fehler bei Barcode-Bulk-Operation: {e}")
@@ -847,13 +1038,13 @@ def _bulk_generate_all_barcodes(item_service):
 
 def _create_delivery_report_pdf(delivery_service):
     """Create delivery report PDF."""
-    st.info("📄 PDF-Berichtserstellung - Funktion wird implementiert")
+    st.info("📄 PDF-Berichtserstellung - " "Funktion wird implementiert")
     # TODO: Implement PDF report generation
 
 
 def _create_quality_report_pdf(item_service):
     """Create quality report PDF."""
-    st.info("📄 Qualitätsbericht PDF-Erstellung - Funktion wird implementiert")
+    st.info("📄 Qualitätsbericht PDF-Erstellung - " "Funktion wird implementiert")
     # TODO: Implement quality PDF report generation
 
 
@@ -866,18 +1057,23 @@ def _create_complete_excel_export(delivery_service, item_service):
             items_data = item_service.get_all_items() or []
 
             if deliveries_data or items_data:
-                excel_path = Path.home() / "Downloads" / f"complete_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                excel_path = Path.home() / "Downloads" / f"complete_export_{ts}.xlsx"
 
-                with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+                with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
                     if deliveries_data:
                         df_deliveries = pd.DataFrame(deliveries_data)
-                        df_deliveries.to_excel(writer, sheet_name='Deliveries', index=False)
+                        df_deliveries.to_excel(
+                            writer, sheet_name="Deliveries", index=False
+                        )
 
                     if items_data:
                         df_items = pd.DataFrame(items_data)
-                        df_items.to_excel(writer, sheet_name='Items', index=False)
+                        df_items.to_excel(writer, sheet_name="Items", index=False)
 
-                st.success(f"✅ Vollständiger Excel-Export erstellt: {excel_path.name}")
+                st.success(
+                    "✅ Vollständiger Excel-Export " f"erstellt: {excel_path.name}"
+                )
                 st.info(f"📁 Gespeichert unter: {excel_path}")
             else:
                 st.warning("⚠️ Keine Daten für vollständigen Export gefunden")
@@ -890,14 +1086,17 @@ def _create_complete_excel_export(delivery_service, item_service):
 def _show_delivery_slip_upload_section():
     """Show delivery slip upload and processing section."""
     st.subheader("📥 Lieferschein Upload & Automatische Verarbeitung")
-    st.write("Laden Sie Lieferscheine hoch für automatische Lieferanten-Erkennung und organisierte Speicherung.")
+    st.write(
+        "Laden Sie Lieferscheine hoch für automatische "
+        "Lieferanten-Erkennung und organisierte Speicherung."
+    )
 
     # Upload interface
     uploaded_files = st.file_uploader(
         "Wählen Sie Lieferschein-Dateien zum Upload:",
-        type=['pdf', 'png', 'jpg', 'jpeg'],
+        type=["pdf", "png", "jpg", "jpeg"],
         accept_multiple_files=True,
-        help="Unterstützte Formate: PDF, PNG, JPG. Mehrere Dateien möglich."
+        help="Unterstützte Formate: PDF, PNG, JPG. " "Mehrere Dateien möglich.",
     )
 
     if uploaded_files:
@@ -912,30 +1111,39 @@ def _show_delivery_slip_upload_section():
         with col1:
             hint_supplier = st.text_input(
                 "Lieferanten-Hinweis (optional):",
-                help="Falls bekannt, können Sie den Lieferantennamen eingeben um die Erkennung zu verbessern",
-                key="delivery_slip_supplier_hint"
+                help="Falls bekannt, können Sie den "
+                "Lieferantennamen eingeben um die "
+                "Erkennung zu verbessern",
+                key="delivery_slip_supplier_hint",
             )
 
         with col2:
             extract_structured = st.checkbox(
                 "Strukturierte Daten extrahieren",
                 value=True,
-                help="Extrahiert zusätzlich strukturierte Daten wie Artikelnummern und Mengen",
-                key="delivery_slip_extract_structured"
+                help="Extrahiert zusätzlich strukturierte "
+                "Daten wie Artikelnummern und Mengen",
+                key="delivery_slip_extract_structured",
             )
 
         # Process button
-        if st.button("🚀 Lieferscheine verarbeiten", type="primary", use_container_width=True):
+        if st.button(
+            "🚀 Lieferscheine verarbeiten", type="primary", use_container_width=True
+        ):
             _process_delivery_slips(uploaded_files, hint_supplier, extract_structured)
 
     # Show recent uploads if any
     _show_recent_delivery_slip_uploads()
 
 
-def _process_delivery_slips(uploaded_files, hint_supplier: str, extract_structured: bool):
+def _process_delivery_slips(
+    uploaded_files, hint_supplier: str, extract_structured: bool
+):
     """Process uploaded delivery slip files."""
     try:
-        from warehouse.application.services.document_processing.document_processing_service import document_processing_service
+        from warehouse.application.services.document_processing.document_processing_service import (  # noqa: E501
+            document_processing_service,
+        )
 
         total_files = len(uploaded_files)
         progress_bar = st.progress(0)
@@ -953,40 +1161,37 @@ def _process_delivery_slips(uploaded_files, hint_supplier: str, extract_structur
                 file_data = uploaded_file.read()
 
                 # Prepare context
-                context = {
-                    'extract_structured_data': extract_structured
-                }
+                context = {"extract_structured_data": extract_structured}
                 if hint_supplier and hint_supplier.strip():
-                    context['hint_supplier'] = hint_supplier.strip()
+                    context["hint_supplier"] = hint_supplier.strip()
 
-                # Process delivery slip using unified document processing
-                context['document_data'] = file_data  # Add document_data for PDF storage
+                # Process delivery slip
+                context["document_data"] = file_data
                 result = document_processing_service.process_document(
                     document_data=file_data,
                     document_type="delivery",
-                    context=context
+                    context=context,
                 )
 
-                results.append({
-                    'filename': uploaded_file.name,
-                    'result': result
-                })
+                results.append({"filename": uploaded_file.name, "result": result})
 
-                if result.get('success'):
+                if result.get("success"):
                     success_count += 1
                 else:
                     error_count += 1
 
             except Exception as e:
                 error_count += 1
-                results.append({
-                    'filename': uploaded_file.name,
-                    'result': {
-                        'success': False,
-                        'error': f"Upload-Fehler: {str(e)}",
-                        'stage': 'upload'
+                results.append(
+                    {
+                        "filename": uploaded_file.name,
+                        "result": {
+                            "success": False,
+                            "error": f"Upload-Fehler: {str(e)}",
+                            "stage": "upload",
+                        },
                     }
-                })
+                )
                 logger.error(f"Error processing {uploaded_file.name}: {e}")
 
             progress_bar.progress((i + 1) / total_files)
@@ -999,50 +1204,62 @@ def _process_delivery_slips(uploaded_files, hint_supplier: str, extract_structur
         st.write("### 📊 Verarbeitungsergebnisse")
 
         if success_count > 0:
-            st.success(f"✅ {success_count} Lieferschein(e) erfolgreich verarbeitet")
+            st.success(f"✅ {success_count} Lieferschein(e) " "erfolgreich verarbeitet")
 
         if error_count > 0:
             st.error(f"❌ {error_count} Fehler aufgetreten")
 
         # Detailed results
         for result_data in results:
-            filename = result_data['filename']
-            result = result_data['result']
+            filename = result_data["filename"]
+            result = result_data["result"]
 
-            with st.expander(f"📄 {filename} - {'✅ Erfolg' if result.get('success') else '❌ Fehler'}"):
-                if result.get('success'):
+            with st.expander(
+                f"📄 {filename} - {'✅ Erfolg' if result.get('success') else '❌ Fehler'}"
+            ):
+                if result.get("success"):
                     # Success case
-                    supplier_info = result.get('supplier_detection', {})
-                    storage_info = result.get('storage', {})
+                    supplier_info = result.get("supplier_detection", {})
+                    storage_info = result.get("storage", {})
 
                     st.write("**Lieferanten-Erkennung:**")
-                    st.write(f"• Lieferant: {supplier_info.get('supplier_name', 'Unbekannt')}")
-                    st.write(f"• Confidence: {supplier_info.get('confidence', 0):.1%}")
+                    supplier = supplier_info.get("supplier_name", "Unbekannt")
+                    st.write(f"• Lieferant: {supplier}")
+                    conf = supplier_info.get("confidence", 0)
+                    st.write(f"• Confidence: {conf:.1%}")
 
-                    if supplier_info.get('delivery_number'):
-                        st.write(f"• Lieferscheinnummer: {supplier_info.get('delivery_number')}")
+                    if supplier_info.get("delivery_number"):
+                        dn = supplier_info.get("delivery_number")
+                        st.write(f"• Lieferscheinnummer: {dn}")
 
-                    if supplier_info.get('delivery_date'):
-                        st.write(f"• Lieferdatum: {supplier_info.get('delivery_date')}")
+                    if supplier_info.get("delivery_date"):
+                        dd = supplier_info.get("delivery_date")
+                        st.write(f"• Lieferdatum: {dd}")
 
                     st.write("**Speicherung:**")
-                    st.write(f"• Pfad: {storage_info.get('file_path', 'Unbekannt')}")
+                    fpath = storage_info.get("file_path", "Unbekannt")
+                    st.write(f"• Pfad: {fpath}")
 
                     # Show detected items if available
-                    detected_items = result.get('detected_items', [])
+                    detected_items = result.get("detected_items", [])
                     if detected_items:
                         st.write("**Erkannte Artikel:**")
-                        for item in detected_items[:5]:  # Show first 5 items
-                            article_num = item.get('article_number', 'Unbekannt')
-                            quantity = item.get('quantity', 'Unbekannt')
-                            description = item.get('description', '')
-                            st.write(f"• {article_num}: {quantity} ({description[:50]}...)" if len(description) > 50 else f"• {article_num}: {quantity} ({description})")
+                        for item in detected_items[:5]:
+                            article_num = item.get("article_number", "Unbekannt")
+                            quantity = item.get("quantity", "Unbekannt")
+                            desc = item.get("description", "")
+                            if len(desc) > 50:
+                                desc_str = f"{desc[:50]}..."
+                            else:
+                                desc_str = desc
+                            st.write(f"• {article_num}: " f"{quantity} ({desc_str})")
 
                         if len(detected_items) > 5:
-                            st.write(f"... und {len(detected_items) - 5} weitere Artikel")
+                            remaining = len(detected_items) - 5
+                            st.write(f"... und {remaining} " "weitere Artikel")
 
                     # Show warnings if any
-                    warnings = supplier_info.get('warnings', [])
+                    warnings = supplier_info.get("warnings", [])
                     if warnings:
                         st.write("**Warnungen:**")
                         for warning in warnings:
@@ -1050,7 +1267,8 @@ def _process_delivery_slips(uploaded_files, hint_supplier: str, extract_structur
 
                 else:
                     # Error case
-                    st.error(f"Fehler: {result.get('error', 'Unbekannter Fehler')}")
+                    err = result.get("error", "Unbekannter Fehler")
+                    st.error(f"Fehler: {err}")
                     st.write(f"Stage: {result.get('stage', 'Unbekannt')}")
 
     except Exception as e:
@@ -1061,13 +1279,15 @@ def _process_delivery_slips(uploaded_files, hint_supplier: str, extract_structur
 def _show_recent_delivery_slip_uploads():
     """Show recent delivery slip uploads from storage."""
     try:
-        from warehouse.application.services.service_registry import get_document_storage_service
+        from warehouse.application.services.service_registry import (
+            get_document_storage_service,
+        )
+
         storage_service = get_document_storage_service()
 
         st.write("### 📁 Kürzlich verarbeitete Lieferscheine")
 
-        # Get recent files (this would need to be implemented in the storage service)
-        if hasattr(storage_service, 'get_recent_delivery_slips'):
+        if hasattr(storage_service, "get_recent_delivery_slips"):
             recent_files = storage_service.get_recent_delivery_slips(limit=10)
 
             if recent_files:
@@ -1075,17 +1295,24 @@ def _show_recent_delivery_slip_uploads():
                     col1, col2, col3 = st.columns([3, 2, 1])
 
                     with col1:
-                        st.write(f"📄 {file_info.get('filename', 'Unbekannt')}")
-                        st.caption(f"Lieferant: {file_info.get('supplier_name', 'Unbekannt')}")
+                        fname = file_info.get("filename", "Unbekannt")
+                        st.write(f"📄 {fname}")
+                        sname = file_info.get("supplier_name", "Unbekannt")
+                        st.caption(f"Lieferant: {sname}")
 
                     with col2:
-                        upload_date = file_info.get('upload_date', 'Unbekannt')
+                        upload_date = file_info.get("upload_date", "Unbekannt")
                         st.write(f"📅 {upload_date}")
 
                     with col3:
-                        if st.button("📁", key=f"open_{file_info.get('id', 'unknown')}", help="Ordner öffnen"):
+                        fid = file_info.get("id", "unknown")
+                        if st.button(
+                            "📁",
+                            key=f"open_{fid}",
+                            help="Ordner öffnen",
+                        ):
                             # Open folder functionality
-                            file_path = file_info.get('file_path')
+                            file_path = file_info.get("file_path")
                             if file_path:
                                 import os
                                 import platform
@@ -1096,17 +1323,21 @@ def _show_recent_delivery_slip_uploads():
                                     if platform.system() == "Windows":
                                         os.startfile(str(folder_path))
                                     elif platform.system() == "Darwin":  # macOS
-                                        subprocess.run(["open", str(folder_path)], check=False)
+                                        subprocess.run(
+                                            ["open", str(folder_path)], check=False
+                                        )
                                     else:  # Linux
-                                        subprocess.run(["xdg-open", str(folder_path)], check=False)
+                                        subprocess.run(
+                                            ["xdg-open", str(folder_path)], check=False
+                                        )
                                     st.success("✅ Ordner geöffnet")
                                 except Exception as e:
                                     st.error(f"Fehler beim Öffnen: {e}")
             else:
                 st.info("Noch keine Lieferscheine verarbeitet")
         else:
-            st.info("Funktion für kürzlich verarbeitete Dateien wird implementiert")
+            st.info("Funktion für kürzlich verarbeitete " "Dateien wird implementiert")
 
     except Exception as e:
-        st.error(f"Fehler beim Laden der kürzlichen Uploads: {e}")
+        st.error("Fehler beim Laden der kürzlichen " f"Uploads: {e}")
         logger.error(f"Error loading recent uploads: {e}")
