@@ -72,30 +72,22 @@ def main():
 @st.cache_resource
 def get_services():
     """
-    Initialize and cache Application Services.
+    Initialize and cache Application Services via ServiceContainer.
 
-    Uses @st.cache_resource to keep service instances alive across page
-    navigations, significantly improving performance.
+    Uses @st.cache_resource + Singleton ServiceContainer to keep service
+    instances alive across page navigations and shared between Admin/User apps.
 
     Returns:
         dict: Service instances for delivery, item, supplier, order management
+              (legacy dict format for compatibility with existing code)
     """
-    logger.info("Initializing cached services...")
+    logger.info("Initializing services via ServiceContainer...")
 
-    # Lazy import - Services werden nur beim ersten Aufruf geladen
-    from warehouse.application.services import (
-        DeliveryService,
-        ItemService,
-        SupplierService,
-        OrderService,
-    )
+    # Import ServiceContainer (Singleton - shared mit User-App!)
+    from warehouse.shared.service_container import get_services_dict
 
-    return {
-        "delivery": DeliveryService(),
-        "item": ItemService(),
-        "supplier": SupplierService(),
-        "order": OrderService(),
-    }
+    # Gibt Services als Dict zurück (für Kompatibilität mit bestehendem Code)
+    return get_services_dict()
 
 
 @st.cache_resource

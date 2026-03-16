@@ -22,13 +22,27 @@ logger = logging.getLogger(__name__)
 # Cookie Manager initialisieren
 try:
     import os
+    import sys
     from streamlit_cookies_manager import EncryptedCookieManager
 
-    cookie_secret = os.getenv("COOKIE_SECRET_KEY", "medealis-default-secret-change-in-production")
+    # Erkenne welche App läuft (Admin vs User) anhand des Prozess-Arguments
+    # main_admin_app.py → Admin, main_user_app.py → User
+    app_type = "admin" if "main_admin_app" in " ".join(sys.argv) else "user"
+
+    # Separate Cookie-Secrets für Admin und User (verhindert Session-Kollisionen!)
+    cookie_secret = os.getenv(
+        f"COOKIE_SECRET_{app_type.upper()}",
+        f"medealis-{app_type}-default-secret-change-in-production"
+    )
+
+    # Separate Cookie-Prefixes: "medealis_admin_" vs "medealis_user_"
     cookies = EncryptedCookieManager(
-        prefix="medealis_",
+        prefix=f"medealis_{app_type}_",
         password=cookie_secret
     )
+
+    logger.info(f"🍪 Cookie Manager initialized for {app_type.upper()} app (prefix: medealis_{app_type}_)")
+
     if not cookies.ready():
         st.stop()
 except ImportError:

@@ -45,11 +45,16 @@ st.set_page_config(
 @st.cache_resource
 def get_application_services():
     """
-    Initialize and cache application services (Singleton).
-    This ensures services are only initialized ONCE per Streamlit server session.
+    Initialize and cache application services via ServiceContainer.
+
+    Uses @st.cache_resource + Singleton ServiceContainer to keep service
+    instances alive across page navigations and SHARED with Admin app.
+
+    Returns:
+        dict: Service instances (legacy dict format for compatibility)
     """
     try:
-        logger.info("Initializing application services (cached singleton)...")
+        logger.info("Initializing application services via ServiceContainer...")
 
         # Initialize database infrastructure
         from warehouse.application.services import initialize_system
@@ -59,22 +64,12 @@ def get_application_services():
             raise RuntimeError("System initialization failed")
         logger.info("Database infrastructure initialized successfully")
 
-        # Initialize Application Services
-        from warehouse.application.services import (
-            DeliveryService,
-            ItemService,
-            SupplierService,
-            OrderService,
-        )
+        # Import ServiceContainer (Singleton - shared mit Admin-App!)
+        from warehouse.shared.service_container import get_services_dict
 
-        services = {
-            "delivery": DeliveryService(),
-            "item": ItemService(),
-            "supplier": SupplierService(),
-            "order": OrderService(),
-        }
+        services = get_services_dict()
 
-        logger.info("Application services initialized successfully (cached)")
+        logger.info("Application services initialized successfully via ServiceContainer")
         return services
 
     except Exception as e:
