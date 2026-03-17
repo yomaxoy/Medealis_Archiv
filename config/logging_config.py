@@ -1,6 +1,11 @@
 """
 Logging-Konfiguration für das Warehouse Management System.
 Zentrale Stelle für alle Logging-Einstellungen.
+
+Features:
+- User-Context aus Streamlit Session State
+- File Rotation (10MB application.log, 5MB error.log)
+- Streamlit-safe (idempotent, delay=True)
 """
 
 import logging
@@ -8,7 +13,56 @@ import logging.handlers
 import sys
 from typing import Optional
 
-from .settings import settings
+# Import settings - funktioniert mit absolutem und relativem Import
+try:
+    from .settings import settings  # Relative import (wenn als Package importiert)
+except ImportError:
+    from settings import settings  # Absolute import (wenn config/ im Path)
+
+
+# Globaler Flag für Idempotenz (Streamlit-safe)
+_LOGGING_INITIALIZED = False
+
+
+class UserContextFilter(logging.Filter):
+    """
+    Fügt Benutzer-Info aus Streamlit Session State zu jedem Log hinzu.
+
+    Format: %(user)s wird ersetzt durch Username oder "System"
+    """
+
+    def filter(self, record):
+        """
+        Erweitert LogRecord um User-Attribut.
+
+        Args:
+            record: logging.LogRecord
+
+        Returns:
+            True (Log wird durchgelassen)
+        """
+        try:
+            # Versuche User aus Streamlit Session State zu holen
+            import streamlit as st
+
+            if hasattr(st, 'session_state') and 'current_user' in st.session_state:
+                user = st.session_state.current_user
+
+                # current_user kann dict oder string sein
+                if isinstance(user, dict):
+                    record.user = user.get('username', 'System')
+                elif isinstance(user, str):
+                    record.user = user
+                else:
+                    record.user = str(user) if user else "System"
+            else:
+                record.user = "System"
+
+        except (ImportError, RuntimeError, Exception):
+            # Außerhalb Streamlit-Context oder andere Fehler
+            record.user = "System"
+
+        return True
 
 
 class LoggerSetup:
@@ -23,6 +77,8 @@ class LoggerSetup:
         """
         Konfiguriert das Logging-System.
 
+        IDEMPOTENT: Kann mehrfach aufgerufen werden ohne Probleme (Streamlit-safe).
+
         Args:
             log_level: Log-Level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
             log_to_file: Soll in Datei geloggt werden
@@ -31,6 +87,12 @@ class LoggerSetup:
         Returns:
             Konfigurierter Root-Logger
         """
+        global _LOGGING_INITIALIZED
+
+        # Idempotenz-Check: Wenn bereits initialisiert, gib existierenden Logger zurück
+        if _LOGGING_INITIALIZED:
+            return logging.getLogger()
+
         # Log-Level bestimmen
         if log_level is None:
             log_level = settings.LOG_LEVEL
@@ -41,13 +103,17 @@ class LoggerSetup:
         root_logger = logging.getLogger()
         root_logger.setLevel(numeric_level)
 
-        # Entferne existierende Handler
+        # Entferne existierende Handler (nur beim ersten Aufruf)
         for handler in root_logger.handlers[:]:
             root_logger.removeHandler(handler)
 
-        # Formatter erstellen
+        # User-Context-Filter erstellen
+        user_filter = UserContextFilter()
+
+        # Formatter mit User-Info erstellen
         formatter = logging.Formatter(
-            fmt=settings.LOG_FORMAT, datefmt=settings.LOG_DATE_FORMAT
+            fmt="%(asctime)s - %(user)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
         )
 
         # Console Handler
@@ -55,31 +121,50 @@ class LoggerSetup:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(numeric_level)
             console_handler.setFormatter(formatter)
+            console_handler.addFilter(user_filter)
             root_logger.addHandler(console_handler)
 
         # File Handler
         if log_to_file:
+            # Stelle sicher dass LOG_DIR existiert
+            settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
+
             # Haupt-Logdatei
-            file_handler = logging.handlers.RotatingFileHandler(
-                filename=settings.LOG_DIR / "application.log",
-                maxBytes=10 * 1024 * 1024,  # 10MB
-                backupCount=5,
-                encoding="utf-8",
-            )
-            file_handler.setLevel(numeric_level)
-            file_handler.setFormatter(formatter)
-            root_logger.addHandler(file_handler)
+            try:
+                file_handler = logging.handlers.RotatingFileHandler(
+                    filename=settings.LOG_DIR / "application.log",
+                    maxBytes=10 * 1024 * 1024,  # 10MB
+                    backupCount=5,
+                    encoding="utf-8",
+                    delay=True  # Öffne Datei erst beim ersten Log (Streamlit-safe)
+                )
+                file_handler.setLevel(numeric_level)
+                file_handler.setFormatter(formatter)
+                file_handler.addFilter(user_filter)
+                root_logger.addHandler(file_handler)
+            except (PermissionError, OSError) as e:
+                # Fehler beim File-Handler nicht kritisch (z.B. Read-Only-Filesystem)
+                sys.stderr.write(f"WARNING: Could not setup application.log: {e}\n")
 
             # Error-spezifische Logdatei
-            error_handler = logging.handlers.RotatingFileHandler(
-                filename=settings.LOG_DIR / "error.log",
-                maxBytes=5 * 1024 * 1024,  # 5MB
-                backupCount=3,
-                encoding="utf-8",
-            )
-            error_handler.setLevel(logging.ERROR)
-            error_handler.setFormatter(formatter)
-            root_logger.addHandler(error_handler)
+            try:
+                error_handler = logging.handlers.RotatingFileHandler(
+                    filename=settings.LOG_DIR / "error.log",
+                    maxBytes=5 * 1024 * 1024,  # 5MB
+                    backupCount=3,
+                    encoding="utf-8",
+                    delay=True  # Öffne Datei erst beim ersten Log (Streamlit-safe)
+                )
+                error_handler.setLevel(logging.ERROR)
+                error_handler.setFormatter(formatter)
+                error_handler.addFilter(user_filter)
+                root_logger.addHandler(error_handler)
+            except (PermissionError, OSError) as e:
+                # Fehler beim File-Handler nicht kritisch
+                sys.stderr.write(f"WARNING: Could not setup error.log: {e}\n")
+
+        # Markiere als initialisiert
+        _LOGGING_INITIALIZED = True
 
         return root_logger
 

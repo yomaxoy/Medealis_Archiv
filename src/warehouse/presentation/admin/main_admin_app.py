@@ -7,11 +7,14 @@ import sys
 import os
 from pathlib import Path
 
-# Add src to path for imports
+# Add src and config to path for imports
 current_dir = Path(__file__).parent
 src_dir = current_dir.parent.parent.parent
+config_dir = src_dir.parent / "config"
 if str(src_dir) not in sys.path:
     sys.path.append(str(src_dir))
+if str(config_dir) not in sys.path:
+    sys.path.insert(0, str(config_dir))
 
 # Load .env file BEFORE anything else - ALWAYS load to ensure API keys are available
 try:
@@ -29,9 +32,16 @@ except Exception:
 import streamlit as st
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Standard Python Logger (wie alle anderen Module auch)
 logger = logging.getLogger(__name__)
+
+# Configure logging (einheitliches System mit User-Context)
+# Setup wird nur einmal pro Session ausgeführt
+# Import muss in Funktion sein, damit Path-Setup vorher läuft
+if "logging_initialized" not in st.session_state:
+    from logging_config import setup_logging  # config/ ist bereits im Path (Zeile 16)
+    setup_logging(log_to_file=True, log_to_console=True)
+    st.session_state.logging_initialized = True
 
 # Application configuration
 st.set_page_config(
