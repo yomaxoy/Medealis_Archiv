@@ -12,6 +12,7 @@ class BatchNumber:
     Unterstützte Formate:
     - Primec: P-XXXXXXXXXXXX-XXXX (z.B. P-293520240528-1234)
     - Terrats Medical: 6-stellige Ziffern (z.B. 123456)
+    - Fleima: xxFL + 6-8 Ziffern (z.B. 26FL007400)
     - Standard: Buchstabe + Zahlen (z.B. B123456, CH789)
     """
 
@@ -29,7 +30,8 @@ class BatchNumber:
         if not self._is_valid_format():
             raise ValueError(
                 f"Ungültiges Chargennummern-Format: '{self.value}'. "
-                "Erlaubt: Primec (P-XXXXXXXXXXXX-XXXX), Terrats (6 Ziffern), Standard (Buchstabe+Zahlen)"
+                "Erlaubt: Primec (P-XXXXXXXXXXXX-XXXX), Terrats (6 Ziffern), "
+                "Fleima (xxFL + 7-8 Ziffern), Standard (Buchstabe+Zahlen)"
             )
 
     def _is_valid_format(self) -> bool:
@@ -52,29 +54,40 @@ class BatchNumber:
         if re.match(r'^\d{6}$', self.value):
             return True
 
-        # Format 3: Standard - Buchstabe + Zahlen (mindestens 5 Zeichen)
+        # Format 3: Fleima - 2 Ziffern + FL + 6-8 Ziffern
+        if re.match(r'^\d{2}FL\d{6,8}$', self.value):
+            return True
+
+        # Format 4: Standard - Buchstabe + Zahlen (mindestens 5 Zeichen)
         if len(self.value) >= 5:
             if self.value[0].isalpha() and any(c.isdigit() for c in self.value):
                 return True
 
-        # Format 4: Nur Zahlen mit 6+ Stellen (flexibler Fallback)
+        # Format 5: Nur Zahlen mit 6+ Stellen (flexibler Fallback)
         if self.value.isdigit() and len(self.value) >= 6:
             return True
 
         return False
 
     def is_complete_format(self) -> bool:
-        """Prüft ob die Chargennummer das vollständige P-XXXXXXXXXXXX-XXXX Format hat"""
-        if not self.value.startswith("P-"):
-            return False
+        """Prüft ob die Chargennummer ein vollständiges Format hat."""
+        # Primec: P-XXXXXXXXXXXX-XXXX
+        if self.value.startswith("P-"):
+            parts = self.value.split("-")
+            if len(parts) != 3:
+                return False
+            return (len(parts[1]) == 12 and parts[1].isdigit() and
+                    len(parts[2]) in [4, 5] and parts[2].isdigit())
 
-        parts = self.value.split("-")
-        if len(parts) != 3:
-            return False
+        # Terrats: 6 Ziffern
+        if re.match(r'^\d{6}$', self.value):
+            return True
 
-        # Prüfe Format
-        return (len(parts[1]) == 12 and parts[1].isdigit() and
-                len(parts[2]) in [4, 5] and parts[2].isdigit())
+        # Fleima: 2 Ziffern + FL + 6-8 Ziffern
+        if re.match(r'^\d{2}FL\d{6,8}$', self.value):
+            return True
+
+        return False
 
     def needs_completion(self) -> bool:
         """Prüft ob die Chargennummer noch vervollständigt werden muss"""
@@ -94,6 +107,10 @@ class BatchNumber:
         # Primec Pattern - P-Format
         if self.value.startswith("P-"):
             return "Primec"
+
+        # Fleima Pattern - xxFL...
+        if re.match(r'^\d{2}FL', self.value):
+            return "Fleima"
 
         return "Unknown"
 

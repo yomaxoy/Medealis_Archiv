@@ -9,6 +9,7 @@ Spezifische Validatoren für die verschiedenen Popups.
 from typing import Dict, Any
 from .validation_result import ValidationResult
 from .field_validators import FieldValidator
+from ..value_objects.supplier_batch_formats import get_pattern, get_format_description
 
 
 class ItemInfoValidator:
@@ -117,10 +118,7 @@ class DataConfirmationValidator:
     - OrderNo (Str)
     """
 
-    # Regex-Patterns für Lot-Nummern
-    # PRIMEC: Erlaubt P-xxxxxxxxxxxx, P-xxxxxxxxxxxx-xxxx, P-xxxxxxxxxxxx-xxxxx
-    PRIMEC_LOT_PATTERN = r"^P-\d{12}(-\d{4,5})?$"
-    TERRATS_LOT_PATTERN = r"^.+$"  # Beliebiger String
+    # Lot-Patterns werden zentral aus supplier_batch_formats bezogen
 
     @staticmethod
     def validate(data: Dict[str, Any], supplier_id: str) -> ValidationResult:
@@ -169,28 +167,22 @@ class DataConfirmationValidator:
 
         # Format-Validierung abhängig von Lieferant
         if batch_number:
-            if supplier_id == "PRIMEC":
+            pattern = get_pattern(supplier_id)
+            if pattern:
+                format_desc = get_format_description(supplier_id)
                 lot_msg = (
-                    "Format muss P-xxxxxxxxxxxx, "
-                    "P-xxxxxxxxxxxx-xxxx oder "
-                    "P-xxxxxxxxxxxx-xxxxx sein "
-                    "(z.B. P-123456789012, "
-                    "P-123456789012-1234 oder "
-                    "P-123456789012-12345)"
+                    f"Lot-Nummer entspricht nicht dem "
+                    f"erwarteten Format: {format_desc}"
                 )
                 lot_result = FieldValidator.validate_regex(
                     batch_number,
                     "batch_number",
-                    DataConfirmationValidator.PRIMEC_LOT_PATTERN,
+                    pattern,
                     lot_msg,
                     "Lot-Nummer",
                 )
                 result.merge(lot_result)
-            elif supplier_id == "TERRATS":
-                # Beliebiger String erlaubt, aber
-                # nicht leer (already checked)
-                pass
-            else:
+            elif supplier_id:
                 # Unbekannter Lieferant - Warning
                 result.add_warning(
                     f"Unbekannter Lieferant "
