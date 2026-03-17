@@ -481,6 +481,17 @@ class DocumentCheckPopup(InspectionPopup):
                 )
 
                 # Generate PDB document with certificate data (DOCX + PDF + SharePoint Upload) (ADMIN STYLE)  # noqa: E501
+                # Neue robuste Implementierung mit DocumentOperationResult
+                from pathlib import Path
+                from warehouse.application.services.document_storage.document_storage_service import (
+                    DocumentOperationResult,
+                    StorageResult,
+                )
+
+                operation_result = DocumentOperationResult(
+                    operation_type="Dokumentenprüfung (PDB)"
+                )
+
                 pdb_result = generation_service.generate_document(
                     document_type="pdb",
                     batch_number=batch_number,
@@ -493,16 +504,28 @@ class DocumentCheckPopup(InspectionPopup):
                 )
 
                 if pdb_result.success:
-                    st.success(
-                        "✅ **PDB erfolgreich erstellt mit Zertifikatsinformationen**"
+                    # DOCX
+                    storage_result = StorageResult(
+                        success=True,
+                        file_path=str(pdb_result.document_path) if pdb_result.document_path else None,
+                        filename=Path(pdb_result.document_path).name if pdb_result.document_path else None,
+                        storage_folder=str(Path(pdb_result.document_path).parent) if pdb_result.document_path else None,
+                        document_type="PDB (DOCX)",
                     )
-                    st.write(f"📄 DOCX-Pfad: {pdb_result.document_path}")
+                    operation_result.add_document(storage_result)
 
-                    # Show PDF info if generated
+                    # PDF (falls vorhanden)
                     if hasattr(pdb_result, "pdf_path") and pdb_result.pdf_path:
-                        st.write(f"📄 PDF-Pfad: {pdb_result.pdf_path}")
+                        pdf_storage = StorageResult(
+                            success=True,
+                            file_path=str(pdb_result.pdf_path),
+                            filename=Path(pdb_result.pdf_path).name,
+                            storage_folder=str(Path(pdb_result.pdf_path).parent),
+                            document_type="PDB (PDF)",
+                        )
+                        operation_result.add_document(pdf_storage)
                 else:
-                    st.error(f"❌ PDB-Erstellung fehlgeschlagen: {pdb_result.error}")
+                    operation_result.add_error(f"PDB-Erstellung fehlgeschlagen: {pdb_result.error}")
 
             except Exception as e:
                 logger.error(f"Error generating PDB: {e}")
@@ -579,6 +602,13 @@ class DocumentCheckPopup(InspectionPopup):
                 logger.error(f"🔥 WORKFLOW ERROR Traceback: {traceback.format_exc()}")
                 st.error(f"❌ Fehler beim Abschließen der Dokumentenprüfung: {e}")
                 return
+
+            # Zeige Bestätigungs-Popup mit allen erstellten Dokumenten
+            if operation_result.has_documents() or operation_result.errors:
+                from warehouse.presentation.shared.popups.document_confirmation import (
+                    show_document_confirmation_popup,
+                )
+                show_document_confirmation_popup(operation_result)
 
             st.success("🎉 **Dokumentenprüfung erfolgreich bestätigt!**")
             st.rerun()

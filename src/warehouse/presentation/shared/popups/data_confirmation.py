@@ -10,6 +10,7 @@ Version: 2.0.0 - Shared Implementation
 
 import streamlit as st
 import logging
+from pathlib import Path
 from typing import Dict, Any, Optional
 from warehouse.presentation.shared.inspection_popup import InspectionPopup
 from warehouse.presentation.shared.components import (
@@ -660,10 +661,22 @@ class DataConfirmationPopup(InspectionPopup):
 
             # 5. Generate documents (Begleitschein, Wareneingangskontrolle, Barcode)
             st.info("📄 **Automatische" " Dokument-Erstellung laeuft...**")
+
+            # Neue robuste Dokumentenerstellung mit DocumentOperationResult
+            from warehouse.application.services.document_storage.document_storage_service import (
+                DocumentOperationResult,
+                StorageResult,
+            )
+            from warehouse.presentation.shared.popups.document_confirmation import (
+                show_document_confirmation_popup,
+            )
+
+            operation_result = DocumentOperationResult(
+                operation_type="Datenbestätigung"
+            )
+
             try:
                 generation_service = DocumentGenerationService()
-                documents_created = []
-                generation_errors = []
 
                 # Generate Begleitschein
                 try:
@@ -681,17 +694,19 @@ class DataConfirmationPopup(InspectionPopup):
                         },
                     )
                     if begleitschein_result.success:
-                        documents_created.append("Begleitschein")
-                        st.write(
-                            "  ✅ Begleitschein:"
-                            f" {begleitschein_result.document_path}"
+                        storage_result = StorageResult(
+                            success=True,
+                            file_path=begleitschein_result.document_path,
+                            filename=Path(begleitschein_result.document_path).name if begleitschein_result.document_path else None,
+                            storage_folder=Path(begleitschein_result.document_path).parent.as_posix() if begleitschein_result.document_path else None,
+                            document_type="Begleitschein",
                         )
+                        operation_result.add_document(storage_result)
                     else:
-                        generation_errors.append(
-                            "Begleitschein:" f" {begleitschein_result.error}"
-                        )
+                        operation_result.add_error(f"Begleitschein: {begleitschein_result.error}")
                 except Exception as e:
-                    generation_errors.append(f"Begleitschein Fehler: {e}")
+                    operation_result.add_error(f"Begleitschein Fehler: {e}")
+                    logger.exception("Begleitschein generation failed")
 
                 # Generate Wareneingangskontrolle
                 try:
@@ -705,22 +720,22 @@ class DataConfirmationPopup(InspectionPopup):
                         employee_name=employee_name,
                         additional_data={
                             "we_date": datetime.now().strftime("%d.%m.%Y"),
-                            # artikel und charge werden auto
-                            # aus generation_models generiert
                         },
                     )
                     if wareneingang_result.success:
-                        documents_created.append("Wareneingangskontrolle")
-                        st.write(
-                            "  ✅ Wareneingangskontrolle:"
-                            f" {wareneingang_result.document_path}"
+                        storage_result = StorageResult(
+                            success=True,
+                            file_path=wareneingang_result.document_path,
+                            filename=Path(wareneingang_result.document_path).name if wareneingang_result.document_path else None,
+                            storage_folder=Path(wareneingang_result.document_path).parent.as_posix() if wareneingang_result.document_path else None,
+                            document_type="Wareneingangskontrolle",
                         )
+                        operation_result.add_document(storage_result)
                     else:
-                        generation_errors.append(
-                            "Wareneingangskontrolle:" f" {wareneingang_result.error}"
-                        )
+                        operation_result.add_error(f"Wareneingangskontrolle: {wareneingang_result.error}")
                 except Exception as e:
-                    generation_errors.append("Wareneingangskontrolle" f" Fehler: {e}")
+                    operation_result.add_error(f"Wareneingangskontrolle Fehler: {e}")
+                    logger.exception("Wareneingangskontrolle generation failed")
 
                 # Generate Barcode/Label
                 try:
@@ -740,33 +755,23 @@ class DataConfirmationPopup(InspectionPopup):
                         },
                     )
                     if barcode_result.success:
-                        documents_created.append("Barcode/Label")
-                        st.write(
-                            "  ✅ Barcode/Label:" f" {barcode_result.document_path}"
+                        storage_result = StorageResult(
+                            success=True,
+                            file_path=barcode_result.document_path,
+                            filename=Path(barcode_result.document_path).name if barcode_result.document_path else None,
+                            storage_folder=Path(barcode_result.document_path).parent.as_posix() if barcode_result.document_path else None,
+                            document_type="Barcode/Label",
                         )
+                        operation_result.add_document(storage_result)
                     else:
-                        generation_errors.append(
-                            f"Barcode/Label: {barcode_result.error}"
-                        )
+                        operation_result.add_error(f"Barcode/Label: {barcode_result.error}")
                 except Exception as e:
-                    generation_errors.append(f"Barcode/Label Fehler: {e}")
-
-                # Show summary
-                if documents_created:
-                    docs_str = ", ".join(documents_created)
-                    st.success(
-                        f"📄 {len(documents_created)}"
-                        " Dokument(e) erstellt:"
-                        f" {docs_str}"
-                    )
-                if generation_errors:
-                    for error in generation_errors:
-                        st.warning(f"⚠️ {error}")
+                    operation_result.add_error(f"Barcode/Label Fehler: {e}")
+                    logger.exception("Barcode generation failed")
 
             except Exception as e:
-                st.warning(
-                    "⚠️ Dokument-Generierung" " teilweise fehlgeschlagen:" f" {e}"
-                )
+                operation_result.add_error(f"Dokument-Generierung fehlgeschlagen: {e}")
+                logger.exception("Document generation failed")
 
             logger.info(
                 "Datenbestaetigung abgeschlossen"
@@ -777,6 +782,14 @@ class DataConfirmationPopup(InspectionPopup):
             # Cleanup: Alle Form-Keys bereinigen damit der naechste Dialog
             # frische Werte bekommt (verhindert stale data in PDFs)
             _cleanup_form_session_state()
+
+            # WICHTIG: Zeige Bestätigungs-Popup mit allen erstellten Dokumenten
+            # Dies gibt dem Nutzer volle Transparenz und verhindert Unsicherheit
+            if operation_result.has_documents() or operation_result.errors:
+                show_document_confirmation_popup(operation_result)
+            else:
+                # Fallback falls keine Dokumente erstellt wurden
+                st.warning("⚠️ Keine Dokumente erstellt.")
 
             # Erfolgs-Toast anzeigen (überlebt den Rerun)
             st.toast("🎉 Datenbestätigung abgeschlossen!", icon="✅")

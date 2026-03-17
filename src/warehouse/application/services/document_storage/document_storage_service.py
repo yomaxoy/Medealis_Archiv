@@ -55,6 +55,95 @@ class StorageResult:
             self.metadata = {}
 
 
+@dataclass
+class DocumentOperationResult:
+    """
+    Aggregiert-Ergebnis für Multi-Dokument-Operationen.
+
+    Sammelt alle StorageResults einer Operation (z.B. PDF + Barcode + Lieferschein).
+    Basis für das Document Confirmation Popup.
+
+    Usage:
+        result = DocumentOperationResult()
+        result.add_document(storage_result1)
+        result.add_document(storage_result2)
+
+        if result.has_documents():
+            show_document_confirmation_popup(result)
+    """
+
+    documents: List[StorageResult] = None
+    errors: List[str] = None
+    warnings: List[str] = None
+    operation_type: Optional[str] = None  # z.B. "Wareneingang", "Prüfung"
+    timestamp: datetime = None
+
+    def __post_init__(self):
+        if self.documents is None:
+            self.documents = []
+        if self.errors is None:
+            self.errors = []
+        if self.warnings is None:
+            self.warnings = []
+        if self.timestamp is None:
+            self.timestamp = datetime.now()
+
+    def add_document(self, storage_result: StorageResult) -> None:
+        """Fügt ein StorageResult hinzu."""
+        self.documents.append(storage_result)
+
+        # Sammle Warnungen/Fehler
+        if storage_result.warnings:
+            self.warnings.extend(storage_result.warnings)
+        if storage_result.error:
+            self.errors.append(storage_result.error)
+
+    def add_error(self, error: str) -> None:
+        """Fügt einen Operation-Level Fehler hinzu."""
+        self.errors.append(error)
+
+    def add_warning(self, warning: str) -> None:
+        """Fügt eine Operation-Level Warnung hinzu."""
+        self.warnings.append(warning)
+
+    @property
+    def success(self) -> bool:
+        """Operation erfolgreich wenn mind. 1 Dokument und keine Fehler."""
+        return len(self.documents) > 0 and len(self.errors) == 0
+
+    @property
+    def partial_success(self) -> bool:
+        """Partial Success: Mind. 1 Dokument, aber auch Fehler."""
+        return len(self.documents) > 0 and len(self.errors) > 0
+
+    def has_documents(self) -> bool:
+        """True wenn mind. 1 Dokument erfolgreich erstellt wurde."""
+        return len(self.documents) > 0
+
+    def get_documents_by_location(self) -> Dict[str, List[StorageResult]]:
+        """
+        Gruppiert Dokumente nach Speicherort.
+
+        Returns:
+            Dict mit Keys: 'server', 'local', 'sharepoint'
+        """
+        grouped = {
+            'server': [],
+            'local': [],
+            'sharepoint': []
+        }
+
+        for doc in self.documents:
+            if doc.sharepoint_url:
+                grouped['sharepoint'].append(doc)
+            elif doc.storage_folder and '\\\\medealis-server\\' in doc.storage_folder:
+                grouped['server'].append(doc)
+            else:
+                grouped['local'].append(doc)
+
+        return grouped
+
+
 class DocumentStorageService:
     """
     ZENTRALER Service für alle Dokument-Speicher-Operationen.

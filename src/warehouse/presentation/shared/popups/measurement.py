@@ -204,12 +204,18 @@ class MeasurementPopup(InspectionPopup):
                 return  # Stop execution
 
             # 1. Save uploaded measurement protocols
+            # Neue robuste Implementierung mit DocumentOperationResult
+            from warehouse.application.services.document_storage.document_storage_service import (
+                DocumentOperationResult,
+            )
+
+            operation_result = DocumentOperationResult(
+                operation_type="Vermessungsprüfung"
+            )
+
             if uploaded_docs:
                 try:
                     storage_service = DocumentStorageService()
-                    successful_saves = []
-                    failed_saves = []
-
                     st.write("💾 Speichere Vermessungsprotokolle...")
 
                     for uploaded_file in uploaded_docs:
@@ -230,33 +236,21 @@ class MeasurementPopup(InspectionPopup):
                             )
 
                             if save_result.success:
-                                successful_saves.append(uploaded_file.name)
-                                st.info(
-                                    f"✅ {uploaded_file.name} → {save_result.file_path}"
-                                )
+                                operation_result.add_document(save_result)
                             else:
-                                failed_saves.append(
+                                operation_result.add_error(
                                     f"{uploaded_file.name}: {save_result.error}"
                                 )
 
                         except Exception as file_error:
-                            failed_saves.append(
+                            operation_result.add_error(
                                 f"{uploaded_file.name}: {str(file_error)}"
                             )
-
-                    if successful_saves:
-                        st.success(
-                            f"✅ {len(successful_saves)} Vermessungsprotokoll{'e' if len(successful_saves) > 1 else ''} gespeichert!"
-                        )
-
-                    if failed_saves:
-                        st.error(f"❌ Fehler beim Speichern einiger Dateien:")
-                        for fail in failed_saves:
-                            st.error(f"  • {fail}")
+                            logger.exception(f"Error processing {uploaded_file.name}")
 
                 except Exception as e:
-                    logger.error(f"Error saving measurement protocols: {e}")
-                    st.warning(f"⚠️ Fehler beim Speichern der Protokolle: {e}")
+                    logger.exception("Error saving measurement protocols")
+                    operation_result.add_error(f"Fehler beim Speichern der Protokolle: {e}")
 
             # 2. Save measurement to database
             if measurement_performed:  # Now boolean
@@ -303,6 +297,13 @@ class MeasurementPopup(InspectionPopup):
 
             else:
                 st.info("ℹ️ Vermessung nicht durchgeführt - Status bleibt unverändert")
+
+            # Zeige Bestätigungs-Popup mit allen gespeicherten Dokumenten
+            if operation_result.has_documents() or operation_result.errors:
+                from warehouse.presentation.shared.popups.document_confirmation import (
+                    show_document_confirmation_popup,
+                )
+                show_document_confirmation_popup(operation_result)
 
             st.success("🎉 **Vermessung erfolgreich bestätigt!**")
             st.rerun()

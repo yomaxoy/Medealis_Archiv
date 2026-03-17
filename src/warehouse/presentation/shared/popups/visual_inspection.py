@@ -195,7 +195,7 @@ class VisualInspectionPopup(InspectionPopup):
                 return
 
             # Generiere Dokument
-            self._generate_inspection_document(
+            operation_result = self._generate_inspection_document(
                 waste_quantity, quality_notes, inspector_name
             )
 
@@ -209,6 +209,13 @@ class VisualInspectionPopup(InspectionPopup):
                 passed=True,  # Bei handle_confirm_action ist die Prüfung bestanden
                 notes=quality_notes if quality_notes else "Keine Mängel",
             )
+
+            # Zeige Bestätigungs-Popup
+            if operation_result.has_documents() or operation_result.errors:
+                from warehouse.presentation.shared.popups.document_confirmation import (
+                    show_document_confirmation_popup,
+                )
+                show_document_confirmation_popup(operation_result)
 
             # Erfolg
             self.show_success(
@@ -275,7 +282,7 @@ class VisualInspectionPopup(InspectionPopup):
                         return
 
                     # Generiere Rejection-Dokument
-                    self._generate_inspection_document(
+                    operation_result = self._generate_inspection_document(
                         waste_quantity=self.quantity,  # 100% Ausschuss
                         quality_notes=quality_notes,
                         inspector_name=inspector_name,
@@ -292,6 +299,13 @@ class VisualInspectionPopup(InspectionPopup):
                         passed=False,  # Bei Zurückweisung ist die Prüfung nicht bestanden
                         notes=f"ZURÜCKGEWIESEN: {quality_notes}",
                     )
+
+                    # Zeige Bestätigungs-Popup
+                    if operation_result.has_documents() or operation_result.errors:
+                        from warehouse.presentation.shared.popups.document_confirmation import (
+                            show_document_confirmation_popup,
+                        )
+                        show_document_confirmation_popup(operation_result)
 
                     self.show_error("❌ Artikel wurde zurückgewiesen!")
                     self.cleanup_session_state()
@@ -311,14 +325,28 @@ class VisualInspectionPopup(InspectionPopup):
         quality_notes: str,
         inspector_name: str,
         is_rejection: bool = False,
-    ) -> None:
-        """Generiert Sichtkontrolle-Dokument."""
-        try:
-            from warehouse.application.services.document_generation import (
-                DocumentGenerationService,
-                DocumentType,
-            )
+    ) -> "DocumentOperationResult":
+        """
+        Generiert Sichtkontrolle-Dokument.
 
+        Returns:
+            DocumentOperationResult mit allen erstellten Dokumenten
+        """
+        from pathlib import Path
+        from warehouse.application.services.document_generation import (
+            DocumentGenerationService,
+            DocumentType,
+        )
+        from warehouse.application.services.document_storage.document_storage_service import (
+            DocumentOperationResult,
+            StorageResult,
+        )
+
+        operation_result = DocumentOperationResult(
+            operation_type="Sichtkontrolle" if not is_rejection else "Zurückweisung"
+        )
+
+        try:
             with st.spinner("📋 Erstelle Sichtkontrolle-Dokument..."):
                 doc_service = DocumentGenerationService()
 
@@ -358,27 +386,41 @@ class VisualInspectionPopup(InspectionPopup):
                 )
 
                 if result.success:
-                    self.show_success("📋 Sichtkontrolle-Dokument erfolgreich erstellt!")
-                    st.info(f"📄 DOCX: {result.document_path.name}")
-
-                    if hasattr(result, "pdf_path") and result.pdf_path:
-                        st.info(f"📄 PDF: {result.pdf_path.name}")
-
-                    # Zeige Zertifikat-Zusammenfassung
-                    if waste_quantity > 0:
-                        st.info(
-                            f"📊 Ausschuss dokumentiert: {waste_quantity} Stück ({ausschussquote})"
-                        )
-
-                else:
-                    st.warning(
-                        f"⚠️ Dokumentenerstellung fehlgeschlagen: {result.error}"
+                    # DOCX
+                    storage_result = StorageResult(
+                        success=True,
+                        file_path=str(result.document_path) if result.document_path else None,
+                        filename=result.document_path.name if result.document_path else None,
+                        storage_folder=str(result.document_path.parent) if result.document_path else None,
+                        document_type="Sichtkontrolle (DOCX)",
                     )
+                    operation_result.add_document(storage_result)
+
+                    # PDF (falls vorhanden)
+                    if hasattr(result, "pdf_path") and result.pdf_path:
+                        pdf_storage = StorageResult(
+                            success=True,
+                            file_path=str(result.pdf_path),
+                            filename=Path(result.pdf_path).name,
+                            storage_folder=str(Path(result.pdf_path).parent),
+                            document_type="Sichtkontrolle (PDF)",
+                        )
+                        operation_result.add_document(pdf_storage)
+
+                    # Zusätzliche Info bei Ausschuss
+                    if waste_quantity > 0:
+                        operation_result.add_warning(
+                            f"Ausschuss dokumentiert: {waste_quantity} Stück ({ausschussquote})"
+                        )
+                else:
+                    operation_result.add_error(f"Dokumentenerstellung fehlgeschlagen: {result.error}")
                     logger.error(f"Document generation failed: {result.error}")
 
         except Exception as e:
-            logger.error(f"Document generation error: {e}", exc_info=True)
-            st.warning(f"⚠️ Fehler bei Dokumentenerstellung: {e}")
+            logger.exception("Document generation error")
+            operation_result.add_error(f"Fehler bei Dokumentenerstellung: {e}")
+
+        return operation_result
 
     def render(self):
         """Override render für Custom Action Handling."""
