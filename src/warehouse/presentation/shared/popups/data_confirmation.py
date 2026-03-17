@@ -669,7 +669,8 @@ class DataConfirmationPopup(InspectionPopup):
             )
 
             operation_result = DocumentOperationResult(
-                operation_type="Datenbestätigung"
+                operation_type="Datenbestätigung",
+                auto_open=True,  # Dokumente zur Kontrolle öffnen
             )
 
             try:

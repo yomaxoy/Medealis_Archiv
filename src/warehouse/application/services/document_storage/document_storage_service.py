@@ -63,8 +63,12 @@ class DocumentOperationResult:
     Sammelt alle StorageResults einer Operation (z.B. PDF + Barcode + Lieferschein).
     Basis für das Document Confirmation Popup.
 
+    Attributes:
+        auto_open: Wenn True, werden Dokumente automatisch geöffnet nach User-Bestätigung
+        trusted: Wenn True, können Dokumente ohne User-Oversight erstellt werden (Zukunft)
+
     Usage:
-        result = DocumentOperationResult()
+        result = DocumentOperationResult(auto_open=True)
         result.add_document(storage_result1)
         result.add_document(storage_result2)
 
@@ -77,6 +81,8 @@ class DocumentOperationResult:
     warnings: List[str] = None
     operation_type: Optional[str] = None  # z.B. "Wareneingang", "Prüfung"
     timestamp: datetime = None
+    auto_open: bool = True  # Auto-open Dokumente nach Bestätigung
+    trusted: bool = False   # Für Zukunft: Bypass confirmation wenn trusted
 
     def __post_init__(self):
         if self.documents is None:

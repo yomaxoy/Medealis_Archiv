@@ -489,7 +489,8 @@ class DocumentCheckPopup(InspectionPopup):
                 )
 
                 operation_result = DocumentOperationResult(
-                    operation_type="Dokumentenprüfung (PDB)"
+                    operation_type="Dokumentenprüfung (PDB)",
+                    auto_open=True,  # Dokumente zur Kontrolle öffnen
                 )
 
                 pdb_result = generation_service.generate_document(

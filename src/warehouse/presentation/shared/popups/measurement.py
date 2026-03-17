@@ -210,7 +210,8 @@ class MeasurementPopup(InspectionPopup):
             )
 
             operation_result = DocumentOperationResult(
-                operation_type="Vermessungsprüfung"
+                operation_type="Vermessungsprüfung",
+                auto_open=True,  # Dokumente zur Kontrolle öffnen
             )
 
             if uploaded_docs:

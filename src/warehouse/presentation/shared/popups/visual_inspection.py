@@ -337,7 +337,8 @@ class VisualInspectionPopup(InspectionPopup):
         )
 
         operation_result = DocumentOperationResult(
-            operation_type="Sichtkontrolle" if not is_rejection else "Zurückweisung"
+            operation_type="Sichtkontrolle" if not is_rejection else "Zurückweisung",
+            auto_open=True,  # Dokumente zur Kontrolle öffnen
         )
 
         try:

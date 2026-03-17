@@ -30,6 +30,44 @@ from warehouse.presentation.shared.popup_styles import COMPACT_POPUP_CSS
 logger = logging.getLogger(__name__)
 
 
+def _auto_open_all_documents(result: DocumentOperationResult) -> None:
+    """
+    Öffnet alle Dokumente automatisch mit DocumentOpeningService.
+
+    Nutzt den zentralen DocumentOpeningService für einheitliches Handling
+    aller Dateitypen (DOCX, PDF, PNG, etc.).
+
+    Args:
+        result: DocumentOperationResult mit allen zu öffnenden Dokumenten
+    """
+    try:
+        from warehouse.application.services.document_operations.document_opening_service import (
+            document_opening_service,
+        )
+
+        opened_count = 0
+        for doc in result.documents:
+            # Überspringe PDF-Dateien beim Auto-Open (nur DOCX öffnen)
+            if doc.document_type and "(PDF)" in doc.document_type:
+                logger.debug(f"Skipping PDF auto-open: {doc.filename}")
+                continue
+
+            if doc.file_path and Path(doc.file_path).exists():
+                try:
+                    document_opening_service.open_document(doc.file_path)
+                    opened_count += 1
+                    logger.info(f"Auto-opened document: {doc.filename}")
+                except Exception as e:
+                    logger.warning(f"Failed to auto-open {doc.filename}: {e}")
+
+        if opened_count > 0:
+            logger.info(f"Auto-opened {opened_count} document(s)")
+
+    except Exception as e:
+        logger.error(f"Error in auto-open: {e}")
+        # Non-critical - don't break the flow
+
+
 def _open_file_explorer(file_path: str) -> None:
     """
     Öffnet den Datei-Explorer und markiert die Datei.
@@ -211,6 +249,10 @@ def show_document_confirmation_popup(result: DocumentOperationResult) -> None:
     # Footer: Timestamp
     st.caption(f"🕒 Erstellt am {result.timestamp.strftime('%d.%m.%Y um %H:%M:%S')}")
 
-    # Close Button
+    # Close Button mit Auto-Open
     if st.button("✅ Schließen", use_container_width=True, type="primary"):
+        # Auto-open alle Dokumente vor dem Schließen (falls aktiviert)
+        if result.auto_open and result.has_documents():
+            _auto_open_all_documents(result)
+
         st.rerun()
