@@ -399,7 +399,7 @@ class BarcodeGenerator:
             lower_half_height = usable_height - upper_half_height
 
             # UPPER HALF: Left side (Article + Storage) + Right side (QR Code)
-            upper_y_start = padding_top + 20
+            upper_y_start = padding_top
 
             # Calculate space for QR code on the right (about 1/3 of width)
             qr_section_width = usable_width // 3
@@ -417,7 +417,7 @@ class BarcodeGenerator:
             )
             # Storage location below header - BOLD
             if storage_location and storage_location.strip():
-                storage_y = upper_y_start + 40
+                storage_y = upper_y_start + 90  # Erhöhter Abstand
                 draw.text(
                     (margin_left, storage_y),
                     storage_location.strip(),
@@ -426,7 +426,7 @@ class BarcodeGenerator:
                 )
             else:
                 # Draw empty field for manual writing if no storage location
-                storage_y = upper_y_start + 40
+                storage_y = upper_y_start + 90  # Erhöhter Abstand
                 # Draw line for manual writing
                 line_end_x = margin_left + text_section_width - 20
                 draw.line(
@@ -436,8 +436,8 @@ class BarcodeGenerator:
                 )
 
             # ROW 2: Article Number (UNTEN - getauscht mit Lagernummer)
-            # Kleiner Zeilenabstand zwischen Lagernummer und Artikelnummer
-            article_header_y = storage_y + 150  # Space below storage location
+            # Reduzierter Zeilenabstand zwischen Lagernummer und Artikelnummer
+            article_header_y = storage_y + 110  # Weiter reduzierter Abstand
             # Header text "Artikelnummer:"
             draw.text(
                 (margin_left, article_header_y),
@@ -446,7 +446,7 @@ class BarcodeGenerator:
                 font=bold_font_medium,
             )
             # Article number below header - BOLD
-            article_y = article_header_y + 40
+            article_y = article_header_y + 90  # Erhöhter Abstand
             draw.text(
                 (margin_left, article_y),
                 article_number,
