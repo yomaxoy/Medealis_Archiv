@@ -185,6 +185,17 @@ def initialize_session_state():
 
 def render_admin_interface():
     """Render the main admin interface."""
+    # Check for pending document confirmation popup (deferred dialog pattern)
+    if "pending_doc_confirmation" in st.session_state:
+        from warehouse.presentation.shared.popups.document_confirmation import (
+            show_document_confirmation_popup,
+        )
+
+        result = st.session_state.pop("pending_doc_confirmation")
+        show_document_confirmation_popup(result)
+        # Return early - popup is now open, rest of page will render after rerun
+        return
+
     # Sidebar navigation
     render_admin_sidebar()
 

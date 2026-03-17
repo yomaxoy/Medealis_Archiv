@@ -603,12 +603,9 @@ class DocumentCheckPopup(InspectionPopup):
                 st.error(f"❌ Fehler beim Abschließen der Dokumentenprüfung: {e}")
                 return
 
-            # Zeige Bestätigungs-Popup mit allen erstellten Dokumenten
+            # Speichere Result in Session State für Deferred Dialog
             if operation_result.has_documents() or operation_result.errors:
-                from warehouse.presentation.shared.popups.document_confirmation import (
-                    show_document_confirmation_popup,
-                )
-                show_document_confirmation_popup(operation_result)
+                st.session_state["pending_doc_confirmation"] = operation_result
 
             st.success("🎉 **Dokumentenprüfung erfolgreich bestätigt!**")
             st.rerun()

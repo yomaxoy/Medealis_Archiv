@@ -210,12 +210,9 @@ class VisualInspectionPopup(InspectionPopup):
                 notes=quality_notes if quality_notes else "Keine Mängel",
             )
 
-            # Zeige Bestätigungs-Popup
+            # Speichere Result in Session State für Deferred Dialog
             if operation_result.has_documents() or operation_result.errors:
-                from warehouse.presentation.shared.popups.document_confirmation import (
-                    show_document_confirmation_popup,
-                )
-                show_document_confirmation_popup(operation_result)
+                st.session_state["pending_doc_confirmation"] = operation_result
 
             # Erfolg
             self.show_success(
@@ -300,12 +297,9 @@ class VisualInspectionPopup(InspectionPopup):
                         notes=f"ZURÜCKGEWIESEN: {quality_notes}",
                     )
 
-                    # Zeige Bestätigungs-Popup
+                    # Speichere Result in Session State für Deferred Dialog
                     if operation_result.has_documents() or operation_result.errors:
-                        from warehouse.presentation.shared.popups.document_confirmation import (
-                            show_document_confirmation_popup,
-                        )
-                        show_document_confirmation_popup(operation_result)
+                        st.session_state["pending_doc_confirmation"] = operation_result
 
                     self.show_error("❌ Artikel wurde zurückgewiesen!")
                     self.cleanup_session_state()

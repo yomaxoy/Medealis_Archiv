@@ -667,9 +667,6 @@ class DataConfirmationPopup(InspectionPopup):
                 DocumentOperationResult,
                 StorageResult,
             )
-            from warehouse.presentation.shared.popups.document_confirmation import (
-                show_document_confirmation_popup,
-            )
 
             operation_result = DocumentOperationResult(
                 operation_type="Datenbestätigung"
@@ -783,10 +780,10 @@ class DataConfirmationPopup(InspectionPopup):
             # frische Werte bekommt (verhindert stale data in PDFs)
             _cleanup_form_session_state()
 
-            # WICHTIG: Zeige Bestätigungs-Popup mit allen erstellten Dokumenten
-            # Dies gibt dem Nutzer volle Transparenz und verhindert Unsicherheit
+            # WICHTIG: Speichere Result in Session State für Deferred Dialog
+            # Main View wird nach Rerun das Document Confirmation Popup öffnen
             if operation_result.has_documents() or operation_result.errors:
-                show_document_confirmation_popup(operation_result)
+                st.session_state["pending_doc_confirmation"] = operation_result
             else:
                 # Fallback falls keine Dokumente erstellt wurden
                 st.warning("⚠️ Keine Dokumente erstellt.")
@@ -795,8 +792,7 @@ class DataConfirmationPopup(InspectionPopup):
             st.toast("🎉 Datenbestätigung abgeschlossen!", icon="✅")
 
             # Dialog schließen durch Rerun
-            # (Dialog wird nur geöffnet wenn der Trigger-Button geklickt wird,
-            #  nach Rerun ist kein Button-Klick aktiv → Dialog schließt sich)
+            # Nach Rerun wird Main View den pending_doc_confirmation Dialog öffnen
             import time
 
             time.sleep(0.5)  # Kurz warten damit Toast sichtbar wird

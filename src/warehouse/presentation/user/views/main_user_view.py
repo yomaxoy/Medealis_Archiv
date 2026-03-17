@@ -328,6 +328,17 @@ def show_main_user_view():
     Show simplified main user view with left menu and item table.
     Focus: Easy to use, clean interface without verbose status messages.
     """
+    # Check for pending document confirmation popup (deferred dialog pattern)
+    if "pending_doc_confirmation" in st.session_state:
+        from warehouse.presentation.shared.popups.document_confirmation import (
+            show_document_confirmation_popup,
+        )
+
+        result = st.session_state.pop("pending_doc_confirmation")
+        show_document_confirmation_popup(result)
+        # Return early - popup is now open, rest of page will render after rerun
+        return
+
     # Title, Scan button and Logout in header
     col1, col2, col3 = st.columns([4, 1, 1])
     with col1:

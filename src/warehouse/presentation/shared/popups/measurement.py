@@ -298,12 +298,9 @@ class MeasurementPopup(InspectionPopup):
             else:
                 st.info("ℹ️ Vermessung nicht durchgeführt - Status bleibt unverändert")
 
-            # Zeige Bestätigungs-Popup mit allen gespeicherten Dokumenten
+            # Speichere Result in Session State für Deferred Dialog
             if operation_result.has_documents() or operation_result.errors:
-                from warehouse.presentation.shared.popups.document_confirmation import (
-                    show_document_confirmation_popup,
-                )
-                show_document_confirmation_popup(operation_result)
+                st.session_state["pending_doc_confirmation"] = operation_result
 
             st.success("🎉 **Vermessung erfolgreich bestätigt!**")
             st.rerun()
