@@ -11,7 +11,7 @@ Version: 2.0.0 - Shared Implementation
 import streamlit as st
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from warehouse.presentation.shared.inspection_popup import InspectionPopup
 from warehouse.presentation.shared.components import (
     render_article_header,
@@ -873,20 +873,37 @@ class DataConfirmationPopup(InspectionPopup):
 
             if not pending_slip:
                 logger.info(
-                    "No pending delivery slip found"
-                    " - skipping save to"
-                    " article folder"
+                    "No pending delivery slip found in session state"
+                    " - attempting to load from disk"
                 )
-                return
-
-            document_data = pending_slip.get("document_data")
-            filename = pending_slip.get("filename", "Lieferschein.pdf")
-
-            if not document_data:
-                logger.warning(
-                    "Pending delivery slip has no document data - skipping save"
+                # FALLBACK: Versuche Lieferschein aus Lieferscheine/ Ordner zu laden
+                document_data, filename = self._load_delivery_slip_from_disk(
+                    delivery_number
                 )
-                return
+
+                if not document_data:
+                    logger.warning(
+                        "Could not find delivery slip in session state or on disk"
+                        " - skipping save to article folder"
+                    )
+                    st.info(
+                        "ℹ️ Lieferschein nicht gefunden - "
+                        "wurde ggf. schon im Artikelordner gespeichert"
+                    )
+                    return
+
+                logger.info(
+                    f"Successfully loaded delivery slip from disk: {filename}"
+                )
+            else:
+                document_data = pending_slip.get("document_data")
+                filename = pending_slip.get("filename", "Lieferschein.pdf")
+
+                if not document_data:
+                    logger.warning(
+                        "Pending delivery slip has no document data - skipping save"
+                    )
+                    return
 
             logger.info(
                 "Saving delivery slip to article" " folder: %s / %s",
@@ -947,6 +964,89 @@ class DataConfirmationPopup(InspectionPopup):
                 " Lieferscheins im"
                 f" Artikelordner: {e}"
             )
+
+    def _load_delivery_slip_from_disk(
+        self, delivery_number: str
+    ) -> Tuple[Optional[bytes], Optional[str]]:
+        """
+        Lädt Lieferschein aus dem zentralen Lieferscheine/ Ordner.
+
+        FALLBACK-Methode wenn Session State keinen Lieferschein enthält.
+        Sucht im Lieferscheine/ Ordner nach PDFs die delivery_number enthalten.
+
+        Args:
+            delivery_number: Lieferscheinnummer zum Suchen
+
+        Returns:
+            Tuple[document_data, filename] oder (None, None) wenn nicht gefunden
+        """
+        try:
+            from warehouse.application.services.document_storage.path_resolver import (
+                path_resolver,
+            )
+
+            # Hole Supplier aus item_data
+            supplier_name = self.item_data.get("supplier_name", "")
+            if not supplier_name:
+                logger.warning(
+                    "Cannot load delivery slip - no supplier name available"
+                )
+                return None, None
+
+            # Resolve Lieferschein-Pfad
+            path_result = path_resolver.resolve_delivery_slip_path(
+                supplier_name=supplier_name,
+                create_folders=False,  # Nur lesen, nicht erstellen
+            )
+
+            if not path_result.success or not path_result.path.exists():
+                logger.warning(
+                    f"Delivery slip folder does not exist: {path_result.path}"
+                )
+                return None, None
+
+            # Suche nach PDF-Datei mit delivery_number im Namen
+            delivery_slip_folder = path_result.path
+            logger.info(
+                f"Searching for delivery slip in: {delivery_slip_folder}"
+            )
+
+            # Pattern-Matching: Suche nach Dateien die delivery_number enthalten
+            matching_files = []
+            for pdf_file in delivery_slip_folder.glob("*.pdf"):
+                if delivery_number.lower() in pdf_file.name.lower():
+                    matching_files.append(pdf_file)
+
+            if not matching_files:
+                logger.warning(
+                    f"No delivery slip found for {delivery_number} "
+                    f"in {delivery_slip_folder}"
+                )
+                return None, None
+
+            # Wenn mehrere gefunden: Nimm neueste Datei
+            if len(matching_files) > 1:
+                logger.warning(
+                    f"Multiple delivery slips found for {delivery_number}, "
+                    f"using newest: {[f.name for f in matching_files]}"
+                )
+                matching_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+            delivery_slip_file = matching_files[0]
+            logger.info(f"Loading delivery slip from disk: {delivery_slip_file}")
+
+            # Lese Datei als bytes
+            document_data = delivery_slip_file.read_bytes()
+            filename = delivery_slip_file.name
+
+            return document_data, filename
+
+        except Exception as e:
+            logger.error(
+                f"Error loading delivery slip from disk: {e}",
+                exc_info=True,
+            )
+            return None, None
 
     def handle_secondary_action(self, form_data: Dict[str, Any]) -> None:
         """Zurückweisen - markiert Artikel als Ausschuss."""
