@@ -532,6 +532,7 @@ class StorageContext:
             "AS": "Dentsply",
             "BR": "Bredent",
             "CT": "C-Tech",
+            "DE": "Click_n_Loc",  # NEW: DE-Prefix für Clic_n_Loc
             "DY": "Dyna",
             "MG": "MegaGen",  # CRITICAL: MG before M!
             "NE": "Neodent",
@@ -539,11 +540,11 @@ class StorageContext:
             "P4": "General Implants",
             "S4": "General Implants",
             # 1-character prefixes second
-            "A": "Zubehörteile",
+            "A": "Zubehör",
             "B": "Bego",
             "C": "Camlog",
             "D": "Dentsply",
-            "E": "Zubehörteile",
+            "E": "Zubehör",  # CHANGED: E-Prefix für Zubehör (gleicher Ordner wie A)
             "L": "Lasak",
             "M": "Medentis",  # CRITICAL: M after MG!
             "N": "Nobel Biocare",
