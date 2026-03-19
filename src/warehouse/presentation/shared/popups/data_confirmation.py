@@ -122,14 +122,13 @@ class DataConfirmationPopup(InspectionPopup):
 
         current_user = get_current_username()
         form.add_text_input(
-            "Mitarbeitername: *",
+            "Mitarbeitername:",
             key="data_employee_name",
             value=current_user if current_user != "System" else "",
             placeholder="Ihr Name",
             help=(
                 "Name des Mitarbeiters der die"
                 " Datenbestaetigung durchfuehrt"
-                " (Pflichtfeld)"
             ),
         )
 
@@ -137,10 +136,10 @@ class DataConfirmationPopup(InspectionPopup):
         form.add_section("🔍 Artikeldaten", expanded=True, use_expander=False)
 
         form.add_text_input(
-            "Artikelnummer: *",
+            "Artikelnummer:",
             key="data_article_number",
             value=self.article_number,
-            help="Artikelnummer vom Lieferschein (Pflichtfeld)",
+            help="Artikelnummer vom Lieferschein",
         )
 
         _batch_override_key = f"batch_override_{self.delivery_number}"
@@ -153,10 +152,10 @@ class DataConfirmationPopup(InspectionPopup):
         else:
             _batch_prefill = self.batch_number
         form.add_text_input(
-            "Chargennummer: *",
+            "Chargennummer:",
             key="data_batch_number",
             value=_batch_prefill,
-            help="Chargennummer vom Lieferschein (Pflichtfeld)",
+            help="Chargennummer vom Lieferschein",
         )
 
         # Batch-Abgleich: Eingabe vs. DB-Wert anzeigen
@@ -211,11 +210,11 @@ class DataConfirmationPopup(InspectionPopup):
         )
 
         form.add_number_input(
-            "Lieferscheinmenge (OCR): *",
+            "Lieferscheinmenge (OCR):",
             key="data_slip_quantity",
             value=slip_qty,
             min_value=0,
-            help="Vom Lieferschein extrahierte Menge (Pflichtfeld)",
+            help="Vom Lieferschein extrahierte Menge",
         )
 
         form.add_number_input(
@@ -246,11 +245,11 @@ class DataConfirmationPopup(InspectionPopup):
             existing_storage = self.item_data.get("storage_location", "")
 
         form.add_text_input(
-            "Lagerplatz: *",
+            "Lagerplatz:",
             key="data_storage_location",
             value=existing_storage or "",
             placeholder="z.B. 123",
-            help="Lagernummer für den Artikel (Pflichtfeld, Integer)",
+            help="Lagernummer für den Artikel (Integer)",
         )
 
         # Lade Bestellnummer aus DB - prüfe mehrere mögliche Keys wie im Admin-Popup
@@ -267,11 +266,11 @@ class DataConfirmationPopup(InspectionPopup):
         )
 
         form.add_text_input(
-            "Bestellnummer: *",
+            "Bestellnummer:",
             key="data_order_number",
             value=extracted_order_number,
             placeholder="Bestellnummer eingeben",
-            help="Bestellnummer aus dem Lieferschein (Pflichtfeld)",
+            help="Bestellnummer aus dem Lieferschein",
         )
 
         form.add_text_area(
@@ -285,9 +284,6 @@ class DataConfirmationPopup(InspectionPopup):
 
         # Render und hole Daten
         form_data = form.render()
-
-        # Pflichtfeld-Hinweis
-        st.caption("* Pflichtfelder")
 
         # Sektion 4: Bestelldokumente hochladen
         st.markdown("---")
