@@ -41,15 +41,13 @@ from .view_independent.workflow_popups import (
 )
 
 # Inspection and Quality Control Popups
-# Note: Core inspection popups migrated to shared (visual_inspection, measurement, document_check, data_confirmation)
-from .inspection_controll_view.document_merge_popup import show_document_merge_popup
-
-# Re-export shared popups for backward compatibility
+# Note: Core inspection popups migrated to shared (visual_inspection, measurement, document_check, data_confirmation, document_merge)
 from warehouse.presentation.shared.popups import (
     show_visual_inspection_popup,
     show_measurement_popup,
     show_document_check_popup,
     show_data_confirmation_popup,
+    show_document_merge_popup,
 )
 
 # Utility and System Popups

@@ -19,7 +19,7 @@ from warehouse.presentation.shared.popups import (
 from warehouse.presentation.shared.components import render_compact_folder_button
 
 # Import User-spezifische Popups (nicht Teil der Inspection-Workflow)
-from warehouse.presentation.user.popups.document_merge import show_document_merge_popup
+from warehouse.presentation.shared.popups.document_merge import show_document_merge_popup
 from warehouse.presentation.user.popups.delivery_scan import (
     show_delivery_scan_popup,
     show_extraction_confirmation_popup,

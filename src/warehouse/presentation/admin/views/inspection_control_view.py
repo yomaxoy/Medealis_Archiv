@@ -34,10 +34,6 @@ from warehouse.presentation.user.popups.iteminfo_edit_dialog import (
     show_iteminfo_edit_dialog,
 )
 
-# Admin-specific popup (only Merge remains Admin-only)
-from warehouse.presentation.admin.popups.inspection_controll_view.merge_check_popup import (
-    show_merge_check_popup,
-)
 
 logger = logging.getLogger(__name__)
 
