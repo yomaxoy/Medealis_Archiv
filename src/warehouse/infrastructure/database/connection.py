@@ -7,10 +7,12 @@ MIGRIERT: Unterstützt PostgreSQL und SQLite
 """
 
 import os
+import sqlite3 as _sqlite3
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
+from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 
 # Base Class für alle Models
@@ -98,16 +100,6 @@ def initialize_database(database_url: str = None) -> None:
 
     elif is_sqlite:
         # SQLite: Kein Pooling (nicht sinnvoll für SQLite)
-        _engine = create_engine(
-            database_url,
-            echo=False,
-            pool_pre_ping=True,
-            poolclass=None,  # Disable connection pooling
-        )
-
-        # SQLite PRAGMAs aktivieren (nur für SQLite)
-        from sqlalchemy import event
-
         # Netzwerk-Pfad erkennen (UNC oder mapped drive, nicht C:)
         _db_path = database_url.replace("sqlite:///", "")
         _is_network = _db_path.startswith("\\\\") or (
@@ -115,6 +107,25 @@ def initialize_database(database_url: str = None) -> None:
             and _db_path[1] == ":"
             and not _db_path.upper().startswith("C:")
         )
+        _timeout = 30.0 if _is_network else 5.0
+
+        # creator= umgeht SQLAlchemy URL-Parsing für UNC-Pfade (Windows SMB)
+        # und übergibt den rohen Pfad direkt an sqlite3.connect()
+        _db_path_captured = _db_path
+        _timeout_captured = _timeout
+        _engine = create_engine(
+            "sqlite+pysqlite://",  # Dummy-URL; tatsächlicher Pfad via creator
+            creator=lambda: _sqlite3.connect(
+                _db_path_captured,
+                timeout=_timeout_captured,
+                check_same_thread=False,
+            ),
+            echo=False,
+            poolclass=NullPool,  # NullPool: keine Connection-Wiederverwendung (SMB-sicher)
+        )
+
+        # SQLite PRAGMAs aktivieren (nur für SQLite)
+        from sqlalchemy import event
 
         @event.listens_for(_engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -122,11 +133,19 @@ def initialize_database(database_url: str = None) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             if _is_network:
-                cursor.execute("PRAGMA journal_mode=DELETE")
-                cursor.execute("PRAGMA synchronous=FULL")
+                # journal_mode=DELETE: WAL→DELETE erfordert einen Checkpoint (Schreib-
+                # operation auf SMB). Schlägt das fehl, verbleiben wir im aktuellen
+                # Modus – beides (WAL und DELETE) ist betriebsfähig.
+                try:
+                    cursor.execute("PRAGMA journal_mode=DELETE")
+                except Exception:
+                    pass
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute(f"PRAGMA busy_timeout={int(_timeout_captured * 1000)}")
             else:
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute(f"PRAGMA busy_timeout={int(_timeout_captured * 1000)}")
             cursor.execute("PRAGMA cache_size=-64000")
             cursor.close()
 

@@ -87,16 +87,27 @@ def initialize_system() -> bool:
         ...     raise RuntimeError("System initialization failed")
     """
     try:
+        import time
         # Import Infrastructure only within Application Layer
         from warehouse.infrastructure.database.connection import (
             initialize_database,
             create_tables,
             is_initialized
         )
+        from sqlalchemy.exc import OperationalError
 
         if not is_initialized():
             initialize_database()
-            create_tables()
+            # Retry für transiente SMB-Fehler (z.B. disk I/O beim ersten Zugriff)
+            for attempt in range(3):
+                try:
+                    create_tables()
+                    break
+                except OperationalError as e:
+                    if "disk I/O error" in str(e) and attempt < 2:
+                        time.sleep(1)
+                        continue
+                    raise
             _ensure_default_admin()
 
         return True
