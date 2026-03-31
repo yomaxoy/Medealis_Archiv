@@ -540,11 +540,11 @@ class StorageContext:
             "P4": "General Implants",
             "S4": "General Implants",
             # 1-character prefixes second
-            "A": "Zubehör",
+            "A": "Zubehörteile",
             "B": "Bego",
             "C": "Camlog",
             "D": "Dentsply",
-            "E": "Zubehör",  # CHANGED: E-Prefix für Zubehör (gleicher Ordner wie A)
+            "E": "Zubehörteile",  # CHANGED: E-Prefix für Zubehörteile (gleicher Ordner wie A)
             "L": "Lasak",
             "M": "Medentis",  # CRITICAL: M after MG!
             "N": "Nobel Biocare",
