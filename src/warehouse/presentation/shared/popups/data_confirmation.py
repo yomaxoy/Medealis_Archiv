@@ -963,8 +963,8 @@ class DataConfirmationPopup(InspectionPopup):
                 path_resolver,
             )
 
-            # Hole Supplier aus item_data
-            supplier_name = self.item_data.get("supplier_name", "")
+            # Hole Supplier aus Instanzvariable
+            supplier_name = self.supplier_name
             if not supplier_name:
                 logger.warning(
                     "Cannot load delivery slip - no supplier name available"
