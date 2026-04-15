@@ -224,12 +224,12 @@ class MeasurementPopup(InspectionPopup):
                             document_data = uploaded_file.read()
                             uploaded_file.seek(0)
 
-                            measurement_filename = f"Vermessungsprotokoll_{article_number}_{uploaded_file.name}"
+                            measurement_filename = f"Messprotokoll-{uploaded_file.name}"
 
                             save_result = storage_service.save_document(
                                 document_data=document_data,
                                 document_name=measurement_filename,
-                                document_type="vermessungsprotokoll",
+                                document_type="messprotokoll",
                                 batch_number=batch_number,
                                 delivery_number=delivery_number,
                                 article_number=article_number,

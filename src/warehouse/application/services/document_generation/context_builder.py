@@ -93,6 +93,7 @@ class ContextBuilder:
                 # Supplier, Hersteller & Kompatibilität
                 supplier_name=storage_context.supplier_name,
                 supplier_normalized=storage_context.supplier_normalized,
+                supplier_id=getattr(storage_context, "supplier_id", ""),
                 hersteller=storage_context.hersteller,
                 kompatibilitaet=storage_context.kompatibilitaet,
                 # Item Details
@@ -225,9 +226,9 @@ class ContextBuilder:
                     ):
                         generation_context.employee_name = item_data["employee_name"]
 
-                    # FIX: Hole supplier_id (Lieferantennummer) von Item-Daten
+                    # Hole supplier_id (Lieferantennummer) von Item-Daten
                     if item_data.get("supplier_id"):
-                        generation_context.supplier_normalized = item_data["supplier_id"]
+                        generation_context.supplier_id = item_data["supplier_id"]
 
                     # Aktualisiere Bestellnummer aus Item-Daten
                     if item_data.get("order_number"):
@@ -351,9 +352,8 @@ class ContextBuilder:
                     f"Could not enhance context with Item data: {item_error}"
                 )
 
-            # FIX: Fallback - Hole supplier_id (Lieferantennummer) direkt von Delivery
-            # (Falls Item-Daten keine supplier_id enthalten)
-            if not generation_context.supplier_normalized and delivery_number:
+            # Fallback: Hole supplier_id direkt von Delivery falls noch nicht gesetzt
+            if not generation_context.supplier_id and delivery_number:
                 try:
                     from warehouse.application.services.entity_services.delivery_service import (  # noqa: E501
                         DeliveryService,
@@ -363,12 +363,10 @@ class ContextBuilder:
                     delivery_data = delivery_service.get_delivery(delivery_number)
 
                     if delivery_data and delivery_data.get("supplier_id"):
-                        generation_context.supplier_normalized = delivery_data[
-                            "supplier_id"
-                        ]
+                        generation_context.supplier_id = delivery_data["supplier_id"]
                         logger.debug(
-                            f"supplier_normalized loaded from Delivery: "
-                            f"{generation_context.supplier_normalized}"
+                            f"supplier_id loaded from Delivery: "
+                            f"{generation_context.supplier_id}"
                         )
                 except Exception as delivery_error:
                     logger.warning(

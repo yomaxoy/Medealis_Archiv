@@ -1438,9 +1438,19 @@ class DocumentStorageService:
                     # Suche nach Lieferschein mit passender Lieferscheinnummer
                     # FLACHE STRUKTUR: Durchsuche direkt den Ordner (kein Jahr/Monat!)
                     delivery_slip_found = False
+                    already_loaded_names = {f.name for f in downloaded_files}
                     for pdf_file in delivery_slip_path_result.path.glob("*.pdf"):
                         # Prüfe ob Lieferscheinnummer im Dateinamen vorkommt
                         if delivery_number.lower() in pdf_file.name.lower():
+                            # Überspringe falls Datei bereits aus Artikel-Ordner geladen
+                            if pdf_file.name in already_loaded_names:
+                                self.logger.info(
+                                    "[MERGE] Delivery slip already"
+                                    " included from article folder,"
+                                    f" skipping duplicate: {pdf_file.name}"
+                                )
+                                delivery_slip_found = True
+                                break
                             # Kopiere Lieferschein zu Temp-Ordner
                             import shutil
 

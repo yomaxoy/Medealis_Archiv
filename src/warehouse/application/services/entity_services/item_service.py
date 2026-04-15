@@ -1805,6 +1805,7 @@ class ItemService:
                     "hersteller": item_info.hersteller if item_info else "",
                     "kompatibilitaet": (item_info.kompatibilitaet if item_info else ""),
                     "supplier_name": delivery.supplier_name if delivery else "",
+                    "supplier_id": delivery.supplier_id if delivery else "",
                     # Certificate data for template
                     # generation and popup pre-filling
                     "certificates": {

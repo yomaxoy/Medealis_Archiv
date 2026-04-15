@@ -47,6 +47,7 @@ class StorageContextData:
     # Lieferanten-Informationen
     supplier_name: str = ""
     supplier_normalized: str = ""
+    supplier_id: str = ""  # Echte Lieferantennummer aus der DB (z.B. "PRIM-001")
 
     # Hersteller / Kompatibilitäts-Informationen
     # Verantwortlicher Hersteller des Abutments (aus Artikelstamm)
@@ -195,6 +196,7 @@ class StorageContext:
                 article_number=article_number or db_context.get("article_number", ""),
                 article_description=db_context.get("article_description", ""),
                 supplier_name=supplier_name or db_context.get("supplier_name", ""),
+                supplier_id=db_context.get("supplier_id", ""),
                 quantity=db_context.get("quantity", 0),
                 unit=db_context.get("unit", ""),
                 employee_name=db_context.get("employee_name", ""),
@@ -270,6 +272,7 @@ class StorageContext:
                         "article_number": delivery_data.get("article_number", ""),
                         "article_description": delivery_data.get("description", ""),
                         "supplier_name": supplier_name,
+                        "supplier_id": delivery_data.get("supplier_id", ""),
                         "quantity": delivery_data.get("quantity", 0),
                         "unit": delivery_data.get("unit", ""),
                         "employee_name": delivery_data.get("employee_name", ""),

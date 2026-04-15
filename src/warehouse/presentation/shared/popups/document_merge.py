@@ -160,7 +160,7 @@ def show_document_merge_popup(item_data: Dict[str, Any], audit: bool = True) -> 
 
         st.write("**📄 Verfügbare PDF-Dateien für Merge:**")
         if delivery_slip_added:
-            st.caption("💡 Dateien sind automatisch in der optimalen Reihenfolge sortiert (PDB → Vermessungsprotokoll → Sichtkontrolle → Bestellung → Lieferschein → Begleitpapiere)")
+            st.caption("💡 Dateien sind automatisch in der optimalen Reihenfolge sortiert (PDB → Messprotokoll → Sichtkontrolle → Bestellung → Lieferschein → Begleitpapiere)")
 
         selected_files = []
         for pdf_file in all_merge_files:
@@ -341,7 +341,7 @@ def _categorize_files(all_files: List[Path], scan_result: Dict[str, Any]) -> Dic
             scan_result["document_categories"]["pdb"].append(file)
         elif any(pattern in file_name_lower for pattern in ["sichtkontrolle", "fo00141", "visuell"]):
             scan_result["document_categories"]["sichtkontrolle"].append(file)
-        elif any(pattern in file_name_lower for pattern in ["vermessungsprotokoll_", "vermessung", "messung", "protokoll"]):
+        elif any(pattern in file_name_lower for pattern in ["messprotokoll-", "vermessungsprotokoll_", "vermessung", "messung", "protokoll"]):
             scan_result["document_categories"]["vermessung"].append(file)
         elif any(pattern in file_name_lower for pattern in ["bestellung", "order", "bestell"]):
             scan_result["document_categories"]["bestellung"].append(file)
@@ -382,7 +382,7 @@ def show_document_status_matrix(scanned_docs: Dict[str, Any], item_data: Dict[st
     categories = {
         "📋 PDB": scanned_docs["document_categories"]["pdb"],
         "👁️ Sichtkontrolle": scanned_docs["document_categories"]["sichtkontrolle"],
-        "📏 Vermessungsprotokoll": scanned_docs["document_categories"]["vermessung"],
+        "📏 Messprotokoll": scanned_docs["document_categories"]["vermessung"],
         "📋 Bestellung": scanned_docs["document_categories"]["bestellung"],
         "📄 Lieferschein": scanned_docs["document_categories"]["lieferschein"],
         "📦 Begleitpapiere": scanned_docs["document_categories"]["begleitpapiere"],
@@ -684,7 +684,7 @@ def sort_files_by_document_type(pdf_files: List[Path]) -> List[Path]:
     try:
         document_order = [
             {"patterns": ["pdb", "produktdatenblatt", "datasheet", "product_data"], "name": "PDB"},
-            {"patterns": ["vermessungsprotokoll", "vermessung", "messung", "protokoll", "measurement"], "name": "Vermessungsprotokoll"},
+            {"patterns": ["messprotokoll", "vermessungsprotokoll", "vermessung", "messung", "protokoll", "measurement"], "name": "Messprotokoll"},
             {"patterns": ["sichtkontrolle", "fo00141", "visuell", "visual_inspection"], "name": "Sichtkontrolle"},
             {"patterns": ["bestellung", "order", "bestell", "po_", "bestellungsdokument"], "name": "Bestellung"},
             {"patterns": ["lieferschein", "ls_", "delivery_slip", "packing_slip"], "name": "Lieferschein"},

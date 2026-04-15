@@ -56,7 +56,8 @@ class GenerationContext:
 
     # SUPPLIER, HERSTELLER & KOMPATIBILITÄT
     supplier_name: str = ""
-    supplier_normalized: str = ""
+    supplier_normalized: str = ""  # Normalisierter Name für Ordnerpfade
+    supplier_id: str = ""  # Echte Lieferantennummer aus der DB (z.B. "PRIM-001")
     hersteller: str = ""  # Verantwortlicher Hersteller des Abutments
     kompatibilitaet: str = ""  # Kompatible Implantatmarke (aus Artikelnummer)
 
@@ -144,8 +145,8 @@ class GenerationContext:
                 "kompatibilitaet": self.kompatibilitaet,
                 # Backward-Compat: manufacturer zeigt Kompatibilitätsmarke
                 "manufacturer": self.kompatibilitaet,
-                "lieferantnr": self.supplier_normalized or "",  # Lieferantennummer
-                "itemnrL": ".-",  # Artikelnummer Lieferant (Standard: .-)
+                "lieferantnr": self.supplier_id or "",  # Echte Lieferantennummer aus DB
+                "itemnrL": "-",  # Artikelnummer Lieferant (Standard: -)
                 # Employee & Timestamps
                 "name": self.employee_name,
                 "mitarbeitername": self.employee_name,
@@ -335,6 +336,7 @@ class GenerationContext:
                 article_number=storage_context.article_number,
                 supplier_name=storage_context.supplier_name,
                 supplier_normalized=storage_context.supplier_normalized,
+                supplier_id=getattr(storage_context, "supplier_id", "") or self.supplier_id,
                 hersteller=storage_context.hersteller,
                 kompatibilitaet=storage_context.kompatibilitaet,
                 quantity=storage_context.quantity,
