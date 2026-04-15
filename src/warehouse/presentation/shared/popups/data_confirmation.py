@@ -978,7 +978,7 @@ class DataConfirmationPopup(InspectionPopup):
             delivery_slip_folders = []
 
             # 1. Versuche Server-Pfad (PRIMARY)
-            if env_config.use_server_storage:
+            if env_config.is_server_storage_documents_enabled():
                 server_path_result = path_resolver.resolve_server_delivery_slip_path(
                     supplier_name=supplier_name,
                     create_folders=False,
