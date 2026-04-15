@@ -47,7 +47,7 @@ def _auto_open_all_documents(result: DocumentOperationResult) -> None:
 
         opened_count = 0
         for doc in result.documents:
-            # Überspringe PDF-Dateien beim Auto-Open (nur DOCX öffnen)
+            # Nur PDFs überspringen – DOCX und PNG werden automatisch geöffnet
             if doc.document_type and "(PDF)" in doc.document_type:
                 logger.debug(f"Skipping PDF auto-open: {doc.filename}")
                 continue
