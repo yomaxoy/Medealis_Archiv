@@ -38,7 +38,6 @@ _DATA_CONFIRMATION_FORM_KEYS = [
     "data_notes",
     "data_order_doc_upload",
     "uploaded_order_documents",
-    "pending_delivery_slip_save",
     "data_confirmation_action_clicked",
 ]
 
@@ -535,6 +534,11 @@ class DataConfirmationPopup(InspectionPopup):
                 confirmed_article, confirmed_batch, delivery_number
             )
 
+            # Cleanup: Entferne pending_delivery_slip_save aus Session State
+            # nach erfolgreichem Speichern, damit bei nächstem Artikel
+            # nicht der alte Lieferschein genommen wird
+            st.session_state.pop("pending_delivery_slip_save", None)
+
             # 4. Bestelldokumente speichern (falls vorhanden)
             uploaded_docs = form_data.get("uploaded_documents")
             logger.info(
@@ -928,7 +932,7 @@ class DataConfirmationPopup(InspectionPopup):
                 batch_number=batch_number,
                 delivery_number=delivery_number,
                 article_number=article_number,
-                supplier_name="",
+                supplier_name=self.supplier_name,
                 create_folders=True,
             )
 

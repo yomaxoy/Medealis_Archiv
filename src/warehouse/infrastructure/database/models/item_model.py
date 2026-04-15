@@ -103,6 +103,9 @@ class ItemModel(Base):
     order_number = Column(
         String(10), ForeignKey("orders.order_number"), nullable=True, index=True
     )  # ← NEU: Beziehung zur ursprünglichen Bestellung
+    supplier_id = Column(
+        String(20), ForeignKey("suppliers.supplier_id"), nullable=True, index=True
+    )  # ← Lieferantennummer (denormalisiert aus delivery via supplier)
 
     # === MENGEN-TRACKING ===
     # Drei Mengentypen für vollständige Rückverfolgbarkeit:

@@ -51,10 +51,8 @@ class ItemMapper(BaseMapper):
         article_number = ArticleNumber(item_model.article_number)
         batch_number = BatchNumber(item_model.batch_number)
 
-        # Supplier ID ermitteln
-        supplier_id = "UNKNOWN"
-        if hasattr(item_model, "delivery") and item_model.delivery:
-            supplier_id = item_model.delivery.supplier_id
+        # Supplier ID direkt aus ItemModel (wurde hinzugefügt zur Denormalisierung)
+        supplier_id = item_model.supplier_id or "UNKNOWN"
 
         # Priority Level
         priority_level = PriorityLevel.MEDIUM  # Default
@@ -152,6 +150,7 @@ class ItemMapper(BaseMapper):
             delivered_quantity=entity.delivered_quantity,
             delivery_slip_quantity=entity.delivery_slip_quantity,
             ordered_quantity=entity.ordered_quantity,
+            supplier_id=entity.supplier_id or None,  # Denormalisierung für schnellere Abfragen
             employee=entity.created_by or "Unknown",
             notes=entity.notes or "",
             order_number=entity.order_number,

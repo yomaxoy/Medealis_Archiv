@@ -5,7 +5,11 @@
       "Bash(git add src/warehouse/presentation/shared/popup_styles.py src/warehouse/presentation/shared/popups/data_confirmation.py src/warehouse/presentation/shared/popups/document_check.py src/warehouse/presentation/shared/popups/measurement.py src/warehouse/presentation/shared/popups/visual_inspection.py)",
       "Bash(git push origin master)",
       "Bash(python3:*)",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(python -c ' *)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(taskkill /F /IM python3.13.exe)",
+      "Bash(PYTHONPATH=\"c:\\\\Users\\\\User\\\\Desktop\\\\Medealis Archiv neu\\\\src\" python)"
     ],
     "deny": [],
     "ask": []

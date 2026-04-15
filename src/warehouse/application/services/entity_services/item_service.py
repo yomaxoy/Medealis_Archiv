@@ -1631,6 +1631,20 @@ class ItemService:
                         else 1
                     )
 
+                # Laden der supplier_id aus der Delivery, falls nicht angegeben
+                final_supplier_id = supplier_id or ""
+                if not final_supplier_id:
+                    # Versuche supplier_id aus der DeliveryModel zu laden
+                    try:
+                        from warehouse.infrastructure.database.models.delivery_model import DeliveryModel
+                        delivery = session.query(DeliveryModel).filter(
+                            DeliveryModel.delivery_number == delivery_number
+                        ).first()
+                        if delivery:
+                            final_supplier_id = delivery.supplier_id
+                    except Exception as e:
+                        logger.warning(f"Could not load supplier from delivery: {e}")
+
                 item = ItemModel(
                     article_number=article_number,
                     batch_number=batch_number,
@@ -1643,6 +1657,8 @@ class ItemService:
                     ordered_quantity=ordered_quantity,
                     # NULL instead of empty string
                     order_number=final_order_number,
+                    # Lieferant (Denormalisierung für schnellere Abfragen)
+                    supplier_id=final_supplier_id or None,
                     employee=employee_name or "System",
                 )
                 session.add(item)
