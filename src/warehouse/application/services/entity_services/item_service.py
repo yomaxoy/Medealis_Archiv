@@ -33,6 +33,9 @@ from warehouse.infrastructure.database.repositories.sql_delivery_rep_domain impo
 from warehouse.infrastructure.database.repositories.sql_item_rep_domain import (
     SQLAlchemyItemRepositoryDomain,
 )
+from warehouse.infrastructure.database.repositories.item_info_repository import (
+    ItemInfoRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +56,7 @@ class ItemService:
             # Database should already be initialized by Infrastructure Layer
             self.item_repo = SQLAlchemyItemRepositoryDomain()
             self.delivery_repo = SQLAlchemyDeliveryRepositoryDomain()
+            self.item_info_repo = ItemInfoRepository()
             logger.info("ItemService erfolgreich initialisiert")
         except (ImportError, AttributeError, ConnectionError) as e:
             logger.error("Fehler bei ItemService Initialisierung: %s", e)

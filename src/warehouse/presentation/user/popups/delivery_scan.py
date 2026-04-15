@@ -247,6 +247,10 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
         logger.info(
             f"DEBUG: First item description: {items_data[0].get('description', 'NOT FOUND')}"
         )
+        # CRITICAL: Log order_numbers when popup loads
+        logger.info(f"🔍 EXTRACTION POPUP LOAD - order_numbers:")
+        for idx, item in enumerate(items_data):
+            logger.info(f"   Item {idx}: article={item.get('article_number')}, order_number={item.get('order_number', 'MISSING')}")
 
     # Delivery information section - editable
     col1, col2 = st.columns(2)
@@ -445,6 +449,11 @@ def show_extraction_confirmation_popup(extraction_data: Dict[str, Any]):
             use_container_width=True,
             key="user_confirm_extraction",
         ):
+            # CRITICAL: Log edited_items before saving
+            logger.info(f"🔥 SAVE BUTTON CLICKED - edited_items about to save:")
+            for idx, item in enumerate(edited_items):
+                logger.info(f"   Item {idx}: article={item.get('article_number')}, order_number={item.get('order_number', 'MISSING')}")
+
             # Update extraction data with edited values
             updated_extraction_data = {
                 "delivery_number": edited_delivery_number,
