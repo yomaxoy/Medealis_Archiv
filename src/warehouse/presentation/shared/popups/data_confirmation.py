@@ -963,7 +963,7 @@ class DataConfirmationPopup(InspectionPopup):
                 path_resolver,
             )
             from warehouse.shared.config.environment_config import (
-                app_config,
+                env_config,
             )
 
             # Hole Supplier aus Instanzvariable
@@ -978,7 +978,7 @@ class DataConfirmationPopup(InspectionPopup):
             delivery_slip_folders = []
 
             # 1. Versuche Server-Pfad (PRIMARY)
-            if app_config.USE_SERVER_STORAGE:
+            if env_config.use_server_storage:
                 server_path_result = path_resolver.resolve_server_delivery_slip_path(
                     supplier_name=supplier_name,
                     create_folders=False,
