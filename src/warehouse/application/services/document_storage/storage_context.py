@@ -463,20 +463,25 @@ class StorageContext:
         supplier_lower = supplier_name.lower().strip()
 
         # Basic Mapping-Regeln (mit Unterstrichen statt Leerzeichen für Dateisystem)
+        # WICHTIG: Nur echte physische Lieferanten hier!
         if "primec" in supplier_lower:
             return "Primec"
         elif "terrats" in supplier_lower:
             return "Terrats_Medical"  # FIXED: Mit Unterstrich statt Leerzeichen
+        elif "fleima" in supplier_lower:
+            return "Fleima"
         elif "megagen" in supplier_lower:
             return "MEGAGEN"
         elif "ctech" in supplier_lower or "c-tech" in supplier_lower:
             return "C-Tech"
-        elif "straumann" in supplier_lower:
-            return "Straumann"
-        elif "nobel" in supplier_lower:
-            return "Nobel_Biocare"  # FIXED: Mit Unterstrich statt Leerzeichen
-        elif "fleima" in supplier_lower:
-            return "Fleima"
+        # HINWEIS: Implantatmarken wie Straumann, Nobel, Camlog, Bego etc. sind KEINE Lieferanten
+        # und werden daher hier NICHT gemappt. Falls sie dennoch auftauchen, wird eine Warnung geloggt.
+        elif any(brand in supplier_lower for brand in ["straumann", "nobel", "camlog", "bego", "dentsply", "zimmer"]):
+            logger.warning(
+                f"Implantatmarke '{supplier_name}' wurde als Lieferantenname übergeben. "
+                "Dies ist ein Fehler - prüfe die OCR/Input-Quelle. Nutze 'Unbekannt' als Fallback."
+            )
+            return "Unbekannt"
         else:
             # Fallback: Ersetze Leerzeichen durch
             # Unterstriche für unbekannte Lieferanten

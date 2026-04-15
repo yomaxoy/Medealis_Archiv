@@ -96,28 +96,30 @@ class DeliveryService:
                 f"Database search failed for supplier {supplier_name_clean}: {e}"
             )
 
-        # 2. Mapping-Tabelle für bekannte Supplier
+        # 2. Mapping-Tabelle für bekannte Supplier (nur echte physische Lieferanten)
+        # WICHTIG: Implantatmarken (BEGO, CAMLOG, STRAUMANN etc.) sind KEINE Lieferanten!
+        # Sie stehen in item_info.kompatibilitaet und werden aus Artikelnummer-Präfix abgeleitet.
         supplier_name_mapping = {
-            "primec GmbH": "PRIMEC",
-            "PRIMEC": "PRIMEC",
-            "primec": "PRIMEC",
-            "Primec": "PRIMEC",
-            "Terrats Medical": "TERRATS",
-            "TERRATS MEDICAL": "TERRATS",
-            "Terrats": "TERRATS",
-            "TERRATS": "TERRATS",
-            "terrats": "TERRATS",
-            "terrats medical": "TERRATS",
-            "Terrats Medical GmbH": "TERRATS",
-            "MEGAGEN": "MEGAGEN",
-            "Megagen": "MEGAGEN",
-            "C-Tech": "CTECH",
-            "C-TECH": "CTECH",
-            "Ctech": "CTECH",
-            "Straumann": "STRAUMANN",
-            "Nobel Biocare": "NOBEL",
-            "Zimmer Biomet": "ZIMMER",
-            "Dentsply Sirona": "DENTSPLY",
+            "primec GmbH": "10006",
+            "PRIMEC": "10006",
+            "primec": "10006",
+            "Primec": "10006",
+            "Terrats Medical": "10031",
+            "TERRATS MEDICAL SL": "10031",
+            "TERRATS MEDICAL": "10031",
+            "Terrats": "10031",
+            "TERRATS": "10031",
+            "terrats": "10031",
+            "terrats medical": "10031",
+            "Terrats Medical GmbH": "10031",
+            "Fleima-Plastic GmbH": "10005",
+            "Fleima": "10005",
+            "FLEIMA": "10005",
+            "fleima": "10005",
+            "KSP": "10004",
+            # MEGAGEN / C-TECH: Lieferantennummern noch nicht bekannt
+            # "MEGAGEN": "10XXX",
+            # "C-Tech": "10XXX",
             # Weitere Mappings können hier hinzugefügt werden
         }
 
@@ -139,11 +141,12 @@ class DeliveryService:
                 )
                 return supplier_id
 
-        # 4. Fallback: Erstelle automatische ID aus Namen
-        auto_id = self._generate_auto_supplier_id(supplier_name_clean)
-        logger.info(f"Generated auto supplier ID: {supplier_name_clean} -> {auto_id}")
-
-        return auto_id
+        # 4. Fallback: Kein Auto-Generieren - Lieferant muss manuell angelegt werden
+        logger.warning(
+            f"Unbekannter Lieferant '{supplier_name_clean}'. "
+            "Bitte im Supplier Management manuell anlegen (5-stellige Lieferantennummer)."
+        )
+        return ""
 
     def _generate_auto_supplier_id(self, supplier_name: str) -> str:
         """

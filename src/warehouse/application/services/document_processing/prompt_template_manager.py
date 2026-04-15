@@ -139,15 +139,14 @@ C-TECH Variationen → "C-Tech":
 - "ctech", "C-tech", "C-Tech", "CTECH", "C-TECH"
 - "C-Tech GmbH", "CTECH GmbH" → alle zu "C-Tech"
 
-STRAUMANN Variationen → "Straumann":
-- "straumann", "Straumann", "STRAUMANN"
-- "Straumann GmbH", "STRAUMANN AG" → alle zu "Straumann"
-
-NOBEL Variationen → "Nobel Biocare":
-- "nobel", "Nobel", "NOBEL", "nobel biocare", "Nobel Biocare", "NOBEL BIOCARE"
+🚨 WICHTIG - IMPLANTATMARKEN SIND KEINE LIEFERANTEN:
+- Straumann, Nobel Biocare, Camlog, Bego, Dentsply, Zimmer etc. sind IMPLANTAT-HERSTELLER, nicht Lieferanten!
+- Falls solche Namen im Lieferantennamen auftauchen, ist das ein FEHLER im Dokument.
+- Gib NIEMALS Implantatmarken als Lieferantennamen aus. Gib stattdessen "Unbekannt" zurück.
 
 Beispiel: Wenn du "primec" oder "PRIMEC" erkennst → IMMER ausgeben als "Primec"
 Beispiel: Wenn du "terrats medical" oder "TERRATS" erkennst → IMMER ausgeben als "Terrats Medical"
+FALSCH-Beispiel: Du erkennst "Straumann" im Dokument → Gib NICHT "Straumann" aus! Das ist eine Implantatmarke, kein Lieferant. Gib stattdessen "Unbekannt" aus.
 
 CHARGENNUMMER-OPTIMIERUNG (ERWEITERTE SUCHE):
 Suche nach Chargennummern mit folgenden Strategien:
@@ -228,8 +227,18 @@ BLOCK 1 = Alles von Dokumentstart bis zur ERSTEN "Bestellnummer:"
 BLOCK 2 = Alles von ERSTER "Bestellnummer:" bis zur ZWEITEN "Bestellnummer:"
 BLOCK 3 = Alles von ZWEITER "Bestellnummer:" bis Dokumentende
 
-SCHRITT 2: BESTELLNUMMER-TRENNER (Primec)
+SCHRITT 2: BESTELLNUMMER UND BESTELLDATUM-TRENNER (Primec)
 Suche nach: "Bestellnummer: \\d{5} vom \\d{2}\\.\\d{2}\\.\\d{4}"
+
+⚠️ KRITISCH: Das BESTELLDATUM steht IMMER unmittelbar nach "vom" in der GLEICHEN ZEILE!
+Beispiel: "Bestellnummer: 10170 vom 28.05.2024"
+          ↓                         ↓ DATUM IST HIER
+          Bestellnummer             in der selben Zeile nach "vom"
+
+Format:
+- Bestellnummer: 5 Ziffern
+- vom: Literal (kann auch "v." oder "v.h." sein)
+- Datum: DD.MM.YYYY Format (z.B. 28.05.2024)
 
 SCHRITT 3: ARTIKEL-ZUORDNUNG (Primec Block-Struktur)
 ┌─ BLOCK 1 (bis erste Bestellnummer)
@@ -486,7 +495,28 @@ Wichtige Regeln:
 - Mengen als Integer-Zahlen
 - Preise als Decimal-Zahlen
 - Datum im Format YYYY-MM-DD
-- Wenn Informationen fehlen, verwende null"""
+- Wenn Informationen fehlen, verwende null
+
+🔴 BESTELLDATUM-EXTRAKTION (KRITISCH FÜR PRIMEC):
+
+PRIMEC LIEFERSCHEINE:
+- Format: "Bestellnummer: XXXXX vom DD.MM.YYYY" (Z.B. "Bestellnummer: 10170 vom 28.05.2024")
+- Das BESTELLDATUM steht IMMER in der SELBEN ZEILE hinter der Bestellnummer nach "vom"
+- Regex: "Bestellnummer:\\s*(\\d{5})\\s+vom\\s+(\\d{2})\\.(\\d{2})\\.(\\d{4})"
+- Konvertiere das Datum zu YYYY-MM-DD Format (28.05.2024 → 2024-05-28)
+
+TERRATS MEDICAL LIEFERSCHEINE:
+- Bestelldatum oft separat in Kopfzeile oder Tabelle vorhanden
+- Suche nach Datums-Mustern (DD.MM.YYYY oder ähnlich) in der Nähe von "Purchase Order"
+
+WENN order_number GEFUNDEN:
+1. Suche nach "Bestellnummer: XXXXX vom DD.MM.YYYY" Muster
+2. Extrahiere Datum direkt aus dieser Zeile
+3. Konvertiere zu YYYY-MM-DD Format
+
+WENN order_number NICHT GEFUNDEN:
+- Suche nach isolierten Datums-Formaten
+- Fallback: Datum aus Kopfzeile oder "Lieferdatum""""
 
     def _get_accompanying_template(self) -> str:
         """

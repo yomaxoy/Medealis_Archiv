@@ -175,9 +175,9 @@ def show_new_supplier_tab(supplier_service):
 
         with col1:
             supplier_id = st.text_input(
-                "Supplier ID*",
-                placeholder="SUP-001",
-                help="Eindeutige Identifikation für den Supplier",
+                "Lieferantennummer*",
+                placeholder="z.B. 10007",
+                help="5-stellige Lieferantennummer (numerisch), z.B. 10006, 10031",
             )
             name = st.text_input(
                 "Name*",
@@ -247,7 +247,15 @@ def create_new_supplier(
         # Validation
         if not supplier_id or not name:
             st.error(
-                "❌ Unvollständige Angaben: Supplier ID und Name sind erforderlich"
+                "❌ Unvollständige Angaben: Lieferantennummer und Name sind erforderlich"
+            )
+            return
+
+        # Validate supplier_id format: must be 5 digits
+        supplier_id_clean = supplier_id.strip()
+        if not supplier_id_clean.isdigit() or len(supplier_id_clean) != 5:
+            st.error(
+                "❌ Lieferantennummer muss eine 5-stellige Zahl sein (z.B. 10007)."
             )
             return
 

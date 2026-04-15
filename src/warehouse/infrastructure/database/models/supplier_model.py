@@ -23,7 +23,10 @@ class SupplierModel(Base):
     __table_args__ = {"extend_existing": True}
 
     # === PRIMÄRSCHLÜSSEL (Business Key) ===
-    supplier_id = Column(String(10), primary_key=True)  # "BEGO", "CAMLOG", "DENTSPLY"
+    # Frei wählbare 5-stellige numerische Lieferantennummer, z.B. "10006" (Primec), "10031" (Terrats)
+    # Nur echte physische Lieferanten! Implantatmarken (BEGO, CAMLOG, DENTSPLY etc.) gehören
+    # NICHT hier rein - sie sind Kompatibilitäten und stehen in item_info.kompatibilitaet.
+    supplier_id = Column(String(20), primary_key=True)
 
     # === AUDIT FIELDS ===
     created_at = Column(DateTime, default=datetime.now, nullable=False)

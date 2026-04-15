@@ -35,6 +35,7 @@ class ManufacturerService:
         }
 
         # Supplier name normalization - ERWEITERT für konsistente Speicherung
+        # WICHTIG: Nur echte physische Lieferanten! Implantatmarken gehören nicht hier rein.
         self.supplier_normalization = {
             # Primec Varianten
             "primec": "Primec",
@@ -42,17 +43,13 @@ class ManufacturerService:
             "Primec": "Primec",
             "primec gmbh": "Primec",
             "PRIMEC GMBH": "Primec",
-            "Primec GmbH": "Primec",  # ← NEU! Häufigste Variante
-            "Primec_GmbH": "Primec",  # ← NEU! Alte Ordnerstruktur
-            "Primec_Gmbh": "Primec",  # ← NEU! Path-cleaning Variante
-            "10006": "Primec",  # ← NEU! Supplier-ID
+            "Primec GmbH": "Primec",
+            "Primec_GmbH": "Primec",
+            "Primec_Gmbh": "Primec",
+            "10006": "Primec",
             # Weitere Lieferanten (vorbereitet)
-            "straumann": "Straumann",
-            "STRAUMANN": "Straumann",
-            "Straumann": "Straumann",
-            "camlog": "Camlog",
-            "CAMLOG": "Camlog",
-            "Camlog": "Camlog",
+            # Hinweis: Implantatmarken (Straumann, Camlog, etc.) sind KEINE Lieferanten
+            # und gehören daher NICHT in dieses Mapping!
         }
 
     def determine_manufacturer(self, article_number: str) -> str:
