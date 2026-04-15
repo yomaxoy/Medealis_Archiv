@@ -516,7 +516,7 @@ WENN order_number GEFUNDEN:
 
 WENN order_number NICHT GEFUNDEN:
 - Suche nach isolierten Datums-Formaten
-- Fallback: Datum aus Kopfzeile oder "Lieferdatum\"""
+- Fallback: Datum aus Kopfzeile oder Lieferdatum-Feld"""
 
     def _get_accompanying_template(self) -> str:
         """
