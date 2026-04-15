@@ -830,14 +830,12 @@ class DeliveryService:
                         except:
                             expiry_date = None
 
-                    order_number = item.get("order_number", "")
-
                     item_create_data = {
                         "article_number": article_number,
                         "batch_number": batch_number,
                         "quantity": quantity,
                         "delivery_number": delivery_number,
-                        "order_number": order_number,
+                        "order_number": item.get("order_number", ""),
                         "expiry_date": expiry_date,
                         "storage_location": item.get("storage_location", ""),
                         "description": item.get("description", ""),  # Use empty string, not delivery notes
@@ -846,11 +844,6 @@ class DeliveryService:
 
                     logger.info(
                         "Creating item %d/%d: %s", i + 1, len(items), article_number
-                    )
-                    # CRITICAL: Log order_number for each item
-                    logger.info(
-                        "🔥 DELIVERY_SERVICE: Item %d order_number='%s' (article='%s')",
-                        i + 1, order_number, article_number
                     )
                     logger.info(
                         "DEBUG: item description from extraction: '%s'", item.get("description", "NOT FOUND")

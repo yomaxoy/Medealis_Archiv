@@ -110,14 +110,6 @@ class UnifiedDocumentProcessingService:
 
             if cached_result:
                 self.logger.info(f"✅ Cache hit for {document_type} raw extraction")
-                # DEBUG: Log order_numbers from cache
-                if "items" in cached_result:
-                    self.logger.info(f"   📦 Cache contains {len(cached_result['items'])} items:")
-                    for idx, item in enumerate(cached_result["items"]):
-                        self.logger.info(
-                            f"      Item {idx}: article={item.get('article_number')}, "
-                            f"order_number={item.get('order_number', 'MISSING')}"
-                        )
                 return self._add_processing_metadata(cached_result, from_cache=True)
 
             # 2. Temporär speichern
