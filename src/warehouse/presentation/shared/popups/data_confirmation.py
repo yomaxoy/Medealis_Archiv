@@ -114,13 +114,15 @@ class DataConfirmationPopup(InspectionPopup):
 
     def render_body(self) -> Dict[str, Any]:
         """Rendert Formular für Datenbestätigung."""
-        form = FormBuilder(columns=2)
+
+        # ── Teil 1: Mitarbeiter + Artikeldaten ──────────────────────────────
+        form1 = FormBuilder(columns=2)
 
         # ===== MITARBEITERNAME GANZ OBEN (PFLICHTFELD) =====
-        form.add_section("👤 Mitarbeiter", expanded=True, use_expander=False)
+        form1.add_section("👤 Mitarbeiter", expanded=True, use_expander=False)
 
         current_user = get_current_username()
-        form.add_text_input(
+        form1.add_text_input(
             "Mitarbeitername:",
             key="data_employee_name",
             value=current_user if current_user != "System" else "",
@@ -132,9 +134,9 @@ class DataConfirmationPopup(InspectionPopup):
         )
 
         # Sektion 1: Artikeldaten bestätigen
-        form.add_section("🔍 Artikeldaten", expanded=True, use_expander=False)
+        form1.add_section("🔍 Artikeldaten", expanded=True, use_expander=False)
 
-        form.add_text_input(
+        form1.add_text_input(
             "Artikelnummer:",
             key="data_article_number",
             value=self.article_number,
@@ -150,12 +152,14 @@ class DataConfirmationPopup(InspectionPopup):
             _batch_prefill = _batch_override
         else:
             _batch_prefill = self.batch_number
-        form.add_text_input(
+        form1.add_text_input(
             "Chargennummer:",
             key="data_batch_number",
             value=_batch_prefill,
             help="Chargennummer vom Lieferschein",
         )
+
+        form_data_1 = form1.render()
 
         # Batch-Abgleich: Eingabe vs. DB-Wert anzeigen
         _current_batch = st.session_state.get("data_batch_number", "")
@@ -180,111 +184,7 @@ class DataConfirmationPopup(InspectionPopup):
                 "✅ Chargennummer stimmt mit DB" f" ueberein: `{self.batch_number}`"
             )
 
-        # Sektion 2: Mengenerfassung
-        form.add_section("📊 Mengenerfassung", expanded=True, use_expander=False)
-
-        # Lade Mengen aus DB falls vorhanden
-        ordered_qty = (
-            int(self.item_data.get("ordered_quantity", 0))
-            if self.item_data.get("ordered_quantity")
-            else 0
-        )
-        slip_qty = (
-            int(self.item_data.get("delivery_slip_quantity", 0))
-            if self.item_data.get("delivery_slip_quantity")
-            else (self.quantity if self.quantity else 0)
-        )
-        delivered_qty = (
-            int(self.item_data.get("delivered_quantity", 0))
-            if self.item_data.get("delivered_quantity")
-            else 0
-        )
-
-        form.add_number_input(
-            "Bestellmenge:",
-            key="data_ordered_quantity",
-            value=ordered_qty,
-            min_value=0,
-            help="Ursprünglich bestellte Menge (optional)",
-        )
-
-        form.add_number_input(
-            "Lieferscheinmenge (OCR):",
-            key="data_slip_quantity",
-            value=slip_qty,
-            min_value=0,
-            help="Vom Lieferschein extrahierte Menge",
-        )
-
-        form.add_number_input(
-            "Liefermenge (gezählt):",
-            key="data_delivered_quantity",
-            value=delivered_qty,
-            min_value=0,
-            help="Tatsächlich gelieferte und gezählte Menge (optional)",
-        )
-
-        # Sektion 3: Zusätzliche Daten
-        form.add_section(
-            "📦 Zusätzliche Informationen", expanded=True, use_expander=False
-        )
-
-        # Lade Lagerplatz aus DB falls vorhanden
-        try:
-            from warehouse.application.services.data_integration_service import (
-                data_integration_service,
-            )
-
-            existing_storage = (
-                data_integration_service.get_storage_location_from_article(
-                    self.article_number
-                )
-            )
-        except Exception:
-            existing_storage = self.item_data.get("storage_location", "")
-
-        form.add_text_input(
-            "Lagerplatz:",
-            key="data_storage_location",
-            value=existing_storage or "",
-            placeholder="z.B. 123",
-            help="Lagernummer für den Artikel (Integer)",
-        )
-
-        # Lade Bestellnummer aus DB - prüfe mehrere mögliche Keys wie im Admin-Popup
-        extracted_order_number = (
-            self.item_data.get("order_number", "")
-            or self.item_data.get("bestellnummer", "")
-            or self.item_data.get("purchase_order", "")
-            or self.item_data.get("po_number", "")
-            or self.item_data.get("order_nr", "")
-            or self.item_data.get("bestell_nr", "")
-            or self.item_data.get("bestellung", "")
-            or self.item_data.get("purchase_order_number", "")
-            or ""
-        )
-
-        form.add_text_input(
-            "Bestellnummer:",
-            key="data_order_number",
-            value=extracted_order_number,
-            placeholder="Bestellnummer eingeben",
-            help="Bestellnummer aus dem Lieferschein",
-        )
-
-        form.add_text_area(
-            "Bemerkungen:",
-            key="data_notes",
-            value="",
-            height=40,
-            placeholder="Optionale Bemerkungen...",
-            help="Zusätzliche Anmerkungen",
-        )
-
-        # Render und hole Daten
-        form_data = form.render()
-
-        # Sektion 4: Bestelldokumente hochladen
+        # ── Bestelldokument hochladen (vor Mengenerfassung) ─────────────────
         st.markdown("---")
         st.write("### 📋 Bestelldokument")
 
@@ -329,6 +229,116 @@ class DataConfirmationPopup(InspectionPopup):
 
             # Store in session state to preserve across reruns
             st.session_state["uploaded_order_documents"] = files_list
+
+        # ── Teil 2: Mengenerfassung + Zusätzliche Informationen ─────────────
+        st.markdown("---")
+        form2 = FormBuilder(columns=2)
+
+        # Sektion 2: Mengenerfassung
+        form2.add_section("📊 Mengenerfassung", expanded=True, use_expander=False)
+
+        # Lade Mengen aus DB falls vorhanden
+        ordered_qty = (
+            int(self.item_data.get("ordered_quantity", 0))
+            if self.item_data.get("ordered_quantity")
+            else 0
+        )
+        slip_qty = (
+            int(self.item_data.get("delivery_slip_quantity", 0))
+            if self.item_data.get("delivery_slip_quantity")
+            else (self.quantity if self.quantity else 0)
+        )
+        delivered_qty = (
+            int(self.item_data.get("delivered_quantity", 0))
+            if self.item_data.get("delivered_quantity")
+            else 0
+        )
+
+        form2.add_number_input(
+            "Bestellmenge:",
+            key="data_ordered_quantity",
+            value=ordered_qty,
+            min_value=0,
+            help="Ursprünglich bestellte Menge (optional)",
+        )
+
+        form2.add_number_input(
+            "Lieferscheinmenge (OCR):",
+            key="data_slip_quantity",
+            value=slip_qty,
+            min_value=0,
+            help="Vom Lieferschein extrahierte Menge",
+        )
+
+        form2.add_number_input(
+            "Liefermenge (gezählt):",
+            key="data_delivered_quantity",
+            value=delivered_qty,
+            min_value=0,
+            help="Tatsächlich gelieferte und gezählte Menge (optional)",
+        )
+
+        # Sektion 3: Zusätzliche Daten
+        form2.add_section(
+            "📦 Zusätzliche Informationen", expanded=True, use_expander=False
+        )
+
+        # Lade Lagerplatz aus DB falls vorhanden
+        try:
+            from warehouse.application.services.data_integration_service import (
+                data_integration_service,
+            )
+
+            existing_storage = (
+                data_integration_service.get_storage_location_from_article(
+                    self.article_number
+                )
+            )
+        except Exception:
+            existing_storage = self.item_data.get("storage_location", "")
+
+        form2.add_text_input(
+            "Lagerplatz:",
+            key="data_storage_location",
+            value=existing_storage or "",
+            placeholder="z.B. 123",
+            help="Lagernummer für den Artikel (Integer)",
+        )
+
+        # Lade Bestellnummer aus DB - prüfe mehrere mögliche Keys wie im Admin-Popup
+        extracted_order_number = (
+            self.item_data.get("order_number", "")
+            or self.item_data.get("bestellnummer", "")
+            or self.item_data.get("purchase_order", "")
+            or self.item_data.get("po_number", "")
+            or self.item_data.get("order_nr", "")
+            or self.item_data.get("bestell_nr", "")
+            or self.item_data.get("bestellung", "")
+            or self.item_data.get("purchase_order_number", "")
+            or ""
+        )
+
+        form2.add_text_input(
+            "Bestellnummer:",
+            key="data_order_number",
+            value=extracted_order_number,
+            placeholder="Bestellnummer eingeben",
+            help="Bestellnummer aus dem Lieferschein",
+        )
+
+        form2.add_text_area(
+            "Bemerkungen:",
+            key="data_notes",
+            value="",
+            height=40,
+            placeholder="Optionale Bemerkungen...",
+            help="Zusätzliche Anmerkungen",
+        )
+
+        form_data_2 = form2.render()
+
+        # Zusammenführen beider Form-Teile
+        form_data = {**form_data_1, **form_data_2}
 
         # Speichere hochgeladene Dokumente in form_data
         form_data["uploaded_documents"] = st.session_state.get(
