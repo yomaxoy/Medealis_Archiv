@@ -534,11 +534,6 @@ class DataConfirmationPopup(InspectionPopup):
                 confirmed_article, confirmed_batch, delivery_number
             )
 
-            # Cleanup: Entferne pending_delivery_slip_save aus Session State
-            # nach erfolgreichem Speichern, damit bei nächstem Artikel
-            # nicht der alte Lieferschein genommen wird
-            st.session_state.pop("pending_delivery_slip_save", None)
-
             # 4. Bestelldokumente speichern (falls vorhanden)
             uploaded_docs = form_data.get("uploaded_documents")
             logger.info(
@@ -868,47 +863,28 @@ class DataConfirmationPopup(InspectionPopup):
         import streamlit as st
 
         try:
-            # Check if we have a pending delivery slip to save
-            pending_slip = st.session_state.get("pending_delivery_slip_save")
+            # Lade Lieferschein direkt aus Supplier/Lieferscheine/ Ordner
+            # (wird beim Upload dort bereits gespeichert)
+            document_data, filename = self._load_delivery_slip_from_disk(
+                delivery_number
+            )
 
-            if not pending_slip:
-                logger.info(
-                    "No pending delivery slip found in session state"
-                    " - attempting to load from disk"
+            if not document_data:
+                logger.warning(
+                    "Could not find delivery slip in Lieferscheine/ folder"
+                    " - skipping save to article folder"
                 )
-                # FALLBACK: Versuche Lieferschein aus Lieferscheine/ Ordner zu laden
-                document_data, filename = self._load_delivery_slip_from_disk(
-                    delivery_number
+                st.info(
+                    "ℹ️ Lieferschein nicht gefunden - "
+                    "wurde ggf. schon im Artikelordner gespeichert"
                 )
-
-                if not document_data:
-                    logger.warning(
-                        "Could not find delivery slip in session state or on disk"
-                        " - skipping save to article folder"
-                    )
-                    st.info(
-                        "ℹ️ Lieferschein nicht gefunden - "
-                        "wurde ggf. schon im Artikelordner gespeichert"
-                    )
-                    return
-
-                logger.info(
-                    f"Successfully loaded delivery slip from disk: {filename}"
-                )
-            else:
-                document_data = pending_slip.get("document_data")
-                filename = pending_slip.get("filename", "Lieferschein.pdf")
-
-                if not document_data:
-                    logger.warning(
-                        "Pending delivery slip has no document data - skipping save"
-                    )
-                    return
+                return
 
             logger.info(
-                "Saving delivery slip to article" " folder: %s / %s",
+                "Saving delivery slip to article folder: %s / %s (%s)",
                 article_number,
                 batch_number,
+                filename,
             )
 
             # Get document storage service
@@ -971,7 +947,9 @@ class DataConfirmationPopup(InspectionPopup):
         """
         Lädt Lieferschein aus dem zentralen Lieferscheine/ Ordner.
 
-        FALLBACK-Methode wenn Session State keinen Lieferschein enthält.
+        Der Lieferschein wird beim Upload in Supplier/Lieferscheine/ gespeichert
+        und wird von hier beim "Daten bestätigen" in den Artikelordner kopiert.
+
         Sucht im Lieferscheine/ Ordner nach PDFs die delivery_number enthalten.
 
         Args:
