@@ -812,6 +812,43 @@ class ItemService:
             logger.error("Unerwarteter Fehler beim Laden aller Items: %s", e)
             return []
 
+    def get_all_item_infos(self) -> List[Dict[str, Any]]:
+        """
+        Holt alle ItemInfo-Stammdaten (eine Zeile pro Artikel, ohne Chargen).
+        Für die Artikel-Übersicht (nicht für Chargen-Details).
+
+        Returns:
+            Liste von Item-Info-Dictionaries mit: article_number, designation,
+            kompatibilitaet, hersteller, revision_number, storage_location
+        """
+        try:
+            item_infos = self.item_info_repo.get_all()
+
+            if not item_infos:
+                return []
+
+            item_list = []
+            for item_info in item_infos:
+                item_dict = {
+                    "article_number": item_info.article_number,
+                    "designation": item_info.designation or "",
+                    "kompatibilitaet": item_info.kompatibilitaet or "",
+                    "hersteller": item_info.hersteller or "",
+                    "revision_number": item_info.revision_number,
+                    "storage_location": item_info.storage_location or "",
+                    "material_specification": item_info.material_specification or "",
+                    "drawing_reference": item_info.drawing_reference or "",
+                    "description": item_info.description or "",
+                    "created_at": item_info.created_at.isoformat() if item_info.created_at else None,
+                }
+                item_list.append(item_dict)
+
+            return item_list
+
+        except Exception as e:
+            logger.error(f"Fehler beim Laden aller ItemInfos: {e}")
+            return []
+
     def get_item_statistics(self) -> Dict[str, Any]:
         """Holt Item-Statistiken für Dashboard."""
         try:

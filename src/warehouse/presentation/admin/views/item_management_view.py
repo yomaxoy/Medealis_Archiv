@@ -28,6 +28,18 @@ def _load_all_items(_service, _cache_version: int) -> List[Dict[str, Any]]:
         return []
 
 
+@st.cache_data(ttl=60)
+def _load_all_item_infos(_service, _cache_version: int) -> List[Dict[str, Any]]:
+    """Load all ItemInfo (article master data) with caching (60s TTL)."""
+    try:
+        if hasattr(_service, "get_all_item_infos"):
+            return _service.get_all_item_infos() or []
+        return []
+    except Exception as e:
+        logger.error(f"Error loading item infos: {e}")
+        return []
+
+
 def show_item_management_view():
     """Main item management view with all functionality."""
     st.header("📦 Item Management")
@@ -48,7 +60,7 @@ def show_item_management_view():
 
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["📋 Liste", "➕ Item zu Delivery hinzufügen", "📊 Statistiken", "📄 Dokumente"]
+        ["📋 Artikel-Stammdaten", "➕ Item zu Delivery hinzufügen", "📊 Statistiken", "📄 Dokumente"]
     )
 
     with tab1:
@@ -68,75 +80,94 @@ def show_item_management_view():
 
 
 def show_item_list_tab(item_service):
-    """Show item list with management actions."""
-    st.subheader("📋 Item Liste")
+    """Show ItemInfo list (article master data - one row per article)."""
+    st.subheader("📋 Artikel-Stammdaten")
 
     try:
         from warehouse.presentation.shared.cache_manager import CacheManager
 
-        # Get all items (cached)
-        items_data = _load_all_items(
+        # Get all item infos (cached)
+        items_data = _load_all_item_infos(
             item_service,
             CacheManager.get_version("items")
         )
 
         if items_data and len(items_data) > 0:
-            # Search and filter controls
-            show_item_search_filters()
+            # Search and filter controls for ItemInfo
+            show_item_info_search_filters()
 
             # Apply filters
-            filtered_items = apply_item_filters(items_data)
+            filtered_items = apply_item_info_filters(items_data)
 
             if filtered_items:
                 # Show items table
-                render_items_table(filtered_items)
+                render_item_info_table(filtered_items)
             else:
-                st.info("Keine Items entsprechen den Filterkriterien.")
+                st.info("Keine Artikel entsprechen den Filterkriterien.")
         else:
-            st.info("Keine Items gefunden")
-
-            # Quick action to add first item
-            if st.button("➕ Erstes Item hinzufügen", type="primary"):
-                st.session_state.switch_to_add_tab = True
-                st.rerun()
+            st.info("Keine Artikel gefunden")
 
     except Exception as e:
         import traceback
-        logger.error(f"Error loading items: {e}")
+        logger.error(f"Error loading item infos: {e}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        st.error(f"Fehler beim Laden der Items: {e}")
+        st.error(f"Fehler beim Laden der Artikel: {e}")
         st.code(traceback.format_exc())
 
 
-def show_item_search_filters():
-    """Show search and filter controls."""
-    col1, col2, col3, col4 = st.columns(4)
+def show_item_info_search_filters():
+    """Show search and filter controls for ItemInfo (article master data)."""
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        search_article = st.text_input(
-            "🔍 Artikelnummer:", placeholder="A0001...", key="item_search_article"
+        st.text_input(
+            "🔍 Artikelnummer:", placeholder="A0001...", key="item_info_search_article"
         )
 
     with col2:
-        search_batch = st.text_input(
-            "🔍 Chargennummer:", placeholder="P-123...", key="item_search_batch"
+        st.text_input(
+            "🔍 Bezeichnung:", placeholder="Abutment...", key="item_info_search_designation"
         )
 
     with col3:
-        search_delivery = st.text_input(
-            "🔍 Lieferung:", placeholder="DEL-001...", key="item_search_delivery"
+        st.text_input(
+            "🔍 Kompatibilität:", placeholder="Straumann...", key="item_info_search_compatibility"
         )
 
-    with col4:
-        status_filter = st.selectbox(
-            "Status Filter:",
-            options=["Alle", "PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"],
-            key="item_status_filter",
-        )
+
+def apply_item_info_filters(items_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Apply search filters to item infos (article master data)."""
+    filtered = items_data
+
+    # Filter by article number
+    article_filter = st.session_state.get("item_info_search_article", "").lower()
+    if article_filter:
+        filtered = [
+            item for item in filtered
+            if article_filter in str(item.get("article_number", "")).lower()
+        ]
+
+    # Filter by designation
+    designation_filter = st.session_state.get("item_info_search_designation", "").lower()
+    if designation_filter:
+        filtered = [
+            item for item in filtered
+            if designation_filter in str(item.get("designation", "")).lower()
+        ]
+
+    # Filter by compatibility
+    compatibility_filter = st.session_state.get("item_info_search_compatibility", "").lower()
+    if compatibility_filter:
+        filtered = [
+            item for item in filtered
+            if compatibility_filter in str(item.get("kompatibilitaet", "")).lower()
+        ]
+
+    return filtered
 
 
 def apply_item_filters(items_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Apply search filters to items."""
+    """Apply search filters to items (legacy - kept for backward compatibility)."""
     # Safety check: ensure items_data is not None
     if items_data is None:
         logger.warning("apply_item_filters received None items_data")
@@ -367,6 +398,65 @@ def show_item_delete_action(item_dict: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Error in item delete action: {e}")
         st.error(f"Fehler beim Löschen: {e}")
+
+
+def render_item_info_table(items_data: List[Dict[str, Any]]):
+    """Render ItemInfo table (article master data - one row per article)."""
+    if not items_data:
+        st.info("Keine Artikel zum Anzeigen vorhanden")
+        return
+
+    # Header row
+    header_cols = st.columns([1.5, 2.5, 2, 2, 1, 1.5])
+    headers = ["Artikel", "Bezeichnung", "Kompatibilität", "Hersteller", "Rev.", "Lagerplatz"]
+
+    for col, header in zip(header_cols, headers):
+        with col:
+            st.write(f"**{header}**")
+
+    st.divider()
+
+    # Data rows
+    for i, item_dict in enumerate(items_data):
+        if item_dict:
+            render_item_info_row(item_dict, i)
+            if i < len(items_data) - 1:
+                st.divider()
+
+
+def render_item_info_row(item_dict: Dict[str, Any], index: int):
+    """Render a single ItemInfo row."""
+    cols = st.columns([1.5, 2.5, 2, 2, 1, 1.5])
+
+    with cols[0]:  # Article Number
+        article_num = item_dict.get("article_number", "N/A")
+        st.write(f"**{article_num}**")
+
+    with cols[1]:  # Designation
+        designation = item_dict.get("designation", "N/A") or "N/A"
+        if isinstance(designation, str) and len(designation) > 30:
+            st.write(f"{designation[:27]}...")
+        else:
+            st.write(designation)
+
+    with cols[2]:  # Kompatibilität
+        compatibility = item_dict.get("kompatibilitaet", "") or "—"
+        st.write(compatibility)
+
+    with cols[3]:  # Hersteller
+        manufacturer = item_dict.get("hersteller", "") or "—"
+        st.write(manufacturer)
+
+    with cols[4]:  # Revision
+        revision = item_dict.get("revision_number") or "—"
+        st.write(revision)
+
+    with cols[5]:  # Storage Location
+        storage = item_dict.get("storage_location", "") or "—"
+        if isinstance(storage, str) and len(storage) > 15:
+            st.write(f"{storage[:12]}...")
+        else:
+            st.write(storage)
 
 
 def show_add_item_tab(delivery_service):

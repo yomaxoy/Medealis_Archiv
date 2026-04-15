@@ -6,7 +6,7 @@ Unterstützt QR-Code Binary Storage.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from warehouse.infrastructure.database.connection import get_session
@@ -47,6 +47,27 @@ class ItemInfoRepository:
         except Exception as e:
             logger.error(f"Error loading ItemInfo for {article_number}: {str(e)}")
             return None
+
+    def get_all(self) -> List[ItemInfoModel]:
+        """
+        Lädt alle ItemInfo-Stammdaten (eine Zeile pro Artikel, ohne Chargendaten).
+
+        Returns:
+            Liste aller ItemInfoModel-Instanzen, sortiert nach article_number
+        """
+        try:
+            with get_session() as session:
+                items = (
+                    session.query(ItemInfoModel)
+                    .order_by(ItemInfoModel.article_number)
+                    .all()
+                )
+                for item in items:
+                    session.expunge(item)
+                return items
+        except Exception as e:
+            logger.error(f"Error loading all ItemInfos: {str(e)}")
+            return []
 
     def create_item_info(
         self, item_info_data: Dict[str, Any]
