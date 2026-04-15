@@ -962,6 +962,9 @@ class DataConfirmationPopup(InspectionPopup):
             from warehouse.application.services.document_storage.path_resolver import (
                 path_resolver,
             )
+            from warehouse.shared.config.environment_config import (
+                app_config,
+            )
 
             # Hole Supplier aus Instanzvariable
             supplier_name = self.supplier_name
@@ -971,47 +974,63 @@ class DataConfirmationPopup(InspectionPopup):
                 )
                 return None, None
 
-            # Resolve Lieferschein-Pfad
-            path_result = path_resolver.resolve_delivery_slip_path(
-                supplier_name=supplier_name,
-                create_folders=False,  # Nur lesen, nicht erstellen
-            )
+            # Versuche ZUERST Server-Pfad (wenn aktiviert), dann lokal als Fallback
+            delivery_slip_folders = []
 
-            if not path_result.success or not path_result.path.exists():
+            # 1. Versuche Server-Pfad (PRIMARY)
+            if app_config.USE_SERVER_STORAGE:
+                server_path_result = path_resolver.resolve_server_delivery_slip_path(
+                    supplier_name=supplier_name,
+                    create_folders=False,
+                )
+                if server_path_result.success and server_path_result.path.exists():
+                    delivery_slip_folders.append(server_path_result.path)
+                    logger.info(f"Server delivery slip folder available: {server_path_result.path}")
+
+            # 2. Fallback: Lokaler Pfad
+            local_path_result = path_resolver.resolve_delivery_slip_path(
+                supplier_name=supplier_name,
+                create_folders=False,
+            )
+            if local_path_result.success and local_path_result.path.exists():
+                delivery_slip_folders.append(local_path_result.path)
+                logger.info(f"Local delivery slip folder available: {local_path_result.path}")
+
+            if not delivery_slip_folders:
                 logger.warning(
-                    f"Delivery slip folder does not exist: {path_result.path}"
+                    f"No delivery slip folders found for supplier: {supplier_name}"
                 )
                 return None, None
 
-            # Suche nach PDF-Datei mit delivery_number im Namen
-            delivery_slip_folder = path_result.path
-            logger.info(
-                f"Searching for delivery slip in: {delivery_slip_folder}"
-            )
-
-            # Pattern-Matching: Suche nach Dateien die delivery_number enthalten
+            # Suche in allen verfügbaren Ordnern nach PDF mit delivery_number
             matching_files = []
-            for pdf_file in delivery_slip_folder.glob("*.pdf"):
-                if delivery_number.lower() in pdf_file.name.lower():
-                    matching_files.append(pdf_file)
+            for folder in delivery_slip_folders:
+                logger.info(f"Searching for delivery slip in: {folder}")
+                try:
+                    for pdf_file in folder.glob("*.pdf"):
+                        if delivery_number.lower() in pdf_file.name.lower():
+                            matching_files.append(pdf_file)
+                except Exception as folder_error:
+                    logger.warning(f"Error searching folder {folder}: {folder_error}")
+                    continue
 
             if not matching_files:
                 logger.warning(
                     f"No delivery slip found for {delivery_number} "
-                    f"in {delivery_slip_folder}"
+                    f"in any of these folders: {delivery_slip_folders}"
                 )
                 return None, None
 
             # Wenn mehrere gefunden: Nimm neueste Datei
             if len(matching_files) > 1:
-                logger.warning(
+                logger.info(
                     f"Multiple delivery slips found for {delivery_number}, "
                     f"using newest: {[f.name for f in matching_files]}"
                 )
                 matching_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
 
             delivery_slip_file = matching_files[0]
-            logger.info(f"Loading delivery slip from disk: {delivery_slip_file}")
+            logger.info(f"Loading delivery slip from: {delivery_slip_file}")
 
             # Lese Datei als bytes
             document_data = delivery_slip_file.read_bytes()
