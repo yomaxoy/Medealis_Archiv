@@ -169,13 +169,28 @@ class DataIntegrationService:
         if not supplier_name:
             return "Unknown"
 
-        # Basic normalization
-        normalized = supplier_name.strip().title()
+        supplier_lower = supplier_name.lower().strip()
 
-        # Common mappings
-        mapping = {"Primec": "Primec", "PRIMEC": "Primec", "primec": "Primec"}
-
-        return mapping.get(normalized, normalized)
+        # Basic Mapping-Regeln - MUSS mit storage_context._basic_supplier_normalization() synchron sein!
+        if "primec" in supplier_lower:
+            return "Primec"
+        elif "terrats" in supplier_lower:
+            return "Terrats_Medical"
+        elif "fleima" in supplier_lower:
+            return "Fleima"
+        elif "megagen" in supplier_lower:
+            return "MEGAGEN"
+        elif "ctech" in supplier_lower or "c-tech" in supplier_lower:
+            return "C-Tech"
+        elif any(brand in supplier_lower for brand in ["straumann", "nobel", "camlog", "bego", "dentsply", "zimmer"]):
+            logger.warning(
+                f"Implantatmarke '{supplier_name}' wurde als Lieferantenname übergeben. "
+                "Dies ist ein Fehler - prüfe die OCR/Input-Quelle. Nutze 'Unbekannt' als Fallback."
+            )
+            return "Unknown"
+        else:
+            # Fallback: Ersetze Leerzeichen durch Unterstriche für unbekannte Lieferanten
+            return supplier_name.replace(" ", "_")
 
     @ttl_cache(seconds=180, maxsize=32, key_prefix="delivery_stats")
     def get_delivery_statistics(self, delivery_number: str) -> Dict[str, Any]:
