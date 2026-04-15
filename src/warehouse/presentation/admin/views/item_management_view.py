@@ -407,8 +407,8 @@ def render_item_info_table(items_data: List[Dict[str, Any]]):
         return
 
     # Header row
-    header_cols = st.columns([1.5, 2.5, 2, 2, 1, 1.5])
-    headers = ["Artikel", "Bezeichnung", "Kompatibilität", "Hersteller", "Rev.", "Lagerplatz"]
+    header_cols = st.columns([1.5, 2.5, 2, 2, 1, 1.5, 0.8])
+    headers = ["Artikel", "Bezeichnung", "Kompatibilität", "Hersteller", "Rev.", "Lagerplatz", ""]
 
     for col, header in zip(header_cols, headers):
         with col:
@@ -426,7 +426,7 @@ def render_item_info_table(items_data: List[Dict[str, Any]]):
 
 def render_item_info_row(item_dict: Dict[str, Any], index: int):
     """Render a single ItemInfo row."""
-    cols = st.columns([1.5, 2.5, 2, 2, 1, 1.5])
+    cols = st.columns([1.5, 2.5, 2, 2, 1, 1.5, 0.8])
 
     with cols[0]:  # Article Number
         article_num = item_dict.get("article_number", "N/A")
@@ -457,6 +457,13 @@ def render_item_info_row(item_dict: Dict[str, Any], index: int):
             st.write(f"{storage[:12]}...")
         else:
             st.write(storage)
+
+    with cols[6]:  # Edit button
+        article_num = item_dict.get("article_number", "")
+        if st.button("✏️", key=f"edit_iteminfo_{article_num}_{index}", help="Stammdaten bearbeiten"):
+            st.session_state["show_iteminfo_edit_dialog"] = True
+            st.session_state["edit_iteminfo_item_data"] = item_dict
+            st.rerun()
 
 
 def show_add_item_tab(delivery_service):
