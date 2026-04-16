@@ -107,8 +107,66 @@ def show_main_user_view():
     if st.session_state.get("popup_action") == "extraction_confirm":
         handle_extraction_confirmation(services)
 
+    # Handle item delete confirmation (from popup)
+    elif st.session_state.get("popup_action") == "delete_confirm" and st.session_state.get(
+        "delete_item_confirmed"
+    ):
+        _handle_item_delete_confirmation(services)
+
+    # Handle popup cancellation
+    elif st.session_state.get("popup_action") == "cancel":
+        st.session_state.popup_action = None
+        st.session_state.pop("delete_item_confirmed", None)
+
     # Main content: Item table
     show_item_table(services)
+
+
+def _handle_item_delete_confirmation(services: Dict[str, Any]) -> None:
+    """Führt den Item-Löschvorgang nach Popup-Bestätigung aus."""
+    item_data = st.session_state.delete_item_confirmed
+    item_service = services.get("item")
+
+    article_number = item_data.get("article_number")
+    batch_number = item_data.get("batch_number")
+    delivery_number = item_data.get("delivery_number")
+
+    st.session_state.popup_action = None
+    st.session_state.delete_item_confirmed = None
+
+    if not all([delivery_number, article_number, batch_number]):
+        st.error("❌ Unvollständige Item-Daten")
+        return
+
+    try:
+        success = item_service.delete_item(
+            delivery_number=delivery_number,
+            article_number=article_number,
+            batch_number=batch_number,
+        )
+        if success:
+            from warehouse.presentation.shared.cache_manager import CacheManager
+            CacheManager.invalidate_related("items")
+            st.success(f"✅ Item '{article_number}' erfolgreich gelöscht!")
+        else:
+            st.warning(f"⚠️ Item '{article_number}' konnte nicht gelöscht werden")
+    except Exception as e:
+        logger.error(f"Error deleting item: {e}")
+        st.error(f"❌ Fehler beim Löschen: {e}")
+
+    st.rerun()
+
+
+def _on_filter_delivery_change():
+    st.session_state["user_filter_delivery"] = st.session_state.get(
+        "_widget_filter_delivery", ""
+    )
+
+
+def _on_filter_article_change():
+    st.session_state["user_filter_article"] = st.session_state.get(
+        "_widget_filter_article", ""
+    )
 
 
 def show_item_table(services):
@@ -156,26 +214,30 @@ def show_item_table(services):
         filter_delivery = st.text_input(
             "🔍 Lieferschein-Nr:",
             value=st.session_state.get("user_filter_delivery", ""),
-            key="user_filter_delivery",
+            key="_widget_filter_delivery",
             placeholder="Filter nach LS-Nr...",
+            on_change=_on_filter_delivery_change,
         )
 
     with col2:
         filter_article = st.text_input(
             "🔍 Artikel-Nr:",
             value=st.session_state.get("user_filter_article", ""),
-            key="user_filter_article",
+            key="_widget_filter_article",
             placeholder="Filter nach Artikel-Nr...",
+            on_change=_on_filter_article_change,
         )
 
     with col3:
         if st.button("🔄 Zurücksetzen", use_container_width=True):
-            if "user_filter_delivery" in st.session_state:
-                del st.session_state.user_filter_delivery
-            if "user_filter_article" in st.session_state:
-                del st.session_state.user_filter_article
-            if "user_filter_status" in st.session_state:
-                del st.session_state.user_filter_status
+            for key in [
+                "user_filter_delivery",
+                "user_filter_article",
+                "user_filter_status",
+                "_widget_filter_delivery",
+                "_widget_filter_article",
+            ]:
+                st.session_state.pop(key, None)
             st.rerun()
 
     # Status filter buttons (IST-Zustand)
@@ -419,7 +481,7 @@ def show_item_table(services):
             with row_cols[6]:
                 st.markdown(item["supplier"])
 
-            # Action buttons column - 6 buttons (ItemInfo + 5 workflow buttons)
+            # Action buttons column - 7 buttons (ItemInfo + 5 workflow buttons + Löschen)
             with row_cols[7]:
                 (
                     action_col0,
@@ -428,7 +490,8 @@ def show_item_table(services):
                     action_col3,
                     action_col4,
                     action_col5,
-                ) = st.columns(6)
+                    action_col6,
+                ) = st.columns(7)
 
             # Get individual step completion status from domain entity
             article_number = item.get("article_number")
@@ -664,6 +727,24 @@ def show_item_table(services):
                         "supplier_name": item["supplier"],
                     }
                     show_document_merge_popup(item_data)
+
+            # Button 6: Item löschen
+            with action_col6:
+                if st.button(
+                    "🗑️",
+                    key=f"delete_{i}",
+                    help="Item löschen",
+                    use_container_width=True,
+                ):
+                    from warehouse.presentation.admin.popups.item_view.item_popups import (
+                        show_item_delete_popup,
+                    )
+                    show_item_delete_popup({
+                        "article_number": item["article_number"],
+                        "batch_number": item["batch_number"],
+                        "delivery_number": item["delivery_number"],
+                        "quantity": int(item["quantity"]) if item["quantity"] != "N/A" else 0,
+                    })
 
             # Ordner-Button (jetzt in row_cols[8] - nach den Action-Buttons)
             with row_cols[8]:
