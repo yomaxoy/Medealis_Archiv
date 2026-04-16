@@ -33,6 +33,25 @@ from .template_manager import TemplateManager
 
 logger = logging.getLogger(__name__)
 
+MAX_PATH_LENGTH = 259  # Windows-Limit 260, 1 Zeichen Puffer
+
+
+def _trim_path_to_max_length(path: Path) -> Path:
+    """
+    Kürzt den Dateinamen-Stem von rechts, falls der Gesamtpfad das
+    Windows-Limit (260 Zeichen) überschreitet. Dateiendung bleibt erhalten.
+    """
+    if len(str(path)) <= MAX_PATH_LENGTH:
+        return path
+
+    excess = len(str(path)) - MAX_PATH_LENGTH
+    new_stem = path.stem[:-excess]
+    new_path = path.parent / f"{new_stem}{path.suffix}"
+    logger.warning(
+        f"Path too long ({len(str(path))} chars), trimmed to {len(str(new_path))}: {new_path.name}"
+    )
+    return new_path
+
 
 class DocumentProcessor:
     """
@@ -468,6 +487,9 @@ class WordProcessor:
             # 4. Ausgabepfad bestimmen
             if not output_path:
                 output_path = self._generate_output_path(context)
+
+            # Pfadlänge prüfen und ggf. Dateinamen kürzen (Windows-Limit 260 Zeichen)
+            output_path = _trim_path_to_max_length(output_path)
 
             # Stelle sicher dass Ausgabeverzeichnis existiert
             output_path.parent.mkdir(parents=True, exist_ok=True)

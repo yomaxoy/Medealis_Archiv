@@ -321,7 +321,7 @@ TEMPLATE_REGISTRY: Dict[DocumentType, TemplateInfo] = {
             "datum"                # Deutscher Datum
         ],
 
-        default_filename_pattern="Wareneingang_{charge}",
+        default_filename_pattern="WEK_{charge}",
         supported_formats=["docx"],
         has_tables=True,
         supports_conditional_content=False

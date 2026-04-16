@@ -148,7 +148,7 @@ def show_ls_data_confirmation_popup(item_index: int, item_data: Dict[str, Any]):
                     # Weiter mit Dokumentenerstellung, auch wenn ItemInfo fehlschlägt
 
                 # Import document generation service
-                from warehouse.application.services.document_generation import DocumentGenerationService, DocumentType
+                from warehouse.application.services.document_generation import DocumentGenerationService, DocumentType, ProcessingOptions
 
                 st.write("🔄 Erstelle Dokumente...")
                 doc_service = DocumentGenerationService()
@@ -159,9 +159,9 @@ def show_ls_data_confirmation_popup(item_index: int, item_data: Dict[str, Any]):
                     article_number=confirmed_article,
                     batch_number=confirmed_batch,
                     delivery_number=confirmed_ls_nr,
-                    auto_open=True
+                    processing_options=ProcessingOptions(open_after_creation=True),
                 )
-                begleitschein_path = begleitschein_result.output_path if begleitschein_result.success else None
+                begleitschein_path = begleitschein_result.document_path if begleitschein_result.success else None
 
                 # Create Wareneingangskontrolle document
                 wek_result = doc_service.generate_document(
@@ -169,12 +169,12 @@ def show_ls_data_confirmation_popup(item_index: int, item_data: Dict[str, Any]):
                     article_number=confirmed_article,
                     batch_number=confirmed_batch,
                     delivery_number=confirmed_ls_nr,
-                    additional_placeholders={
-                        "we_date": confirmed_we_date.strftime('%Y-%m-%d') if confirmed_we_date else ""
+                    additional_data={
+                        "we_date": confirmed_we_date.strftime("%d.%m.%Y") if confirmed_we_date else ""
                     },
-                    auto_open=True
+                    processing_options=ProcessingOptions(open_after_creation=True),
                 )
-                wek_path = wek_result.output_path if wek_result.success else None
+                wek_path = wek_result.document_path if wek_result.success else None
 
                 # Create barcode files with validation
                 try:
@@ -239,8 +239,14 @@ def show_ls_data_confirmation_popup(item_index: int, item_data: Dict[str, Any]):
                     barcode_result = {'article_barcode': None, 'batch_barcode': None}
 
                 st.success("✅ LS-Daten bestätigt!")
-                st.success(f"✅ Begleitschein erstellt: {begleitschein_path.name}")
-                st.success(f"✅ Wareneingangskontrolle-Dokument erstellt: {wek_path.name}")
+                if begleitschein_path:
+                    st.success(f"✅ Begleitschein erstellt: {begleitschein_path.name}")
+                else:
+                    st.error("❌ Begleitschein konnte nicht erstellt werden")
+                if wek_path:
+                    st.success(f"✅ WEK erstellt: {wek_path.name}")
+                else:
+                    st.error("❌ Wareneingangskontrolle konnte nicht erstellt werden")
                 if barcode_success:
                     if barcode_result.get('article_barcode'):
                         from pathlib import Path
@@ -388,7 +394,7 @@ def show_ls_confirmation_popup(item_data: Dict[str, Any]):
                     # Weiter mit Dokumentenerstellung, auch wenn ItemInfo fehlschlägt
 
                 # Create Begleitschein and Wareneingangskontrolle documents
-                from warehouse.application.services.document_generation import DocumentGenerationService, DocumentType
+                from warehouse.application.services.document_generation import DocumentGenerationService, DocumentType, ProcessingOptions
 
                 st.write("🔄 Erstelle Dokumente...")
                 doc_service = DocumentGenerationService()
@@ -399,9 +405,9 @@ def show_ls_confirmation_popup(item_data: Dict[str, Any]):
                     article_number=confirmed_article,
                     batch_number=confirmed_batch,
                     delivery_number=confirmed_ls_nr,
-                    auto_open=True
+                    processing_options=ProcessingOptions(open_after_creation=True),
                 )
-                begleitschein_path = begleitschein_result.output_path if begleitschein_result.success else None
+                begleitschein_path = begleitschein_result.document_path if begleitschein_result.success else None
 
                 # Create Wareneingangskontrolle document
                 wek_result = doc_service.generate_document(
@@ -409,12 +415,12 @@ def show_ls_confirmation_popup(item_data: Dict[str, Any]):
                     article_number=confirmed_article,
                     batch_number=confirmed_batch,
                     delivery_number=confirmed_ls_nr,
-                    additional_placeholders={
-                        "we_date": confirmed_we_date.strftime('%Y-%m-%d') if confirmed_we_date else ""
+                    additional_data={
+                        "we_date": confirmed_we_date.strftime("%d.%m.%Y") if confirmed_we_date else ""
                     },
-                    auto_open=True
+                    processing_options=ProcessingOptions(open_after_creation=True),
                 )
-                wek_path = wek_result.output_path if wek_result.success else None
+                wek_path = wek_result.document_path if wek_result.success else None
 
                 # Create barcode files with validation
                 try:
@@ -479,8 +485,14 @@ def show_ls_confirmation_popup(item_data: Dict[str, Any]):
                     barcode_result = {'article_barcode': None, 'batch_barcode': None}
 
                 st.success("✅ LS-Daten bestätigt!")
-                st.success(f"✅ Begleitschein erstellt: {begleitschein_path.name}")
-                st.success(f"✅ Wareneingangskontrolle-Dokument erstellt: {wek_path.name}")
+                if begleitschein_path:
+                    st.success(f"✅ Begleitschein erstellt: {begleitschein_path.name}")
+                else:
+                    st.error("❌ Begleitschein konnte nicht erstellt werden")
+                if wek_path:
+                    st.success(f"✅ WEK erstellt: {wek_path.name}")
+                else:
+                    st.error("❌ Wareneingangskontrolle konnte nicht erstellt werden")
                 if barcode_success:
                     if barcode_result.get('article_barcode'):
                         from pathlib import Path
