@@ -14,6 +14,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
+from warehouse.infrastructure.database.repositories.item_info_repository import (
+    item_info_repository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -456,12 +459,9 @@ class BarcodeGenerator:
 
             # QR Code on the right side
             qr_section_x = padding_left + text_section_width + 20
-            qr_code_path = self._get_qr_code_for_article(article_number)
-            if qr_code_path and qr_code_path.exists():
+            qr_img = self._load_qr_code_image(article_number)
+            if qr_img:
                 try:
-                    # QR-Code laden
-                    qr_img = Image.open(qr_code_path)
-
                     # Optimale Größe für rechte obere Ecke berechnen
                     available_width = qr_section_width - 20
                     available_height = (
@@ -485,13 +485,10 @@ class BarcodeGenerator:
                     # QR-Code ins Label einfügen
                     label.paste(qr_resized, (qr_x, qr_y))
 
-                    logger.info(
-                        "QR-Code erfolgreich eingefuegt:" " %s",
-                        qr_code_path.name,
-                    )
+                    logger.info("QR-Code erfolgreich eingefuegt")
                 except Exception as e:
                     logger.warning(
-                        "QR-Code konnte nicht geladen" " werden: %s",
+                        "QR-Code konnte nicht eingefuegt" " werden: %s",
                         e,
                     )
             else:
@@ -725,6 +722,45 @@ class BarcodeGenerator:
 
         except Exception as e:
             return {"status": "error", "error": str(e)}
+
+    def _load_qr_code_image(self, article_number: str) -> Optional[Any]:
+        """
+        Lädt QR-Code als PIL-Image. Priorität:
+          1. Datenbank (item_info.qr_code_image)
+          2. Dateisystem (Server → lokal)
+
+        Returns:
+            PIL.Image.Image oder None
+        """
+        import io
+
+        try:
+            from PIL import Image as PILImage
+        except ImportError:
+            return None
+
+        # Primär: Datenbank
+        try:
+            db_qr = item_info_repository.get_qr_code(article_number)
+            if db_qr and db_qr.get("image"):
+                image = PILImage.open(io.BytesIO(db_qr["image"]))
+                logger.info(
+                    "QR-Code aus Datenbank geladen: %s",
+                    db_qr.get("filename"),
+                )
+                return image
+        except Exception as e:
+            logger.warning("QR-Code DB-Ladefehler: %s", e)
+
+        # Fallback: Dateisystem
+        qr_path = self._get_qr_code_for_article(article_number)
+        if qr_path and qr_path.exists():
+            try:
+                return PILImage.open(qr_path)
+            except Exception as e:
+                logger.warning("QR-Code Dateisystem-Ladefehler: %s", e)
+
+        return None
 
     def _get_qr_code_for_article(self, article_number: str) -> Optional[Path]:
         r"""

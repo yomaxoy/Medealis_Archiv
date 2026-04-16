@@ -151,17 +151,18 @@ def show_iteminfo_edit_dialog(article_data: Dict[str, Any]):
 
     # Zeige existierenden QR-Code falls vorhanden
     if existing_iteminfo and existing_iteminfo.qr_code_image:
-        qr_fname = existing_iteminfo.qr_code_filename
-        qr_date = existing_iteminfo.qr_code_uploaded_at.strftime("%d.%m.%Y %H:%M")
-        st.info(f"✅ QR-Code vorhanden: {qr_fname} " f"(hochgeladen am {qr_date})")
+        qr_fname = existing_iteminfo.qr_code_filename or "unbekannt"
+        uploaded_at = existing_iteminfo.qr_code_uploaded_at
+        qr_date = uploaded_at.strftime("%d.%m.%Y %H:%M") if uploaded_at else "unbekannt"
+        st.info(f"✅ QR-Code vorhanden: {qr_fname} (hochgeladen am {qr_date})")
 
         col_qr1, col_qr2 = st.columns(2)
         with col_qr1:
-            if st.button("🔄 QR-Code ersetzen"):
+            if st.button("🔄 QR-Code ersetzen", key="iteminfo_replace_qr"):
                 st.session_state.replace_qr = True
                 st.rerun()
         with col_qr2:
-            if st.button("🗑️ QR-Code löschen"):
+            if st.button("🗑️ QR-Code löschen", key="iteminfo_delete_qr"):
                 item_info_repository.delete_qr_code(article_number)
                 st.success("✅ QR-Code gelöscht!")
                 st.rerun()
