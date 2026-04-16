@@ -543,6 +543,93 @@ class ItemService:
             )
             raise
 
+    def get_missing_workflow_steps(
+        self,
+        article_number: str,
+        batch_number: str,
+        delivery_number: str,
+    ) -> List[str]:
+        """
+        Gibt die Liste fehlender Workflow-Schritte eines Artikels zurück.
+
+        Returns:
+            Liste mit Namen der fehlenden Steps (leer = alle abgeschlossen)
+        """
+        try:
+            article_vo = ArticleNumber(article_number)
+            batch_vo = BatchNumber(batch_number)
+            item = self.item_repo.find_domain_by_composite_key(
+                article_vo, batch_vo, delivery_number
+            )
+            if not item:
+                return []
+            return item.get_missing_steps()
+        except Exception as e:
+            logger.error("Fehler beim Ermitteln fehlender Workflow-Schritte: %s", e)
+            return []
+
+    def force_complete_item_processing(
+        self,
+        article_number: str,
+        batch_number: str,
+        delivery_number: str,
+        employee: str,
+        reason: str,
+    ) -> bool:
+        """
+        Schließt Artikelbearbeitung manuell ab – ohne Voraussetzungs-Prüfung.
+        Fehlende Schritte werden als 'Extern / {employee}' markiert.
+        Für Artikel, deren Dokumentation außerhalb des Systems erstellt wurde.
+
+        Args:
+            article_number: Artikelnummer
+            batch_number: Chargennummer
+            delivery_number: Lieferscheinnummer
+            employee: Durchführender Mitarbeiter
+            reason: Begründung für den manuellen Abschluss
+
+        Returns:
+            True wenn erfolgreich
+        """
+        try:
+            article_vo = ArticleNumber(article_number)
+            batch_vo = BatchNumber(batch_number)
+
+            item = self.item_repo.find_domain_by_composite_key(
+                article_vo, batch_vo, delivery_number
+            )
+
+            if not item:
+                raise ItemNotFoundException(
+                    article_number, batch_number, delivery_number
+                )
+
+            item.force_complete_processing(employee, reason)
+            self.item_repo.save_domain(item)
+
+            logger.info(
+                "Artikel manuell eingelagert (extern): %s | Begründung: %s",
+                item.get_unique_identifier(),
+                reason,
+            )
+            return True
+
+        except (ItemNotFoundException, ItemNotEditableException) as e:
+            logger.error(
+                "Geschäftslogik-Fehler beim manuellen Einlagern: %s", e
+            )
+            raise
+        except (ConnectionError, AttributeError) as e:
+            logger.error(
+                "Infrastructure-Fehler beim manuellen Einlagern: %s", e
+            )
+            raise
+        except Exception as e:
+            logger.error(
+                "Unerwarteter Fehler beim manuellen Einlagern: %s", e
+            )
+            raise
+
     def mark_item_as_waste(
         self,
         article_number: str,
@@ -1774,6 +1861,14 @@ class ItemService:
                 item_info = session.get(ItemInfoModel, article_number)
                 delivery = session.get(DeliveryModel, delivery_number)
 
+                # Lade Lieferantenname aus suppliers-Tabelle (DeliveryModel hat nur supplier_id FK)
+                supplier_id = delivery.supplier_id if delivery else ""
+                supplier_name = ""
+                if supplier_id:
+                    from warehouse.infrastructure.database.models.supplier_model import SupplierModel
+                    supplier = session.get(SupplierModel, supplier_id)
+                    supplier_name = supplier.name if supplier else supplier_id
+
                 # Return dictionary compatible with UI expectations
                 return {
                     "article_number": item.article_number,
@@ -1804,8 +1899,8 @@ class ItemService:
                     "storage_location": item_info.storage_location if item_info else "",
                     "hersteller": item_info.hersteller if item_info else "",
                     "kompatibilitaet": (item_info.kompatibilitaet if item_info else ""),
-                    "supplier_name": delivery.supplier_name if delivery else "",
-                    "supplier_id": delivery.supplier_id if delivery else "",
+                    "supplier_name": supplier_name,
+                    "supplier_id": supplier_id,
                     # Certificate data for template
                     # generation and popup pre-filling
                     "certificates": {

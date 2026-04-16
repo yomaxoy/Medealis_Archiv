@@ -38,22 +38,38 @@ _DOC_CHECK_FORM_KEYS = [
     "doc_notes",
 ]
 
+# Temporäre Keys die während render_body gesetzt werden
+_DOC_CHECK_TEMP_KEYS = [
+    "_temp_materialzeugnis",
+    "_temp_messprotokolle",
+    "_temp_beschichtungszeugnis",
+    "_temp_haertezeugnis",
+    "_temp_weitere_zeugnisse",
+    "_temp_label_attached",
+    "_temp_slip_attached",
+]
+
 
 def _cleanup_doc_check_session_state() -> None:
-    """Entfernt alle Form-Widget-Keys aus dem Session State."""
+    """Entfernt alle Form-Widget-Keys und temporären Keys aus dem Session State."""
     for key in _DOC_CHECK_FORM_KEYS:
         st.session_state.pop(key, None)
+    for key in _DOC_CHECK_TEMP_KEYS:
+        st.session_state.pop(key, None)
     st.session_state.pop("_dcc_item_key", None)
+    # Verhindert, dass ein pending_doc_confirmation von Artikel 1
+    # nach dem Öffnen von Artikel 2 noch im State verbleibt
+    st.session_state.pop("pending_doc_confirmation", None)
 
 
-# PERFORMANCE: Cache DocumentGenerationService als Singleton
-@st.cache_resource
 def get_document_generation_service():
     """
-    Get cached DocumentGenerationService singleton.
+    Erstellt eine neue DocumentGenerationService-Instanz.
 
-    Uses @st.cache_resource to create service ONCE and reuse it.
-    This allows TemplateCache to persist across document generations.
+    Bewusst KEIN @st.cache_resource: Jede PDB-Generierung bekommt eine
+    frische Service-Instanz ohne angesammelten State aus vorherigen Artikeln.
+    Template-Caching bleibt dennoch aktiv, da @ttl_cache auf Klassen-Ebene
+    (nicht Instanz-Ebene) operiert und Instanz-übergreifend cached.
     """
     from warehouse.application.services.document_generation import (
         DocumentGenerationService,
@@ -423,11 +439,21 @@ class DocumentCheckPopup(InspectionPopup):
                     logger.error(f"Error saving documents: {storage_error}")
 
             # 2. Generate PDB with certificate information (ADMIN STYLE)
+            from pathlib import Path
+            from warehouse.application.services.document_storage.document_storage_service import (
+                DocumentOperationResult,
+                StorageResult,
+            )
+
+            operation_result = DocumentOperationResult(
+                operation_type="Dokumentenprüfung (PDB)",
+                auto_open=True,  # Dokumente zur Kontrolle öffnen
+            )
+
             try:
                 st.write(
                     "✨ **Neue Generation Service**: Erstelle PDB mit Zertifikatsinformationen..."  # noqa: E501
                 )
-                # PERFORMANCE: Use cached service instead of creating new one
                 generation_service = get_document_generation_service()
 
                 # Prepare certificate data for PDB generation (ADMIN STYLE)
@@ -481,18 +507,6 @@ class DocumentCheckPopup(InspectionPopup):
                 )
 
                 # Generate PDB document with certificate data (DOCX + PDF + SharePoint Upload) (ADMIN STYLE)  # noqa: E501
-                # Neue robuste Implementierung mit DocumentOperationResult
-                from pathlib import Path
-                from warehouse.application.services.document_storage.document_storage_service import (
-                    DocumentOperationResult,
-                    StorageResult,
-                )
-
-                operation_result = DocumentOperationResult(
-                    operation_type="Dokumentenprüfung (PDB)",
-                    auto_open=True,  # Dokumente zur Kontrolle öffnen
-                )
-
                 pdb_result = generation_service.generate_document(
                     document_type="pdb",
                     batch_number=batch_number,
@@ -534,6 +548,7 @@ class DocumentCheckPopup(InspectionPopup):
 
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 st.error(f"❌ PDB-Generierung fehlgeschlagen: {e}")
+                operation_result.add_error(f"PDB-Generierung fehlgeschlagen: {e}")
 
             # 3. Complete workflow - WITH certificates parameter mapped to CertificateType enums  # noqa: E501
             try:

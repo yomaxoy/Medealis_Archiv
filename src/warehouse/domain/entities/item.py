@@ -298,6 +298,46 @@ class Item:
         self.completed_at = datetime.now()
         self._update_timestamp()
 
+    def force_complete_processing(self, employee: str, reason: str) -> None:
+        """
+        Schließt Artikelbearbeitung manuell ab (Final) – ohne Voraussetzungs-Prüfung.
+        Fehlende Workflow-Schritte werden als 'Extern / {employee}' markiert.
+        Für Artikel, deren Dokumentation außerhalb des Systems erstellt wurde.
+        """
+        if self.is_final_status():
+            raise ItemNotEditableException(self.get_current_status())
+
+        now = datetime.now()
+        extern_label = f"Extern / {employee}"
+
+        if not self.iteminfo_complete_by:
+            self.iteminfo_complete_by = extern_label
+            self.iteminfo_complete_at = now
+        if not self.data_checked_by:
+            self.data_checked_by = extern_label
+            self.data_checked_at = now
+        if not self.documents_checked_by:
+            self.documents_checked_by = extern_label
+            self.documents_checked_at = now
+        if not self.measured_by:
+            self.measured_by = extern_label
+            self.measured_at = now
+        if not self.visually_inspected_by:
+            self.visually_inspected_by = extern_label
+            self.visually_inspected_at = now
+        if not self.documents_merged_by:
+            self.documents_merged_by = extern_label
+            self.documents_merged_at = now
+
+        self.completed_by = employee
+        self.completed_at = now
+
+        timestamp_str = now.strftime("%d.%m.%Y %H:%M")
+        note_entry = f"[MANUELL EINGELAGERT – {timestamp_str}] {reason}"
+        self.notes = f"{self.notes}\n{note_entry}" if self.notes else note_entry
+
+        self._update_timestamp()
+
     def mark_as_rejected(self, reason: str, employee: str) -> None:
         """Markiert Artikel als Ausschuss (Final)."""
         if self.is_final_status():

@@ -677,13 +677,12 @@ class DeliveryService:
                     )
                     break
 
-            # If not found by ID, try by name
+            # If not found by ID, try by name (contains-match, case-insensitive)
             if not found_supplier:
+                lookup_lower = supplier_lookup_value.lower()
                 for supplier in existing_suppliers:
-                    if (
-                        supplier.get("name", "").lower()
-                        == supplier_lookup_value.lower()
-                    ):
+                    db_name = supplier.get("name", "").lower()
+                    if db_name == lookup_lower or lookup_lower in db_name or db_name in lookup_lower:
                         found_supplier = supplier
                         logger.info(
                             "Found supplier by name: %s (ID: %s)",
@@ -691,6 +690,23 @@ class DeliveryService:
                             supplier.get("id"),
                         )
                         break
+
+            # Last resort: try explicit name→ID mapping before creating a new supplier
+            if not found_supplier:
+                fallback_id = self.map_supplier_name_to_id(supplier_lookup_value) or (
+                    self.map_supplier_name_to_id(supplier_name) if supplier_name else None
+                )
+                if fallback_id:
+                    for supplier in existing_suppliers:
+                        sid = supplier.get("id") or supplier.get("supplier_id")
+                        if str(sid) == fallback_id:
+                            found_supplier = supplier
+                            logger.info(
+                                "Found supplier via name mapping: %s -> %s",
+                                supplier_lookup_value,
+                                fallback_id,
+                            )
+                            break
 
             if found_supplier:
                 final_supplier_id = found_supplier.get("id") or found_supplier.get(

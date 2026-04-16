@@ -20,6 +20,7 @@ from warehouse.presentation.shared.components import render_compact_folder_butto
 
 # Import User-spezifische Popups (nicht Teil der Inspection-Workflow)
 from warehouse.presentation.shared.popups.document_merge import show_document_merge_popup
+from warehouse.presentation.shared.popups.manual_completion import show_manual_completion_popup
 from warehouse.presentation.user.popups.delivery_scan import (
     show_delivery_scan_popup,
     show_extraction_confirmation_popup,
@@ -707,12 +708,12 @@ def show_item_table(services):
                     }
                     show_visual_inspection_popup(item_data)
 
-            # Button 5: Dokumente zusammenführen
+            # Button 5: Dokumente zusammenführen / Manuell einlagern
             with action_col5:
                 if st.button(
                     "📄",
                     key=f"doc_merge_{i}",
-                    help="Dokumente zusammenführen",
+                    help="Dokumente zusammenführen / Einlagern",
                     use_container_width=True,
                 ):
                     # Prepare item data for popup
@@ -726,7 +727,21 @@ def show_item_table(services):
                         "status": item.get("status", "Pending"),
                         "supplier_name": item["supplier"],
                     }
-                    show_document_merge_popup(item_data)
+                    # Routing: fehlende Schritte → manuelles Einlagern, sonst normaler Merge
+                    _item_service = services.get("item") if services else None
+                    _missing = (
+                        _item_service.get_missing_workflow_steps(
+                            item["article_number"],
+                            item["batch_number"],
+                            item["delivery_number"],
+                        )
+                        if _item_service
+                        else []
+                    )
+                    if _missing:
+                        show_manual_completion_popup(item_data)
+                    else:
+                        show_document_merge_popup(item_data)
 
             # Button 6: Item löschen
             with action_col6:

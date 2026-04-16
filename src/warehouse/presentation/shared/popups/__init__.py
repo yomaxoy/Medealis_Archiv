@@ -16,6 +16,7 @@ from .visual_inspection import show_visual_inspection_popup, VisualInspectionPop
 from .data_confirmation import show_data_confirmation_popup, DataConfirmationPopup
 from .document_check import show_document_check_popup, DocumentCheckPopup
 from .document_merge import show_document_merge_popup
+from .manual_completion import show_manual_completion_popup
 
 __all__ = [
     # Measurement
@@ -32,4 +33,6 @@ __all__ = [
     'DocumentCheckPopup',
     # Document Merge
     'show_document_merge_popup',
+    # Manual Completion
+    'show_manual_completion_popup',
 ]

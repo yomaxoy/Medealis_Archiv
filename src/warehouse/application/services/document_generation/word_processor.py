@@ -496,7 +496,18 @@ class WordProcessor:
 
             # 5. Dokument speichern
             logger.info(f"Saving document to {output_path}")
-            processed_document.save(str(output_path))
+            try:
+                processed_document.save(str(output_path))
+            except PermissionError:
+                # Datei ist vermutlich noch in Word geöffnet.
+                # Fallback: Zeitstempel-Suffix anhängen um Blockade zu umgehen.
+                ts = datetime.now().strftime("%H%M%S")
+                fallback_path = output_path.with_stem(f"{output_path.stem}_{ts}")
+                logger.warning(
+                    f"PermissionError on {output_path} – saving to fallback {fallback_path}"
+                )
+                processed_document.save(str(fallback_path))
+                output_path = fallback_path
 
             # 6. Erfolg setzen
             generation_result.success = True
