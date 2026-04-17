@@ -9,7 +9,8 @@
       "Bash(python -c ' *)",
       "Bash(taskkill /F /IM python.exe)",
       "Bash(taskkill /F /IM python3.13.exe)",
-      "Bash(PYTHONPATH=\"c:\\\\Users\\\\User\\\\Desktop\\\\Medealis Archiv neu\\\\src\" python)"
+      "Bash(PYTHONPATH=\"c:\\\\Users\\\\User\\\\Desktop\\\\Medealis Archiv neu\\\\src\" python)",
+      "Bash(grep -E \"\\\\.py$\")"
     ],
     "deny": [],
     "ask": []

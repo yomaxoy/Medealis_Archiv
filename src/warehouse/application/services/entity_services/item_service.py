@@ -575,6 +575,8 @@ class ItemService:
         delivery_number: str,
         employee: str,
         reason: str,
+        waste_quantity: int = 0,
+        waste_reason: Optional[str] = None,
     ) -> bool:
         """
         Schließt Artikelbearbeitung manuell ab – ohne Voraussetzungs-Prüfung.
@@ -587,6 +589,8 @@ class ItemService:
             delivery_number: Lieferscheinnummer
             employee: Durchführender Mitarbeiter
             reason: Begründung für den manuellen Abschluss
+            waste_quantity: Anzahl Ausschuss-Teile (0 = kein Ausschuss)
+            waste_reason: Ursache des Ausschusses
 
         Returns:
             True wenn erfolgreich
@@ -604,13 +608,19 @@ class ItemService:
                     article_number, batch_number, delivery_number
                 )
 
-            item.force_complete_processing(employee, reason)
+            item.force_complete_processing(
+                employee=employee,
+                reason=reason,
+                waste_quantity=waste_quantity,
+                waste_reason=waste_reason,
+            )
             self.item_repo.save_domain(item)
 
             logger.info(
-                "Artikel manuell eingelagert (extern): %s | Begründung: %s",
+                "Artikel manuell eingelagert (extern): %s | Begründung: %s | Ausschuss: %d Stk.",
                 item.get_unique_identifier(),
                 reason,
+                waste_quantity,
             )
             return True
 

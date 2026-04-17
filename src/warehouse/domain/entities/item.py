@@ -298,11 +298,23 @@ class Item:
         self.completed_at = datetime.now()
         self._update_timestamp()
 
-    def force_complete_processing(self, employee: str, reason: str) -> None:
+    def force_complete_processing(
+        self,
+        employee: str,
+        reason: str,
+        waste_quantity: int = 0,
+        waste_reason: Optional[str] = None,
+    ) -> None:
         """
         Schließt Artikelbearbeitung manuell ab (Final) – ohne Voraussetzungs-Prüfung.
         Fehlende Workflow-Schritte werden als 'Extern / {employee}' markiert.
         Für Artikel, deren Dokumentation außerhalb des Systems erstellt wurde.
+
+        Args:
+            employee: Durchführender Mitarbeiter
+            reason: Begründung für den manuellen Abschluss
+            waste_quantity: Anzahl Ausschuss-Teile (0 = kein Ausschuss)
+            waste_reason: Ursache des Ausschusses (erforderlich wenn waste_quantity > 0)
         """
         if self.is_final_status():
             raise ItemNotEditableException(self.get_current_status())
@@ -329,11 +341,23 @@ class Item:
             self.documents_merged_by = extern_label
             self.documents_merged_at = now
 
+        # Ausschuss-Menge im InspectionResult festhalten
+        if waste_quantity > 0:
+            self.inspection_result = InspectionResult(
+                performed_at=now,
+                performed_by=extern_label,
+                waste_quantity=waste_quantity,
+                waste_reason=waste_reason,
+                passed=False,
+            )
+
         self.completed_by = employee
         self.completed_at = now
 
         timestamp_str = now.strftime("%d.%m.%Y %H:%M")
         note_entry = f"[MANUELL EINGELAGERT – {timestamp_str}] {reason}"
+        if waste_quantity > 0:
+            note_entry += f" | Ausschuss: {waste_quantity} Stk. – {waste_reason}"
         self.notes = f"{self.notes}\n{note_entry}" if self.notes else note_entry
 
         self._update_timestamp()
