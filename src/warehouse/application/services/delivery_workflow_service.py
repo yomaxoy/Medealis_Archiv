@@ -395,7 +395,7 @@ class DeliveryWorkflowService:
             # Use new DocumentGenerationService instead of deprecated BarcodeService
             from warehouse.application.services.document_generation.document_generation_service import DocumentGenerationService
 
-            logger.info("🔥 DEBUG: Creating barcode via DocumentGenerationService...")
+            logger.info("DEBUG: Creating barcode via DocumentGenerationService...")
             generation_service = DocumentGenerationService()
             barcode_result = generation_service.generate_document(
                 document_type="barcode",

@@ -1997,9 +1997,9 @@ if __name__ == "__main__":
     print("Testing ItemService...")
     try:
         service = ItemService()
-        print("✅ ItemService erfolgreich erstellt!")
+        print("ItemService erfolgreich erstellt!")
     except Exception as e:
-        print(f"❌ Fehler: {e}")
+        print(f"Fehler: {e}")
         import traceback
 
         traceback.print_exc()

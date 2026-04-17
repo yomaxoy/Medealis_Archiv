@@ -354,7 +354,7 @@ class PathResolver:
             # Validiere dass Server verfügbar ist (prüfe direkt den UNC-Pfad)
             server_available = self.server_storage_path.exists()
             self.logger.info(
-                f"🔍 DEBUG path_resolver: Server storage available = {server_available}"
+                f"DEBUG path_resolver: Server storage available = {server_available}"
             )
 
             if not server_available:

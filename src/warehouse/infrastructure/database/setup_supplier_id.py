@@ -37,7 +37,7 @@ def setup_supplier_id() -> None:
                     """)
                 )
                 session.commit()
-                logger.info("✓ Column supplier_id added to items table")
+                logger.info("Column supplier_id added to items table")
 
                 # Erstelle Index
                 try:
@@ -47,7 +47,7 @@ def setup_supplier_id() -> None:
                         """)
                     )
                     session.commit()
-                    logger.info("✓ Index created")
+                    logger.info("Index created")
                 except Exception as e:
                     logger.warning(f"Could not create index (may already exist): {e}")
 
@@ -73,7 +73,7 @@ def setup_supplier_id() -> None:
             session.commit()
 
             rows_updated = result.rowcount
-            logger.info(f"✓ Updated {rows_updated} items with supplier_id from deliveries")
+            logger.info(f"Updated {rows_updated} items with supplier_id from deliveries")
 
             # Schritt 3: Validierung
             result = session.execute(
@@ -85,15 +85,15 @@ def setup_supplier_id() -> None:
             null_count = result.scalar() or 0
 
             if null_count > 0:
-                logger.warning(f"⚠ {null_count} items still have NULL supplier_id")
+                logger.warning(f"{null_count} items still have NULL supplier_id")
                 logger.warning("These items may not have matching deliveries")
             else:
-                logger.info("✓ All items have supplier_id assigned")
+                logger.info("All items have supplier_id assigned")
 
-            logger.info("✓ Setup completed successfully")
+            logger.info("Setup completed successfully")
 
     except Exception as e:
-        logger.error(f"✗ Setup failed: {str(e)}")
+        logger.error(f"Setup failed: {str(e)}")
         logger.exception("Full traceback:")
         raise
 
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     print("Starting setup: adding and populating supplier_id...")
     try:
         setup_supplier_id()
-        print("✓ Setup completed successfully")
+        print("Setup completed successfully")
     except Exception as e:
-        print(f"✗ Setup failed: {e}")
+        print(f"Setup failed: {e}")
         exit(1)

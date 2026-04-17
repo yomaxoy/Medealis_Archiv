@@ -70,15 +70,15 @@ class UnifiedDocumentProcessingService:
 
             # PHASE 3: PDF Storage für Lieferscheine (nach erfolgreicher Datenextraktion)
             if document_type == "delivery" and final_result.get('success'):
-                self.logger.info(f"🔧 DEBUG: Starting PDF storage phase for delivery document")
+                self.logger.info(f"DEBUG: Starting PDF storage phase for delivery document")
                 pdf_storage_result = self._handle_delivery_slip_pdf_storage(final_result, context)
                 if pdf_storage_result:
-                    self.logger.info(f"🔧 DEBUG: PDF storage successful: {pdf_storage_result.get('pdf_stored', False)}")
+                    self.logger.info(f"DEBUG: PDF storage successful: {pdf_storage_result.get('pdf_stored', False)}")
                     final_result.update(pdf_storage_result)
                 else:
-                    self.logger.info(f"🔧 DEBUG: PDF storage was skipped or returned None")
+                    self.logger.info(f"DEBUG: PDF storage was skipped or returned None")
 
-            self.logger.info(f"✅ Successfully processed {document_type} document")
+            self.logger.info(f"Successfully processed {document_type} document")
             return final_result
 
         except Exception as e:
@@ -109,7 +109,7 @@ class UnifiedDocumentProcessingService:
             cached_result = self.cache.get_cached_result(cache_key)
 
             if cached_result:
-                self.logger.info(f"✅ Cache hit for {document_type} raw extraction")
+                self.logger.info(f"Cache hit for {document_type} raw extraction")
                 return self._add_processing_metadata(cached_result, from_cache=True)
 
             # 2. Temporär speichern
@@ -156,7 +156,7 @@ class UnifiedDocumentProcessingService:
                     validation_errors=validation_errors
                 )
 
-                self.logger.info(f"✅ Raw extraction completed for {document_type} document")
+                self.logger.info(f"Raw extraction completed for {document_type} document")
                 return final_result
 
             finally:
@@ -593,7 +593,7 @@ class UnifiedDocumentProcessingService:
             )
 
             if storage_result.success:
-                self.logger.info(f"✅ Delivery slip PDF saved: {storage_result.file_path}")
+                self.logger.info(f"Delivery slip PDF saved: {storage_result.file_path}")
                 return {
                     'success': True,
                     'file_path': storage_result.file_path,
@@ -635,30 +635,30 @@ class UnifiedDocumentProcessingService:
             supplier_name = processing_result.get('supplier_name')
             delivery_number = processing_result.get('delivery_number')
 
-            self.logger.info(f"🔧 DEBUG: PDF storage - supplier_name: '{supplier_name}', delivery_number: '{delivery_number}'")
+            self.logger.info(f"DEBUG: PDF storage - supplier_name: '{supplier_name}', delivery_number: '{delivery_number}'")
 
             if not supplier_name and not delivery_number:
-                self.logger.info("🔧 DEBUG: No supplier or delivery number found - skipping PDF storage")
+                self.logger.info("DEBUG: No supplier or delivery number found - skipping PDF storage")
                 return None
 
             # Hole temp_file_path aus dem context falls vorhanden
             temp_file_path = context.get('temp_file_path')
-            self.logger.info(f"🔧 DEBUG: temp_file_path from context: '{temp_file_path}'")
+            self.logger.info(f"DEBUG: temp_file_path from context: '{temp_file_path}'")
 
             # Falls temp_file_path nicht vorhanden (z.B. Cache-Hit),
             # versuche document_data zu verwenden
             if not temp_file_path:
                 document_data = context.get('document_data')
-                self.logger.info(f"🔧 DEBUG: document_data available: {len(document_data) if document_data else 0} bytes")
+                self.logger.info(f"DEBUG: document_data available: {len(document_data) if document_data else 0} bytes")
                 if document_data:
                     # Erstelle temporäre Datei für PDF Storage
                     temp_file_path = self._save_temporarily(document_data)
                     if temp_file_path:
                         context['temp_file_path'] = temp_file_path
-                        self.logger.info(f"🔧 DEBUG: Created temporary file for PDF storage: {temp_file_path}")
+                        self.logger.info(f"DEBUG: Created temporary file for PDF storage: {temp_file_path}")
 
                 if not temp_file_path:
-                    self.logger.info("🔧 DEBUG: No temp_file_path or document_data available - skipping PDF storage")
+                    self.logger.info("DEBUG: No temp_file_path or document_data available - skipping PDF storage")
                     return None
 
             # Verwende Fallback-Werte wenn nötig
@@ -675,7 +675,7 @@ class UnifiedDocumentProcessingService:
             )
 
             if storage_result.get('success'):
-                self.logger.info(f"✅ Delivery slip PDF stored successfully")
+                self.logger.info(f"Delivery slip PDF stored successfully")
                 return {
                     'pdf_stored': True,
                     'pdf_path': storage_result.get('file_path'),

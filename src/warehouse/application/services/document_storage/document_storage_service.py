@@ -393,7 +393,7 @@ class DocumentStorageService:
                     if upload_result.success:
                         sharepoint_url = upload_result.file_url
                         self.logger.info(
-                            f"✅ SharePoint fallback successful: {sharepoint_url}"
+                            f"SharePoint fallback successful: {sharepoint_url}"
                         )
                     else:
                         error_msg = (

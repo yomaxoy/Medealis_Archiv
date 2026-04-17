@@ -237,7 +237,7 @@ Prüfe dies, aber lass dich nicht davon beeinflussen falls der Text etwas andere
             if doc_quality.get("completeness") == "incomplete":
                 result.warnings.append("Dokument scheint unvollständig zu sein")
 
-            self.logger.info(f"🔧 DEBUG: Extracted {len(result.detected_items)} items from Claude response")
+            self.logger.info(f"DEBUG: Extracted {len(result.detected_items)} items from Claude response")
             return result
 
         except Exception as e:

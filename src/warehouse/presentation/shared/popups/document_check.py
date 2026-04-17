@@ -289,7 +289,7 @@ class DocumentCheckPopup(InspectionPopup):
             delivery_number = self.item_data.get("delivery_number", "")
 
             logger.info(
-                f"🔥 USER POPUP: Employee name from form_data: '{employee_name}'"
+                f"USER POPUP: Employee name from form_data: '{employee_name}'"
             )
 
             # ===== VALIDATION FIRST =====
@@ -328,9 +328,9 @@ class DocumentCheckPopup(InspectionPopup):
             )
 
             # Log for debugging (ADMIN STYLE)
-            logger.info(f"🔍 STEP 2 DEBUG: Documents found: {documents_found}")
+            logger.info(f"STEP 2 DEBUG: Documents found: {documents_found}")
             logger.info(
-                f"🔍 STEP 2 DEBUG: Physical documents: Label={label_attached}, Begleitschein={accompanying_document_attached}"  # noqa: E501
+                f"STEP 2 DEBUG: Physical documents: Label={label_attached}, Begleitschein={accompanying_document_attached}"  # noqa: E501
             )
 
             # 1. Save certificate and document flags (ADMIN STYLE)
@@ -360,26 +360,26 @@ class DocumentCheckPopup(InspectionPopup):
                     "label_present": label_attached,
                     "accompanying_document": accompanying_document_attached,
                 }
-                logger.info(f"🔥 STEP 2 SAVE: Parameters being sent: {save_params}")
+                logger.info(f"STEP 2 SAVE: Parameters being sent: {save_params}")
 
                 item_service.update_item(**save_params)
                 logger.info(
-                    "🔥 STEP 2 SAVE: SUCCESS - Certificates and document flags saved!"
+                    "STEP 2 SAVE: SUCCESS - Certificates and document flags saved!"
                 )
                 st.success("🔥 Certificates and document flags saved!")
 
             except Exception as e:
-                logger.error(f"🔥 STEP 2 SAVE ERROR: {e}")
+                logger.error(f"STEP 2 SAVE ERROR: {e}")
                 import traceback
 
-                logger.error(f"🔥 STEP 2 SAVE Traceback: {traceback.format_exc()}")
+                logger.error(f"STEP 2 SAVE Traceback: {traceback.format_exc()}")
                 st.error(f"❌ Error saving certificates and document flags: {e}")
                 return
 
             # 1.5 Save uploaded documents
             uploaded_docs = form_data.get("uploaded_documents", [])
             logger.info(
-                f"🔍 DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}"  # noqa: E501
+                f"DEBUG: uploaded_docs = {uploaded_docs}, type = {type(uploaded_docs)}"  # noqa: E501
             )
             if uploaded_docs:
                 st.write(
@@ -416,14 +416,14 @@ class DocumentCheckPopup(InspectionPopup):
                             if save_result.success:
                                 st.success(f"✅ Dokument gespeichert: {doc.name}")
                                 logger.info(
-                                    f"✅ Document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}"  # noqa: E501
+                                    f"Document saved: {doc.name} to {save_result.file_path or save_result.storage_folder}"  # noqa: E501
                                 )
                             else:
                                 st.error(
                                     f"❌ Fehler beim Speichern von {doc.name}: {save_result.error}"  # noqa: E501
                                 )
                                 logger.error(
-                                    f"❌ Failed to save {doc.name}: {save_result.error}"
+                                    f"Failed to save {doc.name}: {save_result.error}"
                                 )
 
                         except Exception as doc_error:
@@ -574,7 +574,7 @@ class DocumentCheckPopup(InspectionPopup):
                 }
 
                 logger.info(
-                    f"🔥 WORKFLOW COMPLETE: Certificates dict: {certificates_dict}"
+                    f"WORKFLOW COMPLETE: Certificates dict: {certificates_dict}"
                 )
 
                 item_service.complete_document_check(
@@ -615,7 +615,7 @@ class DocumentCheckPopup(InspectionPopup):
                 logger.error(f"Error completing document check: {e}")
                 import traceback
 
-                logger.error(f"🔥 WORKFLOW ERROR Traceback: {traceback.format_exc()}")
+                logger.error(f"WORKFLOW ERROR Traceback: {traceback.format_exc()}")
                 st.error(f"❌ Fehler beim Abschließen der Dokumentenprüfung: {e}")
                 return
 

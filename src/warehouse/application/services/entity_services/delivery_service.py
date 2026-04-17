@@ -1085,9 +1085,9 @@ if __name__ == "__main__":
     print("Testing DeliveryService...")
     try:
         service = DeliveryService()
-        print("✅ DeliveryService erfolgreich erstellt!")
+        print("DeliveryService erfolgreich erstellt!")
     except Exception as e:
-        print(f"❌ Fehler: {e}")
+        print(f"Fehler: {e}")
         import traceback
 
         traceback.print_exc()

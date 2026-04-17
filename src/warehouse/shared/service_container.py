@@ -55,7 +55,7 @@ class ServiceContainer:
         if ServiceContainer._initialized:
             return
 
-        logger.info("🚀 Initializing ServiceContainer (Singleton)...")
+        logger.info("Initializing ServiceContainer (Singleton)...")
 
         # Lazy Imports - nur wenn ServiceContainer erstellt wird
         # Services nutzen die bestehende Architektur (entity_services/)
@@ -69,7 +69,7 @@ class ServiceContainer:
         from warehouse.infrastructure.database.repositories.user_repository_impl import UserRepositoryImpl
 
         # Service-Instanzen erstellen (Singleton - nur einmal!)
-        logger.info("📦 Creating service instances...")
+        logger.info("Creating service instances...")
 
         # User Service (mit Repository Injection - Clean Architecture)
         self.user_service = UserService(UserRepositoryImpl())
@@ -82,7 +82,7 @@ class ServiceContainer:
         self.order_service = OrderService()
 
         ServiceContainer._initialized = True
-        logger.info("✅ ServiceContainer initialized successfully")
+        logger.info("ServiceContainer initialized successfully")
 
     @classmethod
     def get_instance(cls) -> 'ServiceContainer':
@@ -107,7 +107,7 @@ class ServiceContainer:
 
         WARNING: Nur in Tests verwenden! In Production nicht aufrufen.
         """
-        logger.warning("⚠️  ServiceContainer reset called (should only be used in tests)")
+        logger.warning("ServiceContainer reset called (should only be used in tests)")
         cls._instance = None
         cls._initialized = False
 

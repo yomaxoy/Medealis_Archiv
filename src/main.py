@@ -454,14 +454,14 @@ def main(start_gui: bool = None):
         # 8. Launch GUI (optional)
         launch_gui = input("\nGUI starten? (y/n, default: y): ").strip().lower()
         if launch_gui in ("", "y", "yes", "j", "ja"):
-            print("\n🚀 Starte GUI...")
+            print("\nStarte GUI...")
             try:
                 launch_streamlit_gui()
             except KeyboardInterrupt:
                 print("\nGUI durch Benutzer beendet.")
             except Exception as e:
                 logger.error(f"GUI startup failed: {e}")
-                print(f"\n❌ GUI konnte nicht gestartet werden: {e}")
+                print(f"\nGUI konnte nicht gestartet werden: {e}")
 
         # 9. Orderly Shutdown
         app.shutdown()
@@ -520,9 +520,9 @@ def launch_streamlit_gui():
         "--server.headless=false",
     ]
 
-    print("🌐 GUI wird gestartet...")
-    print(f"📍 URL: http://localhost:8501")
-    print("⏹️  Zum Beenden: Strg+C drücken")
+    print("GUI wird gestartet...")
+    print(f"URL: http://localhost:8501")
+    print("Zum Beenden: Strg+C drücken")
     print("-" * 50)
 
     # Launch Streamlit

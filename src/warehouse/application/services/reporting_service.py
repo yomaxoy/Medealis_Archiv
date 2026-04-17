@@ -164,6 +164,6 @@ if __name__ == "__main__":
     print("Testing ReportingService...")
     try:
         service = ReportingService()
-        print("✅ ReportingService erfolgreich erstellt!")
+        print("ReportingService erfolgreich erstellt!")
     except Exception as e:
-        print(f"❌ Fehler: {e}")
+        print(f"Fehler: {e}")

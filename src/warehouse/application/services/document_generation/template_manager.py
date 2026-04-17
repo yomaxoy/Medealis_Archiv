@@ -30,12 +30,12 @@ try:
     from warehouse.shared.performance.document_pipeline import TemplateCache as OptimizedTemplateCacheBase
     USE_OPTIMIZED_CACHE = True
     logger = logging.getLogger(__name__)
-    logger.info("✅ Using OPTIMIZED TemplateCache from shared/performance")
+    logger.info("Using OPTIMIZED TemplateCache from shared/performance")
 except ImportError:
     USE_OPTIMIZED_CACHE = False
     OptimizedTemplateCacheBase = None
     logger = logging.getLogger(__name__)
-    logger.warning("⚠️ Optimized TemplateCache not available - using FALLBACK cache")
+    logger.warning("Optimized TemplateCache not available - using FALLBACK cache")
 
 
 # Adapter für OptimizedTemplateCache um alte API zu unterstützen
@@ -198,10 +198,10 @@ class TemplateManager:
         # Cache für Performance (optimiert wenn verfügbar)
         if USE_OPTIMIZED_CACHE:
             self.template_cache = OptimizedTemplateCacheAdapter(max_size=20)
-            logger.info("✅ TemplateManager using OPTIMIZED cache (TTL: 30min, max: 20 templates)")
+            logger.info("TemplateManager using OPTIMIZED cache (TTL: 30min, max: 20 templates)")
         else:
             self.template_cache = TemplateCache(max_cache_size=10)
-            logger.info("⚠️ TemplateManager using FALLBACK cache (max: 10 templates)")
+            logger.info("TemplateManager using FALLBACK cache (max: 10 templates)")
 
         # Statistics
         self.stats = {

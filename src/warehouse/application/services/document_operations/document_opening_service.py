@@ -167,13 +167,13 @@ class DocumentOpeningService:
             try:
                 if self.open_document(file_path):
                     result["opened"] += 1
-                    logger.info(f"✅ Auto-opened: {Path(file_path).name}")
+                    logger.info(f"Auto-opened: {Path(file_path).name}")
                 else:
                     result["failed"] += 1
-                    logger.warning(f"❌ Failed to auto-open: {file_path}")
+                    logger.warning(f"Failed to auto-open: {file_path}")
             except Exception as e:
                 result["failed"] += 1
-                logger.error(f"❌ Error auto-opening {file_path}: {e}")
+                logger.error(f"Error auto-opening {file_path}: {e}")
 
         return result
 

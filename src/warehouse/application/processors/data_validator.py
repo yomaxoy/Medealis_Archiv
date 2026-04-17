@@ -82,10 +82,10 @@ class DataValidator:
                     if clean_item["article_number"]:  # Only add items with article numbers
                         validated["items"].append(clean_item)
                         if debug:
-                            logger.debug(f"  ✅ Added to validated items")
+                            logger.debug(f"  Added to validated items")
                     else:
                         if debug:
-                            logger.debug(f"  ❌ Skipped - no article number")
+                            logger.debug(f"  Skipped - no article number")
         
         validated["total_items"] = len(validated["items"])
         

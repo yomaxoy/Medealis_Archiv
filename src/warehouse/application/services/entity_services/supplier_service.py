@@ -543,8 +543,8 @@ if __name__ == "__main__":
     print("Testing SupplierService...")
     try:
         service = SupplierService()
-        print("✅ SupplierService erfolgreich erstellt!")
+        print("SupplierService erfolgreich erstellt!")
     except Exception as e:
-        print("❌ Fehler: %s" % e)
+        print("Fehler: %s" % e)
         import traceback
         traceback.print_exc()

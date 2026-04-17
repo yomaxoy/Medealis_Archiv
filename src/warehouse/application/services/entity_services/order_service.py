@@ -836,9 +836,9 @@ if __name__ == "__main__":
     print("Testing OrderService...")
     try:
         service = OrderService()
-        print("✅ OrderService erfolgreich erstellt!")
+        print("OrderService erfolgreich erstellt!")
     except Exception as e:
-        print("❌ Fehler: %s" % e)
+        print("Fehler: %s" % e)
         import traceback
 
         traceback.print_exc()

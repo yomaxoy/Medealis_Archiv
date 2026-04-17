@@ -370,7 +370,7 @@ if __name__ == "__main__":
     print("Testing ExportService...")
     try:
         service = ExportService()
-        print("✅ ExportService erfolgreich erstellt!")
+        print("ExportService erfolgreich erstellt!")
         
         # Test-Daten
         test_suppliers = [
@@ -383,6 +383,6 @@ if __name__ == "__main__":
         # print(f"✅ Test-Export erstellt: {export_path}")
         
     except Exception as e:
-        print(f"❌ Fehler: {e}")
+        print(f"Fehler: {e}")
         import traceback
         traceback.print_exc()
