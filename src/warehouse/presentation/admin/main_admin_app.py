@@ -55,10 +55,17 @@ st.set_page_config(
 def main():
     """Main admin application entry point."""
     try:
-        # Initialize system
-        if "system_initialized" not in st.session_state:
-            initialize_admin_system()
-            st.session_state.system_initialized = True
+        # Initialize application (handles database, services, processors, session state)
+        from warehouse.presentation.shared.app_initialization import (
+            initialize_application
+        )
+
+        if not st.session_state.get("system_initialized"):
+            if not initialize_application(role="admin"):
+                st.error("Systeminitialisierung fehlgeschlagen")
+                if st.button("Neu starten"):
+                    st.rerun()
+                return
 
         # Authentication Gate
         from warehouse.presentation.auth.login_view import LoginView, is_authenticated
@@ -77,110 +84,6 @@ def main():
 
         if st.button("Neu starten"):
             st.rerun()
-
-
-@st.cache_resource
-def get_services():
-    """
-    Initialize and cache Application Services via ServiceContainer.
-
-    Uses @st.cache_resource + Singleton ServiceContainer to keep service
-    instances alive across page navigations and shared between Admin/User apps.
-
-    Returns:
-        dict: Service instances for delivery, item, supplier, order management
-              (legacy dict format for compatibility with existing code)
-    """
-    logger.info("Initializing services via ServiceContainer...")
-
-    # Import ServiceContainer (Singleton - shared mit User-App!)
-    from warehouse.shared.service_container import get_services_dict
-
-    # Gibt Services als Dict zurück (für Kompatibilität mit bestehendem Code)
-    return get_services_dict()
-
-
-@st.cache_resource
-def get_processors():
-    """
-    Initialize and cache Processors (PDF, OCR, Claude).
-
-    Uses @st.cache_resource to lazy-load processors only when first needed
-    and keep them cached across sessions.
-
-    Returns:
-        dict: Processor instances
-    """
-    logger.info("Initializing cached processors...")
-
-    # Lazy import - Processors werden nur beim ersten Aufruf geladen
-    from warehouse.application.processors import (
-        pdf_processor, ocr_processor, claude_processor
-    )
-    from warehouse.application.services.document_processing import (
-        document_processing_service, process_document
-    )
-
-    return {
-        "pdf": pdf_processor,
-        "ocr": ocr_processor,
-        "claude": claude_processor,
-        "document_processing_service": document_processing_service,
-        "process_document": process_document,
-    }
-
-
-def initialize_admin_system():
-    """Initialize admin system components."""
-    try:
-        logger.info("Initializing admin system...")
-
-        # CLEAN ARCHITECTURE: Initialize system through Application Layer
-        # (No direct Infrastructure imports in Presentation Layer)
-        from warehouse.application.services import initialize_system
-
-        logger.info("Initializing database infrastructure...")
-        if not initialize_system():
-            raise RuntimeError("System initialization failed")
-        logger.info("Database infrastructure initialized successfully")
-
-        # NEW: Use cached services (Lazy Loading + Caching for fast page switches)
-        st.session_state.services = get_services()
-        st.session_state.processors = get_processors()
-
-        # Initialize session state
-        initialize_session_state()
-
-        logger.info("Admin system initialized successfully")
-
-    except Exception as e:
-        logger.error(f"Failed to initialize admin system: {e}")
-        st.error(f"Systeminitialisierung fehlgeschlagen: {e}")
-        raise
-
-
-def initialize_session_state():
-    """Initialize session state variables."""
-    defaults = {
-        "current_page": "Dashboard",
-        "popup_action": None,
-        "confirmed_delivery": None,
-        "confirmed_items": None,
-        "edit_mode": False,
-        "selected_item": None,
-        "last_extracted_text": None,
-        "claude_extraction_result": None,
-        "extracted_delivery_data": None,
-        "delete_delivery_confirmed": None,
-        "show_success_popup": False,
-        "success_message": None,
-        "show_error_popup": False,
-        "error_message": None,
-    }
-
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
 
 
 def render_admin_interface():

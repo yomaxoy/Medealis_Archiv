@@ -52,92 +52,26 @@ st.set_page_config(
 )
 
 
-@st.cache_resource
-def get_application_services():
-    """
-    Initialize and cache application services via ServiceContainer.
-
-    Uses @st.cache_resource + Singleton ServiceContainer to keep service
-    instances alive across page navigations and SHARED with Admin app.
-
-    Returns:
-        dict: Service instances (legacy dict format for compatibility)
-    """
-    try:
-        logger.info("Initializing application services via ServiceContainer...")
-
-        # Initialize database infrastructure
-        from warehouse.application.services import initialize_system
-
-        logger.info("Initializing database infrastructure...")
-        if not initialize_system():
-            raise RuntimeError("System initialization failed")
-        logger.info("Database infrastructure initialized successfully")
-
-        # Import ServiceContainer (Singleton - shared mit Admin-App!)
-        from warehouse.shared.service_container import get_services_dict
-
-        services = get_services_dict()
-
-        logger.info("Application services initialized successfully via ServiceContainer")
-        return services
-
-    except Exception as e:
-        logger.error(f"Failed to initialize application services: {e}")
-        raise
-
-
-@st.cache_resource
-def get_document_processors():
-    """
-    Initialize and cache document processors (Singleton).
-    This ensures processors are only initialized ONCE per Streamlit server session.
-    """
-    try:
-        logger.info("Initializing document processors (cached singleton)...")
-
-        from warehouse.application.processors import (
-            pdf_processor,
-            ocr_processor,
-            claude_processor,
-        )
-
-        from warehouse.application.services.document_processing import (
-            document_processing_service,
-            process_document,
-        )
-
-        processors = {
-            "pdf": pdf_processor,
-            "ocr": ocr_processor,
-            "claude": claude_processor,
-            "document_processing_service": document_processing_service,
-            "process_document": process_document,
-        }
-
-        logger.info("Document processors initialized successfully (cached)")
-        return processors
-
-    except Exception as e:
-        logger.error(f"Failed to initialize document processors: {e}")
-        raise
-
-
 def main():
     """Main user application entry point."""
     try:
-        # Initialize system ONCE using cached resources
-        if "system_initialized" not in st.session_state:
+        # Initialize application (handles database, services, processors, session state)
+        from warehouse.presentation.shared.app_initialization import (
+            initialize_application
+        )
+
+        if not st.session_state.get("system_initialized"):
             logger.info("First run - initializing user system...")
 
-            # Get cached services (only initialized once)
-            st.session_state.services = get_application_services()
-            st.session_state.processors = get_document_processors()
+            if not initialize_application(role="user"):
+                st.error("Anwendungsfehler: Systeminitialisierung fehlgeschlagen")
+                if st.button("Neu starten"):
+                    st.cache_resource.clear()
+                    if "system_initialized" in st.session_state:
+                        del st.session_state.system_initialized
+                    st.rerun()
+                return
 
-            # Initialize session state defaults
-            initialize_session_state()
-
-            st.session_state.system_initialized = True
             logger.info("User system initialized successfully")
 
         # Authentication Gate
@@ -161,19 +95,6 @@ def main():
             if "system_initialized" in st.session_state:
                 del st.session_state.system_initialized
             st.rerun()
-
-
-def initialize_session_state():
-    """Initialize session state variables for user interface."""
-    defaults = {
-        "user_filter_delivery": "",
-        "user_filter_article": "",
-        "show_scan_popup": False,
-    }
-
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
 
 
 def render_user_interface():
