@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEDEALIS - Enterprise Warehouse UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --medealis-blue: #4A90E2;
+            --medealis-dark: #2C3E50;
+            --medealis-light-gray: #ECF0F1;
+            --medealis-text: #34495E;
+        }
+
+        .medealis-blue {
+            background-color: var(--medealis-blue);
+        }
+
+        .medealis-dark {
+            background-color: var(--medealis-dark);
+        }
+
+        .text-medealis-blue {
+            color: var(--medealis-blue);
+        }
+
+        .border-medealis-blue {
+            border-color: var(--medealis-blue);
+        }
+
+        .hover-medealis:hover {
+            background-color: #357ABD;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .status-pending {
+            background-color: #FFF3CD;
+            color: #856404;
+        }
+
+        .status-checked {
+            background-color: #D4EDDA;
+            color: #155724;
+        }
+
+        .status-measuring {
+            background-color: #D1ECF1;
+            color: #0C5460;
+        }
+
+        .status-completed {
+            background-color: #E7D4F5;
+            color: #5A1F7D;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- TOP NAVIGATION -->
+    <div class="medealis-blue text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="text-3xl font-black">MEDEALIS</div>
+                    <div class="text-sm">
+                        <p class="font-bold">Warehouse Management System</p>
+                        <p class="text-blue-100">Goods Receipt Control</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <p class="font-bold text-sm">Max Krüger</p>
+                        <p class="text-xs text-blue-100">Warehouse Manager</p>
+                    </div>
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                        <span class="text-xl">👤</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <!-- TOOLBAR -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                <!-- Search -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">🔍 Suche</label>
+                    <input
+                        type="text"
+                        placeholder="Lieferschein, Artikel..."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                </div>
+
+                <!-- Status Filter -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Status</label>
+                    <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                        <option>Alle anzeigen</option>
+                        <option>Daten geprüft</option>
+                        <option>Dokumente geprüft</option>
+                        <option>Vermessen</option>
+                        <option>Abgeschlossen</option>
+                    </select>
+                </div>
+
+                <!-- Date Range -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Zeitraum</label>
+                    <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                        <option>Heute</option>
+                        <option>Diese Woche</option>
+                        <option>Dieser Monat</option>
+                        <option>Letzter Monat</option>
+                    </select>
+                </div>
+
+                <!-- Sort By -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Sortierung</label>
+                    <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                        <option>Neueste zuerst</option>
+                        <option>Älteste zuerst</option>
+                        <option>Nach Status</option>
+                        <option>Nach Artikel</option>
+                    </select>
+                </div>
+
+                <!-- View Toggle -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Ansicht</label>
+                    <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                        <option>📋 Tabelle</option>
+                        <option>📊 Gitter</option>
+                        <option>🎯 Kanban</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="flex flex-wrap gap-3">
+                <button class="medealis-blue hover-medealis text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md">
+                    📄 Scan Lieferschein
+                </button>
+                <button class="medealis-blue hover-medealis text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md">
+                    ➕ Neue Lieferung
+                </button>
+                <button class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-all">
+                    📊 Export CSV
+                </button>
+                <button class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-all">
+                    🖨️ Bericht drucken
+                </button>
+                <button class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition-all">
+                    ⚙️ Einstellungen
+                </button>
+            </div>
+        </div>
+
+        <!-- DATA TABLE -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <table class="w-full">
+                <thead class="medealis-blue text-white">
+                    <tr>
+                        <th class="px-6 py-4 text-left font-bold">Lieferschein</th>
+                        <th class="px-6 py-4 text-left font-bold">Artikel</th>
+                        <th class="px-6 py-4 text-left font-bold">Charge</th>
+                        <th class="px-6 py-4 text-left font-bold">Menge</th>
+                        <th class="px-6 py-4 text-left font-bold">Status</th>
+                        <th class="px-6 py-4 text-left font-bold">Zeitstempel</th>
+                        <th class="px-6 py-4 text-left font-bold">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <!-- Row 1 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <span class="font-mono font-bold text-medealis-blue">LS-2024-00142</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">ART-12341</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">BATCH-2024-001</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-bold">50 Stück</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge status-checked">✅ Dokumente OK</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            29.04.2024 14:30
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex gap-2">
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">View</button>
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">Edit</button>
+                                <button class="text-red-600 hover:text-red-800 font-bold text-sm">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Row 2 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <span class="font-mono font-bold text-medealis-blue">LS-2024-00143</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">ART-12342</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">BATCH-2024-002</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-bold">75 Stück</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge status-measuring">⏳ Vermessen</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            29.04.2024 14:25
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex gap-2">
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">View</button>
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">Edit</button>
+                                <button class="text-red-600 hover:text-red-800 font-bold text-sm">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Row 3 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <span class="font-mono font-bold text-medealis-blue">LS-2024-00144</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">ART-12343</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">BATCH-2024-003</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-bold">100 Stück</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge status-completed">✅ Abgeschlossen</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            29.04.2024 14:20
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex gap-2">
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">View</button>
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">Edit</button>
+                                <button class="text-red-600 hover:text-red-800 font-bold text-sm">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Row 4 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <span class="font-mono font-bold text-medealis-blue">LS-2024-00145</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">ART-12344</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">BATCH-2024-004</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-bold">60 Stück</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge status-checked">✅ Daten geprüft</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            29.04.2024 14:15
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex gap-2">
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">View</button>
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">Edit</button>
+                                <button class="text-red-600 hover:text-red-800 font-bold text-sm">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Row 5 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <span class="font-mono font-bold text-medealis-blue">LS-2024-00146</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">ART-12345</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono">BATCH-2024-005</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-bold">45 Stück</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="status-badge status-pending">⏳ Ausstehend</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            29.04.2024 14:10
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex gap-2">
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">View</button>
+                                <button class="text-medealis-blue hover:text-blue-700 font-bold text-sm">Edit</button>
+                                <button class="text-red-600 hover:text-red-800 font-bold text-sm">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- STATS DASHBOARD -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+            <!-- Total Items -->
+            <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-medealis-blue">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-bold">Gesamt Items</p>
+                        <p class="text-4xl font-black text-medealis-blue mt-2">245</p>
+                    </div>
+                    <div class="text-5xl opacity-20">📦</div>
+                </div>
+                <p class="text-xs text-gray-600 mt-3">Im System erfasst</p>
+            </div>
+
+            <!-- In Progress -->
+            <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-400">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-bold">In Bearbeitung</p>
+                        <p class="text-4xl font-black text-orange-400 mt-2">42</p>
+                    </div>
+                    <div class="text-5xl opacity-20">⏳</div>
+                </div>
+                <p class="text-xs text-gray-600 mt-3">Aktiv in Verarbeitung</p>
+            </div>
+
+            <!-- Completed -->
+            <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-bold">Abgeschlossen</p>
+                        <p class="text-4xl font-black text-green-500 mt-2">198</p>
+                    </div>
+                    <div class="text-5xl opacity-20">✅</div>
+                </div>
+                <p class="text-xs text-gray-600 mt-3">Erfolgreich verarbeitet</p>
+            </div>
+
+            <!-- Issues -->
+            <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm font-bold">Probleme</p>
+                        <p class="text-4xl font-black text-red-500 mt-2">5</p>
+                    </div>
+                    <div class="text-5xl opacity-20">⚠️</div>
+                </div>
+                <p class="text-xs text-gray-600 mt-3">Benötigen Aufmerksamkeit</p>
+            </div>
+        </div>
+
+        <!-- QUICK INFO -->
+        <div class="bg-blue-50 border border-medealis-blue rounded-lg p-6 mt-8">
+            <h3 class="font-bold text-medealis-blue mb-3">📊 System Status</h3>
+            <div class="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                    <p class="text-gray-600">Durchschnittliche Verarbeitungszeit</p>
+                    <p class="font-bold text-medealis-blue mt-1">2h 15m</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Erfolgsquote heute</p>
+                    <p class="font-bold text-green-600 mt-1">98.5%</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Zuletzt aktualisiert</p>
+                    <p class="font-bold text-gray-700 mt-1">vor 2 Minuten</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="medealis-dark text-white mt-12 py-6">
+        <div class="max-w-7xl mx-auto px-6 text-center text-sm">
+            <p>© 2024 MEDEALIS GmbH – Professional Dental Systems</p>
+            <p class="text-gray-400 mt-2">Warehouse Management System v2.1</p>
+        </div>
+    </div>
+</body>
+</html>
