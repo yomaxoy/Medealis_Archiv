@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse UI Mockups - Interactive Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .mockup-container {
+            display: none;
+        }
+        .mockup-container.active {
+            display: block;
+        }
+        .mockup-frame {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            height: 600px;
+            background: white;
+        }
+        .nav-button {
+            transition: all 0.3s ease;
+        }
+        .nav-button.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 shadow-lg">
+        <div class="max-w-7xl mx-auto">
+            <h1 class="text-3xl font-bold">🎨 Warehouse UI Mockups</h1>
+            <p class="text-blue-100 mt-2">Interactive Preview of 5 Design Concepts for Professional Modernization</p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="bg-white shadow-md sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex gap-2 overflow-x-auto">
+            <button onclick="showMockup(0)" class="nav-button active px-4 py-2 rounded-lg font-bold whitespace-nowrap bg-blue-500 text-white">
+                1️⃣ Minimalist
+            </button>
+            <button onclick="showMockup(1)" class="nav-button px-4 py-2 rounded-lg font-bold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                2️⃣ Enterprise ⭐
+            </button>
+            <button onclick="showMockup(2)" class="nav-button px-4 py-2 rounded-lg font-bold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                3️⃣ Mobile-First
+            </button>
+            <button onclick="showMockup(3)" class="nav-button px-4 py-2 rounded-lg font-bold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                4️⃣ Dark Mode
+            </button>
+            <button onclick="showMockup(4)" class="nav-button px-4 py-2 rounded-lg font-bold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                5️⃣ Component-Based
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- MOCKUP 1: MINIMALIST -->
+        <div id="mockup-0" class="mockup-container active">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="mockup-frame bg-white">
+                        <!-- Minimalist UI Content -->
+                        <div class="h-full flex flex-col">
+                            <!-- Header -->
+                            <div class="bg-blue-600 text-white p-6 border-b">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h2 class="text-2xl font-bold">📦 Wareneingangskontrolle</h2>
+                                        <p class="text-blue-100 text-sm">Goods Receipt Control</p>
+                                    </div>
+                                    <button class="text-sm">👤</button>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="bg-gray-50 p-4 border-b">
+                                <div class="grid grid-cols-4 gap-2">
+                                    <button class="bg-green-500 text-white font-bold py-3 rounded text-sm hover:bg-green-600">📄 Scan</button>
+                                    <button class="bg-blue-500 text-white font-bold py-3 rounded text-sm hover:bg-blue-600">➕ New</button>
+                                    <button class="bg-gray-400 text-white font-bold py-3 rounded text-sm hover:bg-gray-500">🔍 Search</button>
+                                    <button class="bg-gray-400 text-white font-bold py-3 rounded text-sm hover:bg-gray-500">🔄 Refresh</button>
+                                </div>
+                            </div>
+
+                            <!-- Content Area -->
+                            <div class="flex-1 overflow-auto p-4 bg-gray-50 space-y-3">
+                                <div class="bg-white p-4 rounded border-l-4 border-blue-500 shadow-sm">
+                                    <div class="flex justify-between mb-2">
+                                        <div>
+                                            <p class="font-bold text-lg">LS-2024-0001</p>
+                                            <p class="text-sm text-gray-600">ART-12341 | BATCH-001</p>
+                                        </div>
+                                        <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded text-xs font-bold">✅ OK</span>
+                                    </div>
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <button class="bg-blue-500 text-white text-xs font-bold py-2 rounded hover:bg-blue-600">Edit</button>
+                                        <button class="bg-green-500 text-white text-xs font-bold py-2 rounded hover:bg-green-600">✓</button>
+                                        <button class="bg-orange-500 text-white text-xs font-bold py-2 rounded hover:bg-orange-600">📋</button>
+                                        <button class="bg-red-500 text-white text-xs font-bold py-2 rounded hover:bg-red-600">Delete</button>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-4 rounded border-l-4 border-blue-500 shadow-sm">
+                                    <div class="flex justify-between mb-2">
+                                        <div>
+                                            <p class="font-bold text-lg">LS-2024-0002</p>
+                                            <p class="text-sm text-gray-600">ART-12342 | BATCH-002</p>
+                                        </div>
+                                        <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded text-xs font-bold">✅ OK</span>
+                                    </div>
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <button class="bg-blue-500 text-white text-xs font-bold py-2 rounded hover:bg-blue-600">Edit</button>
+                                        <button class="bg-green-500 text-white text-xs font-bold py-2 rounded hover:bg-green-600">✓</button>
+                                        <button class="bg-orange-500 text-white text-xs font-bold py-2 rounded hover:bg-orange-600">📋</button>
+                                        <button class="bg-red-500 text-white text-xs font-bold py-2 rounded hover:bg-red-600">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="bg-gray-800 text-white text-xs p-3 text-center">
+                                ✅ System ready | 📡 Online | 🔋 85%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-bold mb-3">1. Minimalist UI</h3>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="font-bold text-gray-700">Best For:</p>
+                                <p class="text-gray-600">Warehouse workers, gloved hands, mobile/tablet</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Bundle Size:</p>
+                                <p class="text-blue-600">2 MB ⚡</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Load Time:</p>
+                                <p class="text-green-600">&lt;1 second</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Key Features:</p>
+                                <ul class="text-gray-600 list-disc list-inside space-y-1">
+                                    <li>Large touch targets (60x60px)</li>
+                                    <li>Simple navigation</li>
+                                    <li>Big action buttons</li>
+                                    <li>Warehouse-friendly</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Performance:</p>
+                                <p class="text-gray-600">⭐⭐⭐⭐⭐ Excellent</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOCKUP 2: ENTERPRISE -->
+        <div id="mockup-1" class="mockup-container">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="mockup-frame bg-gradient-to-br from-slate-900 to-slate-800">
+                        <!-- Enterprise UI Content -->
+                        <div class="h-full flex flex-col text-white">
+                            <!-- Header -->
+                            <div class="bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700 p-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">📦</div>
+                                        <div>
+                                            <h2 class="text-lg font-bold">Warehouse Management</h2>
+                                            <p class="text-xs text-slate-400">Goods Receipt Dashboard</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <div class="text-right text-sm">
+                                            <p>John Müller</p>
+                                            <p class="text-xs text-slate-400">Operator</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Toolbar -->
+                            <div class="bg-slate-800 border-b border-slate-700 p-3 space-y-3">
+                                <div class="grid grid-cols-4 gap-2">
+                                    <input type="text" placeholder="Search..." class="bg-slate-700 border border-slate-600 px-3 py-1 rounded text-sm text-white placeholder-slate-400">
+                                    <select class="bg-slate-700 border border-slate-600 px-3 py-1 rounded text-sm text-white">
+                                        <option>All Status</option>
+                                    </select>
+                                    <select class="bg-slate-700 border border-slate-600 px-3 py-1 rounded text-sm text-white">
+                                        <option>Today</option>
+                                    </select>
+                                    <select class="bg-slate-700 border border-slate-600 px-3 py-1 rounded text-sm text-white">
+                                        <option>Newest</option>
+                                    </select>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-bold">+ Scan</button>
+                                    <button class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm font-bold">+ New</button>
+                                    <button class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-sm border border-slate-600">Export</button>
+                                </div>
+                            </div>
+
+                            <!-- Data Table -->
+                            <div class="flex-1 overflow-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-slate-900 border-b border-slate-700 font-bold text-slate-300 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left">Delivery</th>
+                                            <th class="px-4 py-2 text-left">Article</th>
+                                            <th class="px-4 py-2 text-left">Status</th>
+                                            <th class="px-4 py-2 text-left">Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="border-b border-slate-700 hover:bg-slate-700">
+                                            <td class="px-4 py-2 font-mono text-blue-400">LS-2024-0001</td>
+                                            <td class="px-4 py-2 font-mono">ART-12341</td>
+                                            <td class="px-4 py-2"><span class="bg-green-900 text-green-200 px-2 py-1 rounded text-xs">✅ OK</span></td>
+                                            <td class="px-4 py-2 text-slate-400">14:30</td>
+                                        </tr>
+                                        <tr class="border-b border-slate-700 hover:bg-slate-700">
+                                            <td class="px-4 py-2 font-mono text-blue-400">LS-2024-0002</td>
+                                            <td class="px-4 py-2 font-mono">ART-12342</td>
+                                            <td class="px-4 py-2"><span class="bg-yellow-900 text-yellow-200 px-2 py-1 rounded text-xs">⏳ Measuring</span></td>
+                                            <td class="px-4 py-2 text-slate-400">14:25</td>
+                                        </tr>
+                                        <tr class="border-b border-slate-700 hover:bg-slate-700">
+                                            <td class="px-4 py-2 font-mono text-blue-400">LS-2024-0003</td>
+                                            <td class="px-4 py-2 font-mono">ART-12343</td>
+                                            <td class="px-4 py-2"><span class="bg-purple-900 text-purple-200 px-2 py-1 rounded text-xs">✅ Done</span></td>
+                                            <td class="px-4 py-2 text-slate-400">14:20</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Stats Footer -->
+                            <div class="bg-slate-900 border-t border-slate-700 p-3 grid grid-cols-4 gap-2 text-xs">
+                                <div class="text-center">
+                                    <p class="text-xl font-bold">245</p>
+                                    <p class="text-slate-400">Items</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-xl font-bold">42</p>
+                                    <p class="text-slate-400">In Work</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-xl font-bold">198</p>
+                                    <p class="text-slate-400">Done</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-xl font-bold">5</p>
+                                    <p class="text-slate-400">Issues</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-bold mb-3">2. Enterprise UI ⭐</h3>
+                        <p class="text-xs text-orange-600 font-bold mb-3">RECOMMENDED FOR MANAGERS</p>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="font-bold text-gray-700">Best For:</p>
+                                <p class="text-gray-600">Managers, admins, power users</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Bundle Size:</p>
+                                <p class="text-blue-600">5 MB</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Key Features:</p>
+                                <ul class="text-gray-600 list-disc list-inside space-y-1">
+                                    <li>Dark mode (modern)</li>
+                                    <li>Advanced filtering</li>
+                                    <li>3 view options</li>
+                                    <li>Analytics dashboard</li>
+                                    <li>Export/Report</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Views:</p>
+                                <p class="text-gray-600">List, Grid, Kanban board</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOCKUP 3: MOBILE-FIRST -->
+        <div id="mockup-2" class="mockup-container">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="mockup-frame bg-white" style="max-width: 400px; margin: 0 auto;">
+                        <!-- Mobile UI Content -->
+                        <div class="h-full flex flex-col">
+                            <!-- Header -->
+                            <div class="bg-white border-b border-gray-200 p-3 flex justify-between items-center sticky top-0 z-10">
+                                <p class="font-bold">WMS</p>
+                                <div class="flex gap-2 text-lg">
+                                    <button>🔔</button>
+                                    <button>⚙️</button>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions -->
+                            <div class="p-4 space-y-3">
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button class="bg-green-500 text-white p-4 rounded flex flex-col items-center justify-center gap-1">
+                                        <span class="text-2xl">📄</span>
+                                        <span class="text-xs font-bold">Scan</span>
+                                    </button>
+                                    <button class="bg-blue-500 text-white p-4 rounded flex flex-col items-center justify-center gap-1">
+                                        <span class="text-2xl">➕</span>
+                                        <span class="text-xs font-bold">New</span>
+                                    </button>
+                                    <button class="bg-gray-500 text-white p-4 rounded flex flex-col items-center justify-center gap-1">
+                                        <span class="text-2xl">🔄</span>
+                                        <span class="text-xs font-bold">Refresh</span>
+                                    </button>
+                                </div>
+
+                                <!-- Search -->
+                                <input type="text" placeholder="Search..." class="w-full px-3 py-2 border border-gray-300 rounded text-sm">
+                            </div>
+
+                            <!-- Item Cards -->
+                            <div class="flex-1 overflow-auto px-4 pb-20 space-y-3">
+                                <div class="bg-white p-4 rounded border border-gray-200 shadow-sm">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <p class="font-bold text-gray-900">LS-2024-0001</p>
+                                            <p class="text-xs text-gray-500">ART-12341</p>
+                                        </div>
+                                        <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">OK</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button class="bg-blue-500 text-white text-xs font-bold py-2 rounded">View</button>
+                                        <button class="bg-green-500 text-white text-xs font-bold py-2 rounded">✓ Confirm</button>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-4 rounded border border-gray-200 shadow-sm">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <p class="font-bold text-gray-900">LS-2024-0002</p>
+                                            <p class="text-xs text-gray-500">ART-12342</p>
+                                        </div>
+                                        <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">OK</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button class="bg-blue-500 text-white text-xs font-bold py-2 rounded">View</button>
+                                        <button class="bg-green-500 text-white text-xs font-bold py-2 rounded">✓ Confirm</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bottom Navigation -->
+                            <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+                                <div style="max-width: 400px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr);">
+                                    <button class="py-3 flex flex-col items-center text-xs font-bold text-blue-600 border-t-2 border-blue-600">
+                                        <span class="text-lg">📄</span>
+                                        Scan
+                                    </button>
+                                    <button class="py-3 flex flex-col items-center text-xs font-bold text-gray-600">
+                                        <span class="text-lg">📋</span>
+                                        List
+                                    </button>
+                                    <button class="py-3 flex flex-col items-center text-xs font-bold text-gray-600">
+                                        <span class="text-lg">📍</span>
+                                        Map
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-bold mb-3">3. Mobile-First UI</h3>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="font-bold text-gray-700">Best For:</p>
+                                <p class="text-gray-600">Warehouse staff on tablets & mobile</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Bundle Size:</p>
+                                <p class="text-blue-600">3 MB ⚡</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Load Time:</p>
+                                <p class="text-green-600">&lt;1 second</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Key Features:</p>
+                                <ul class="text-gray-600 list-disc list-inside space-y-1">
+                                    <li>Fully responsive</li>
+                                    <li>Bottom navigation</li>
+                                    <li>PWA capable</li>
+                                    <li>Offline support</li>
+                                    <li>Touch gestures</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOCKUP 4: DARK MODE -->
+        <div id="mockup-3" class="mockup-container">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="mockup-frame bg-gray-950 text-white">
+                        <!-- Dark Mode UI Content -->
+                        <div class="h-full flex flex-col">
+                            <!-- Header -->
+                            <div class="bg-gradient-to-r from-gray-900 to-gray-800 border-b-2 border-yellow-400 p-6">
+                                <h2 class="text-3xl font-black text-yellow-400">⚠️ WAREHOUSE CONTROL</h2>
+                                <p class="text-gray-400 mt-2">High-Contrast Mode for Low-Light</p>
+                            </div>
+
+                            <!-- Big Action Buttons -->
+                            <div class="p-6 grid grid-cols-2 gap-6">
+                                <button class="bg-yellow-400 hover:bg-yellow-300 text-gray-950 font-black py-6 rounded-lg flex flex-col items-center justify-center gap-2 transform hover:scale-105 transition">
+                                    <span class="text-3xl">📄</span>
+                                    <span>SCAN DELIVERY</span>
+                                </button>
+
+                                <button class="bg-green-500 hover:bg-green-400 text-gray-950 font-black py-6 rounded-lg flex flex-col items-center justify-center gap-2 transform hover:scale-105 transition">
+                                    <span class="text-3xl">✅</span>
+                                    <span>CONFIRM ITEM</span>
+                                </button>
+                            </div>
+
+                            <!-- HIGH CONTRAST TABLE -->
+                            <div class="flex-1 overflow-auto px-6 pb-6">
+                                <div class="bg-gray-900 border-4 border-yellow-400 rounded-lg overflow-hidden">
+                                    <div class="grid grid-cols-5 gap-4 bg-gray-800 px-6 py-4 border-b-4 border-yellow-400 font-black text-yellow-400 text-lg">
+                                        <div>DELIVERY</div>
+                                        <div>ARTICLE</div>
+                                        <div>STATUS</div>
+                                        <div>QTY</div>
+                                        <div>ACTION</div>
+                                    </div>
+
+                                    <div class="space-y-4 p-6">
+                                        <div class="grid grid-cols-5 gap-4 items-center hover:bg-gray-800 p-4 rounded transition">
+                                            <div class="font-mono text-yellow-400 text-xl font-black">LS-001</div>
+                                            <div class="font-mono text-white text-lg">ART-12341</div>
+                                            <div class="font-black text-green-400 text-lg">✅ OK</div>
+                                            <div class="font-black text-white text-lg">50</div>
+                                            <button class="bg-yellow-400 text-gray-950 font-black py-2 px-4 rounded-lg hover:bg-yellow-300">DETAILS</button>
+                                        </div>
+
+                                        <div class="grid grid-cols-5 gap-4 items-center hover:bg-gray-800 p-4 rounded transition">
+                                            <div class="font-mono text-yellow-400 text-xl font-black">LS-002</div>
+                                            <div class="font-mono text-white text-lg">ART-12342</div>
+                                            <div class="font-black text-green-400 text-lg">✅ OK</div>
+                                            <div class="font-black text-white text-lg">50</div>
+                                            <button class="bg-yellow-400 text-gray-950 font-black py-2 px-4 rounded-lg hover:bg-yellow-300">DETAILS</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Status Indicators -->
+                            <div class="p-6 grid grid-cols-4 gap-4">
+                                <div class="bg-green-900 border-4 border-green-400 rounded-xl p-4 text-center">
+                                    <p class="text-3xl font-black text-green-400">✅</p>
+                                    <p class="text-lg font-black text-green-400 mt-2">SYSTEM OK</p>
+                                </div>
+                                <div class="bg-blue-900 border-4 border-blue-400 rounded-xl p-4 text-center">
+                                    <p class="text-3xl font-black text-blue-400">📡</p>
+                                    <p class="text-lg font-black text-blue-400 mt-2">ONLINE</p>
+                                </div>
+                                <div class="bg-yellow-900 border-4 border-yellow-400 rounded-xl p-4 text-center">
+                                    <p class="text-3xl font-black text-yellow-400">⚠️</p>
+                                    <p class="text-lg font-black text-yellow-400 mt-2">ISSUES: 2</p>
+                                </div>
+                                <div class="bg-purple-900 border-4 border-purple-400 rounded-xl p-4 text-center">
+                                    <p class="text-3xl font-black text-purple-400">📦</p>
+                                    <p class="text-lg font-black text-purple-400 mt-2">245</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-bold mb-3">4. Dark Mode UI</h3>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="font-bold text-gray-700">Best For:</p>
+                                <p class="text-gray-600">Night shifts, low-light warehouse</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Bundle Size:</p>
+                                <p class="text-blue-600">2 MB ⚡</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Key Features:</p>
+                                <ul class="text-gray-600 list-disc list-inside space-y-1">
+                                    <li>High contrast (yellow/white)</li>
+                                    <li>Extra large fonts</li>
+                                    <li>Reduced eye strain</li>
+                                    <li>Big buttons</li>
+                                    <li>Clear status indicators</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Colors:</p>
+                                <p class="text-gray-600">🟨 Yellow, 🟩 Green, 🟥 Red (high visibility)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOCKUP 5: COMPONENT-BASED -->
+        <div id="mockup-4" class="mockup-container">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="mockup-frame bg-gray-50">
+                        <!-- Component-Based UI Content -->
+                        <div class="h-full flex flex-col">
+                            <!-- Header -->
+                            <div class="bg-white border-b border-gray-200 p-6">
+                                <h2 class="text-2xl font-bold text-gray-900">Component-Based Architecture</h2>
+                                <p class="text-gray-600 mt-2">Modern, Type-Safe TypeScript/React Foundation</p>
+                            </div>
+
+                            <!-- Component Showcase -->
+                            <div class="flex-1 overflow-auto p-6 space-y-4">
+                                <!-- Component Cards -->
+                                <div class="grid grid-cols-3 gap-4 mb-6">
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                                        <p class="text-2xl mb-2">📋</p>
+                                        <p class="font-bold text-sm">ItemTable</p>
+                                        <p class="text-xs text-gray-600">100-150 LoC</p>
+                                    </div>
+                                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                                        <p class="text-2xl mb-2">🔍</p>
+                                        <p class="font-bold text-sm">FilterBar</p>
+                                        <p class="text-xs text-gray-600">100-150 LoC</p>
+                                    </div>
+                                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+                                        <p class="text-2xl mb-2">🏷️</p>
+                                        <p class="font-bold text-sm">StatusBadge</p>
+                                        <p class="text-xs text-gray-600">50 LoC</p>
+                                    </div>
+                                </div>
+
+                                <!-- Filter Bar Example -->
+                                <div class="bg-white border border-gray-300 rounded-lg p-4 space-y-4">
+                                    <p class="font-bold text-gray-900">FilterBar Component</p>
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <input type="text" placeholder="Search..." class="px-3 py-2 border border-gray-300 rounded text-sm">
+                                        <select class="px-3 py-2 border border-gray-300 rounded text-sm">
+                                            <option>All</option>
+                                        </select>
+                                        <select class="px-3 py-2 border border-gray-300 rounded text-sm">
+                                            <option>Today</option>
+                                        </select>
+                                        <select class="px-3 py-2 border border-gray-300 rounded text-sm">
+                                            <option>Newest</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Data Table Example -->
+                                <div class="bg-white border border-gray-300 rounded-lg overflow-hidden">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th class="px-4 py-2 text-left font-bold">Delivery</th>
+                                                <th class="px-4 py-2 text-left font-bold">Article</th>
+                                                <th class="px-4 py-2 text-left font-bold">Status</th>
+                                                <th class="px-4 py-2 text-right font-bold">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                                <td class="px-4 py-2 font-mono text-blue-600">LS-2024-001</td>
+                                                <td class="px-4 py-2 font-mono">ART-123</td>
+                                                <td class="px-4 py-2"><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">OK</span></td>
+                                                <td class="px-4 py-2 text-right"><button class="text-blue-600 text-xs font-bold">Edit</button></td>
+                                            </tr>
+                                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                                <td class="px-4 py-2 font-mono text-blue-600">LS-2024-002</td>
+                                                <td class="px-4 py-2 font-mono">ART-124</td>
+                                                <td class="px-4 py-2"><span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-bold">Pending</span></td>
+                                                <td class="px-4 py-2 text-right"><button class="text-blue-600 text-xs font-bold">Edit</button></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Code Example -->
+                                <div class="bg-gray-800 text-gray-100 p-4 rounded-lg font-mono text-xs overflow-auto max-h-32">
+                                    <pre><span class="text-blue-400">interface</span> ItemTableProps {
+  items: Item[];
+  onEdit: (item: Item) => <span class="text-purple-400">void</span>;
+  onDelete: (itemId: <span class="text-green-400">string</span>) => <span class="text-purple-400">void</span>;
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-xl font-bold mb-3">5. Component-Based 🏗️</h3>
+                        <p class="text-xs text-blue-600 font-bold mb-3">FOUNDATION FOR ALL DESIGNS</p>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <p class="font-bold text-gray-700">Best For:</p>
+                                <p class="text-gray-600">Foundation for all 5 UIs</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Bundle Size:</p>
+                                <p class="text-blue-600">4 MB</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Key Features:</p>
+                                <ul class="text-gray-600 list-disc list-inside space-y-1">
+                                    <li>Type-safe TypeScript</li>
+                                    <li>Reusable components</li>
+                                    <li>Clear interfaces</li>
+                                    <li>Unit testable</li>
+                                    <li>Highly scalable</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-700">Approach:</p>
+                                <p class="text-gray-600">Build components once, use in all 5 views</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mt-8">
+            <h2 class="text-2xl font-bold mb-6">📊 Design Comparison Matrix</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left font-bold">Aspect</th>
+                            <th class="px-4 py-2 text-center font-bold">Minimalist</th>
+                            <th class="px-4 py-2 text-center font-bold">Enterprise ⭐</th>
+                            <th class="px-4 py-2 text-center font-bold">Mobile</th>
+                            <th class="px-4 py-2 text-center font-bold">Dark Mode</th>
+                            <th class="px-4 py-2 text-center font-bold">Component</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2 font-bold">Bundle Size</td>
+                            <td class="px-4 py-2 text-center text-green-600">2 MB ⚡</td>
+                            <td class="px-4 py-2 text-center">5 MB</td>
+                            <td class="px-4 py-2 text-center text-green-600">3 MB ⚡</td>
+                            <td class="px-4 py-2 text-center text-green-600">2 MB ⚡</td>
+                            <td class="px-4 py-2 text-center">4 MB</td>
+                        </tr>
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2 font-bold">Performance</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐</td>
+                        </tr>
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2 font-bold">Maintainability</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                        </tr>
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2 font-bold">Mobile-Friendly</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐</td>
+                            <td class="px-4 py-2 text-center">⭐⭐⭐⭐</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 font-bold">Admin Features</td>
+                            <td class="px-4 py-2 text-center">Low</td>
+                            <td class="px-4 py-2 text-center">Very High</td>
+                            <td class="px-4 py-2 text-center">Medium</td>
+                            <td class="px-4 py-2 text-center">Low</td>
+                            <td class="px-4 py-2 text-center">High</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recommendation -->
+        <div class="bg-blue-50 border-2 border-blue-500 rounded-lg p-6 mt-8">
+            <h2 class="text-2xl font-bold text-blue-900 mb-4">🎯 Recommended Approach: HYBRID</h2>
+            <p class="text-gray-700 mb-4">
+                Use <strong>Component-Based Architecture</strong> as the foundation, then create variant views for different user roles:
+            </p>
+            <div class="bg-white rounded p-4 font-mono text-sm mb-4">
+                Component-Based Foundation<br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;↓<br/>
+                ┌─ Minimalist (Warehouse Workers)<br/>
+                ├─ Enterprise (Managers) ⭐<br/>
+                ├─ Mobile-First (Tablets)<br/>
+                └─ Dark Mode (Night Shifts)
+            </div>
+            <p class="text-gray-700">
+                <strong>Benefits:</strong> Code reuse, flexibility, maintainability, scalability, consistency
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function showMockup(index) {
+            // Hide all mockups
+            document.querySelectorAll('.mockup-container').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-button').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                el.classList.remove('bg-blue-500', 'text-white');
+            });
+
+            // Show selected mockup
+            document.getElementById(`mockup-${index}`).classList.add('active');
+
+            // Highlight button
+            const button = event.target;
+            button.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            button.classList.add('bg-blue-500', 'text-white', 'active');
+        }
+    </script>
+</body>
+</html>
