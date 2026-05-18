@@ -132,6 +132,83 @@ class OrderService:
             )
             raise
 
+    def create_order_with_date(
+        self,
+        order_number: str,
+        order_date: date,
+        employee_name: str = "Claude-Import",
+        supplier_id: Optional[str] = None,
+        expected_delivery_date: Optional[date] = None,
+    ) -> str:
+        """
+        Erstellt eine Order mit order_date oder aktualisiert eine existierende Order.
+
+        Diese Methode wird verwendet, um Orders aus XML-Parsing zu erstellen,
+        wo die order_date aus dem Lieferschein-Item extrahiert wird.
+
+        Args:
+            order_number: Eindeutige Bestellnummer
+            order_date: Bestelldatum (MUSS gesetzt sein!)
+            employee_name: Bearbeitender Mitarbeiter (default: Claude-Import)
+            supplier_id: Lieferanten-ID (optional, wird ermittelt falls nicht vorhanden)
+            expected_delivery_date: Erwartetes Lieferdatum (optional)
+
+        Returns:
+            Bestellnummer der erstellten/aktualisierten Order
+        """
+        try:
+            logger.info(
+                "Create or update order: %s with order_date %s",
+                order_number,
+                order_date
+            )
+
+            # Prüfe, ob Order bereits existiert
+            if self.order_repo.exists_domain(order_number):
+                # Update existing order with order_date
+                logger.info("Order %s exists, updating with order_date", order_number)
+                success = self.update_order(
+                    order_number=order_number,
+                    order_date=order_date,
+                    employee_name=employee_name,
+                    expected_delivery_date=expected_delivery_date
+                )
+                if success:
+                    return order_number
+                else:
+                    raise Exception(f"Failed to update order {order_number}")
+            else:
+                # Create new order with order_date
+                logger.info("Order %s does not exist, creating new order", order_number)
+
+                # Use provided supplier_id or default to empty (will be filled by user later)
+                final_supplier_id = supplier_id or ""
+
+                # Create new order with order_date
+                return self.create_order(
+                    order_number=order_number,
+                    supplier_id=final_supplier_id,
+                    order_date=order_date,
+                    employee_name=employee_name,
+                    expected_delivery_date=expected_delivery_date,
+                )
+
+        except OrderAlreadyCompletedException as e:
+            # Order exists and is completed - cannot update, but don't fail
+            logger.warning(
+                "Order %s is already completed, cannot update with order_date: %s",
+                order_number,
+                e
+            )
+            return order_number
+        except Exception as e:
+            logger.error(
+                "Error creating/updating order %s with order_date: %s",
+                order_number,
+                e
+            )
+            raise
+
     def get_order(self, order_number: str) -> Optional[Dict[str, Any]]:
         """
         Holt eine Order mit allen Details.
