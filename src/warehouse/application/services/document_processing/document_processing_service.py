@@ -15,6 +15,7 @@ from .prompt_template_manager import DocumentType as PromptDocumentType
 from ..document_generation.document_types import DocumentType
 from .document_validator import document_validator
 from .document_cache import document_cache
+from .xml_delivery_parser import XMLDeliveryParser
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class UnifiedDocumentProcessingService:
         self.prompt_manager = prompt_manager
         self.validator = document_validator
         self.logger = logger
+        self.xml_parser = XMLDeliveryParser()
 
     def process_document(
         self,
@@ -102,8 +104,25 @@ class UnifiedDocumentProcessingService:
 
         Diese Phase cached nur die reine Claude API Extraktion,
         ohne validation-spezifische expected_* values zu berücksichtigen.
+
+        NEUERUNG: Prüft zuerst auf XML-Format für direktes Parsing ohne AI.
         """
         try:
+            # 0. XML-Parsing Check (vor Cache-Check)
+            if document_type == "delivery":
+                if self.xml_parser.is_xml_delivery(document_data):
+                    self.logger.info("XML delivery detected - parsing directly without AI")
+                    xml_result = self.xml_parser.parse_xml_delivery(document_data)
+                    if xml_result:
+                        self.logger.info(f"Successfully parsed XML delivery: {xml_result.get('delivery_number')}")
+                        return self._add_processing_metadata(
+                            xml_result,
+                            from_cache=False,
+                            validation_errors=[]
+                        )
+                    else:
+                        self.logger.warning("XML parsing failed, falling back to Claude API")
+
             # 1. Cache Check (mit gefiltertem Context ohne expected_* keys)
             cache_key = self.cache.generate_cache_key(document_data, document_type, context)
             cached_result = self.cache.get_cached_result(cache_key)

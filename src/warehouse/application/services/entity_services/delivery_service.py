@@ -9,7 +9,7 @@ mit Infrastructure. Angepasst an deine exakte Projektstruktur.
 
 # Standard library imports
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, Any, List, Optional
 
 # Domain imports
@@ -866,6 +866,56 @@ class DeliveryService:
                     )
 
                     item_result = item_service.create_item(**item_create_data)
+
+                    # Handle order_date: Create or update Order with order_date if available
+                    order_number = item.get("order_number", "").strip() if isinstance(item.get("order_number"), str) else ""
+                    order_date_str = item.get("order_date", "").strip() if isinstance(item.get("order_date"), str) else ""
+
+                    if order_number and order_date_str:
+                        try:
+                            # Parse order_date
+                            order_date_obj: date | None = None
+                            if isinstance(order_date_str, str):
+                                for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%m/%d/%Y"]:
+                                    try:
+                                        order_date_obj = datetime.strptime(
+                                            order_date_str, fmt
+                                        ).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                            elif isinstance(order_date_str, date):
+                                order_date_obj = order_date_str
+
+                            if order_date_obj is not None:
+                                # Import order service
+                                from .order_service import OrderService
+                                order_service = OrderService()
+
+                                # Try to create or update order with order_date
+                                try:
+                                    order_service.create_order_with_date(
+                                        order_number=order_number,
+                                        order_date=order_date_obj,
+                                        employee_name=delivery_data.get("employee_name", "Claude-Import")
+                                    )
+                                    logger.info(
+                                        "Order '%s' created/updated with date %s",
+                                        order_number,
+                                        order_date_obj
+                                    )
+                                except Exception as order_error:
+                                    logger.warning(
+                                        "Could not create/update order '%s': %s",
+                                        order_number,
+                                        order_error
+                                    )
+                        except Exception as e:
+                            logger.warning(
+                                "Error processing order_date for order '%s': %s",
+                                order_number,
+                                e
+                            )
 
                     # Handle both string (item_id) and dict return types
                     if item_result:
