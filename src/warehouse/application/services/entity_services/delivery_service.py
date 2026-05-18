@@ -9,7 +9,7 @@ mit Infrastructure. Angepasst an deine exakte Projektstruktur.
 
 # Standard library imports
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, Any, List, Optional
 
 # Domain imports
